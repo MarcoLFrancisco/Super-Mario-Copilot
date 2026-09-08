@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#09112b">
-  <meta name="description" content="An original cloud-hopping platform adventure inspired by Copilot and Microsoft productivity apps.">
+  <meta name="description" content="A fan-made Mario platform adventure through Microsoft-themed worlds. Collect Outlook emails, Excel sheets, Copilot icons, and Teams conversations.">
   <title>Copilot Cloud Quest</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./src/main.js"></script>
@@ -37,7 +37,7 @@
 
       <dl class="hud" aria-label="Game statistics">
         <div class="hud-item"><dt>Score</dt><dd id="score-value">0</dd></div>
-        <div class="hud-item"><dt>Prompt sparks</dt><dd><span id="sparks-value">0</span> / <span id="sparks-total">—</span></dd></div>
+        <div class="hud-item"><dt>App collectibles</dt><dd><span id="sparks-value">0</span> / <span id="sparks-total">—</span></dd></div>
         <div class="hud-item"><dt>Combo</dt><dd id="combo-value">×1</dd></div>
         <div class="hud-item"><dt>Checkpoint</dt><dd id="checkpoint-value">Launchpad</dd></div>
         <div class="hud-item"><dt>Copilot boost</dt><dd id="boost-value">Ready</dd></div>
@@ -51,14 +51,14 @@
         <section class="game-overlay" id="start-panel" aria-labelledby="start-title">
           <p class="eyebrow">Your next great idea is one jump away</p>
           <h2 id="start-title">Jump into the connected cloud.</h2>
-          <p id="game-objective">Guide your cloud explorer across Excel terraces, Outlook mailways, and Teams skybridges. Collect prompt sparks, discover hidden routes, and reach the Copilot beacon.</p>
+          <p id="game-objective">Guide Mario across Excel terraces, Outlook mailways, and Teams skybridges. Collect Excel sheets, Outlook emails, Teams conversations, and Copilot icons. Discover upper routes with double-value collectibles and reach the Copilot beacon.</p>
           <ul class="feature-pills" aria-label="Adventure features">
             <li>Handcrafted world</li>
-            <li>Hidden spark trails</li>
+            <li>Four app collectible types</li>
             <li>Friendly checkpoints</li>
           </ul>
           <button id="start-button" class="primary-button" type="button" disabled>Start adventure</button>
-          <p id="load-status" role="status">Game shell ready. The remaining game files must be integrated before play is available.</p>
+          <p id="load-status" role="status">Loading the adventure. If Start stays disabled, check that JavaScript is enabled and all game modules are served over HTTP.</p>
         </section>
 
         <section class="game-overlay" id="pause-panel" aria-labelledby="pause-title" hidden>
@@ -77,7 +77,7 @@
           <p id="completion-summary">The cloud is shining a little brighter.</p>
           <dl class="results">
             <div><dt>Final score</dt><dd id="final-score">0</dd></div>
-            <div><dt>Sparks discovered</dt><dd id="final-sparks">0</dd></div>
+            <div><dt>Items collected</dt><dd id="final-sparks">0</dd></div>
             <div><dt>Best combo</dt><dd id="final-combo">×1</dd></div>
           </dl>
           <button id="replay-button" class="primary-button" type="button">Explore again</button>
@@ -97,6 +97,25 @@
           </div>
         </div>
       </div>
+      <section class="controls-bar" aria-labelledby="audio-title" aria-describedby="audio-status">
+        <h3 id="audio-title">Sound studio</h3>
+        <p id="audio-status" role="status">The new music and effects controls await the next integration step. The header Sound button still controls the existing action tones.</p>
+        <fieldset id="audio-settings" disabled>
+          <legend>Independent music and effects controls</legend>
+          <p>
+            <button id="music-button" type="button" aria-pressed="false">Music: off</button>
+            <label for="music-volume">Music volume</label>
+            <input id="music-volume" type="range" min="0" max="100" step="5" value="45" aria-describedby="music-help">
+          </p>
+          <p id="music-help">Original synthesized platformer music with melody, bass, chords, and percussion. No Nintendo recordings are used.</p>
+          <p>
+            <button id="effects-button" type="button" aria-pressed="false">Effects: off</button>
+            <label for="effects-volume">Effects volume</label>
+            <input id="effects-volume" type="range" min="0" max="100" step="5" value="65" aria-describedby="effects-help">
+          </p>
+          <p id="effects-help">App-specific pickups, jumping, boosts, checkpoint jingles, and a victory fanfare. New audio playback will require user activation.</p>
+        </fieldset>
+      </section>
       <p id="game-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
     </section>
 
@@ -109,28 +128,28 @@
         <article class="guide-card" data-app="excel">
           <span class="app-token" aria-hidden="true">X</span>
           <h3>Excel terraces</h3>
-          <p>Find your footing on luminous cell platforms. Look above the obvious path for extra sparks.</p>
+          <p>Collect green Excel sheets above luminous cell platforms. Explore the upper route for double-value sheets marked with a golden ring.</p>
         </article>
         <article class="guide-card" data-app="outlook">
           <span class="app-token" aria-hidden="true">O</span>
           <h3>Outlook mailways</h3>
-          <p>Follow the floating envelopes through the cloud. Checkpoint beacons make missed jumps forgiving.</p>
+          <p>Collect Outlook email envelopes along the mailways. Activate checkpoint flags to make missed jumps forgiving.</p>
         </article>
         <article class="guide-card" data-app="teams">
           <span class="app-token" aria-hidden="true">T</span>
           <h3>Teams skybridges</h3>
-          <p>Hop across the meeting skyline and keep your spark streak going to build a bigger combo.</p>
+          <p>Collect purple Teams conversation bubbles across the meeting skyline. Pick up items quickly to build your combo up to ×8.</p>
         </article>
         <article class="guide-card" data-app="copilot">
           <span class="app-token" aria-hidden="true">✦</span>
           <h3>Copilot boost</h3>
-          <p>Use a burst of forward momentum to reach farther platforms. Watch the HUD for boost readiness.</p>
+          <p>Collect multicolor Copilot ribbon icons on the final stretch. Use Shift for a forward boost and watch the HUD for cooldown readiness.</p>
         </article>
       </div>
     </section>
 
     <footer class="site-footer">
-      <p>Original fan-made platform adventure. Not affiliated with or endorsed by Microsoft or Nintendo. Microsoft application names belong to their respective owners; app motifs are illustrative, not official assets.</p>
+      <p>Unofficial fan-made platform adventure featuring custom procedural Mario artwork. Mario belongs to Nintendo. Microsoft application names and marks belong to Microsoft. Not affiliated with or endorsed by either company. App illustrations are not official assets.</p>
       <p>No sign-in, purchases, or external Microsoft services required.</p>
     </footer>
   </main>
