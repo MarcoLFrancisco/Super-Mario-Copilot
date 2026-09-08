@@ -25,8 +25,18 @@ export const PHYSICS = Object.freeze({
 export const APPS = Object.freeze({
   excel: Object.freeze({ label: 'Excel', glyph: 'X', color: '#37d99b', dark: '#125440' }),
   outlook: Object.freeze({ label: 'Outlook', glyph: 'O', color: '#54c6ff', dark: '#124e80' }),
+  word: Object.freeze({ label: 'Word', glyph: 'W', color: '#73adff', dark: '#185abd' }),
   teams: Object.freeze({ label: 'Teams', glyph: 'T', color: '#b0a0ff', dark: '#443881' }),
   copilot: Object.freeze({ label: 'Copilot', glyph: '✦', color: '#f2a8e1', dark: '#653a7d' })
+});
+
+// In-game achievements only: these do not perform Microsoft service actions.
+export const PRODUCTIVITY = Object.freeze({
+  outlook: 'Emails reviewed',
+  excel: 'Excel files created',
+  word: 'Word docs created',
+  teams: 'Teams conversations completed',
+  copilot: 'Copilot prompts completed'
 });
 
 const platforms = [];
@@ -94,7 +104,10 @@ for (const surface of platforms) {
       y: surface.y - (overHazard ? 95 : 58),
       radius: 11,
       secret: surface.kind === 'secret',
-      app: surface.app
+      // Replace the last item of longer trails, preserving IDs, positions,
+      // total count, and the original app on every platform. Short optional
+      // trails retain their app; longer upper trails also contain Word docs.
+      app: count >= 3 && i === count - 1 ? 'word' : surface.app
     });
   }
 }
@@ -145,6 +158,21 @@ export const LEVEL = deepFreeze({
   signs,
   goal: { x: 7470, y: 465, w: 70, h: 130 }
 });
+
+// Derive counters from collected IDs instead of maintaining duplicate state.
+// This prevents checkpoint respawns or repeated events from double counting.
+// Unknown IDs (including combat rewards) are intentionally ignored.
+export function productivityCounts(collected) {
+  const counts = Object.fromEntries(Object.keys(PRODUCTIVITY).map(app => [app, 0]));
+  for (const item of LEVEL.sparks) {
+    if (collected.has(item.id) && Object.hasOwn(counts, item.app)) counts[item.app] += 1;
+  }
+  return counts;
+}
+
+export const PRODUCTIVITY_TOTALS = Object.freeze(
+  productivityCounts(new Set(LEVEL.sparks.map(item => item.id)))
+);
 
 export function zoneAt(x) {
   return LEVEL.zones.find(zone => x >= zone.x && x < zone.end)
