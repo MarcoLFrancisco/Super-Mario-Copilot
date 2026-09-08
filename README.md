@@ -353,3 +353,14 @@ Files in the approved proposal:
 - src/enemy-art.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-45 -->
+### Merged change: Add AI boss artwork, datacenter arena, and attack telegraphs
+
+Merged pull request #45: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/45
+
+Files in the approved proposal:
+- src/boss-art.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
