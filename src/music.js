@@ -97,6 +97,79 @@ export function musicStep(index) {
   return events;
 }
 
+// Original boss arrangement: same clock and event schema as musicStep.
+// Sharing SCORE timing keeps note envelopes and the scheduler compatible.
+// Phase changes alter orchestration, not tempo or overall output gain.
+export const BOSS_SCORE = Object.freeze({
+  ...SCORE,
+  title: 'The Hallucination Engine'
+});
+
+// A minor -> F -> D minor -> E dominant; a contrasting bridge returns
+// through the dominant so the sixteen-bar loop resolves into its opening.
+const bossHarmony = freeze([
+  [45, 57, 60, 64], [45, 57, 60, 64],
+  [41, 57, 60, 65], [40, 56, 59, 64],
+  [45, 57, 60, 64], [41, 57, 60, 65],
+  [38, 57, 62, 65], [40, 56, 59, 64],
+  [41, 57, 60, 65], [43, 55, 59, 62],
+  [45, 57, 60, 64], [40, 56, 59, 64],
+  [38, 57, 62, 65], [41, 57, 60, 65],
+  [40, 56, 59, 64], [40, 56, 59, 64]
+]);
+
+// Sparse opening motif leaves room for attack warnings and sound effects.
+// Each entry is [sixteenth-note position, pitch, duration in beats].
+const bossMotifs = freeze([
+  [[0, 76, .4], [3, 72, .2], [6, 69, .6], [10, 71, .35], [14, 72, .3]],
+  [[0, 69, .65], [4, 76, .4], [7, 79, .2], [10, 76, .5], [14, 72, .3]],
+  [[0, 77, .5], [4, 76, .3], [7, 72, .2], [10, 69, .5], [14, 72, .3]],
+  [[0, 76, .5], [4, 71, .35], [7, 68, .2], [10, 71, .4], [14, 68, .3]],
+  [[0, 81, .5], [3, 76, .2], [6, 72, .4], [10, 76, .5], [14, 79, .3]],
+  [[0, 81, .6], [4, 77, .4], [8, 76, .4], [11, 72, .2], [14, 69, .3]],
+  [[0, 74, .5], [3, 77, .2], [6, 81, .5], [10, 77, .4], [14, 74, .3]],
+  [[0, 80, .5], [4, 76, .4], [8, 71, .5], [12, 68, .5]]
+]);
+
+export function bossMusicStep(index, phase = 0) {
+  if (!Number.isSafeInteger(index) || index < 0) return [];
+  const intensity = Number.isFinite(phase) ? Math.max(0, Math.min(2, Math.floor(phase))) : 0;
+  const position = index % BOSS_SCORE.loopSteps;
+  const bar = Math.floor(position / 16);
+  const step = position % 16;
+  const chord = bossHarmony[bar];
+  const events = [];
+  const add = (voice, midi, beats, gain, pan = 0) => {
+    events.push({ voice, midi, beats, gain, pan });
+  };
+  for (const [at, pitch, duration] of bossMotifs[bar % bossMotifs.length]) {
+    if (step === at) add('lead', pitch, duration, .095, -.12);
+  }
+  // Driving octave bass, with a syncopated turnaround every fourth bar.
+  if (step % 2 === 0) {
+    const interval = [0, 12, 0, 7, 0, 12, 7, 12][step / 2];
+    add('bass', chord[0] + interval, .32, .125);
+  }
+  if (step === 0 || step === 8) {
+    chord.slice(1).forEach((pitch, i) => add('chord', pitch, .85, .025, (i - 1) * .35));
+  }
+  if (step === 0 || step === 8 || (intensity > 0 && step === 6)) add('kick', null, .2, .17);
+  if (step === 4 || step === 12) add('snare', null, .16, .06);
+  if (step % 2 === 0) add('hat', null, .06, .02, -.25);
+  // Agent Swarm adds a quiet interlocking high-register sequence.
+  if (intensity > 0 && step % 4 === 2) {
+    const pitch = chord[1 + Math.floor(step / 4) % 3] + 12;
+    add('bell', pitch, .2, .03, .3);
+  }
+  // Context Collapse adds offbeat hats and a short turnaround, rather
+  // than increasing every instrument's gain and masking combat cues.
+  if (intensity === 2 && step % 4 === 3) add('hat', null, .05, .018, .25);
+  if (intensity === 2 && bar % 4 === 3 && (step === 13 || step === 15)) {
+    add('snare', null, .1, .035);
+  }
+  return events;
+}
+
 // Jingle offsets and durations are beats at SCORE.bpm, not seconds.
 // Playback belongs to the effects bus, independent of the background music.
 export const JINGLES = freeze({
