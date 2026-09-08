@@ -531,3 +531,14 @@ Files in the approved proposal:
 - src/boss-dialogue.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-69 -->
+### Merged change: Add moving AI core, combat reactions, and dialogue events
+
+Merged pull request #69: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/69
+
+Files in the approved proposal:
+- src/boss.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
