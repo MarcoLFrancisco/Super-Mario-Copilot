@@ -430,3 +430,14 @@ Files in the approved proposal:
 - src/audio.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-59 -->
+### Merged change: Add combat HUD, productivity counters, and fire-control markup
+
+Merged pull request #59: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/59
+
+Files in the approved proposal:
+- index.html
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
