@@ -196,3 +196,14 @@ Files in the approved proposal:
 - src/collectibles.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-21 -->
+### Merged change: Add layered Microsoft-themed scenery and dimensional platforms
+
+Merged pull request #21: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/21
+
+Files in the approved proposal:
+- src/scenery.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
