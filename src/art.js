@@ -1,9 +1,99 @@
 import { LEVEL, VIEW, APPS, PHYSICS, zoneAt } from './level.js';
+import { drawCharacter } from './character.js';
+import { drawCollectible, drawPickup } from './collectibles.js';
+import { drawBackground, drawPlatform } from './scenery.js';
+
+// Transient visuals stay outside simulation state and reset with each run.
+const visuals = new WeakMap();
+function renderUpgrade(ctx, state, reducedMotion) {
+  let effects = visuals.get(state);
+  if (!effects) {
+    effects = { seen: new Set(state.collected), pickups: [] };
+    visuals.set(state, effects);
+  }
+  for (const item of LEVEL.sparks) {
+    if (state.collected.has(item.id) && !effects.seen.has(item.id)) {
+      effects.seen.add(item.id);
+      effects.pickups.push({ item, startedAt: state.time });
+    }
+  }
+  effects.pickups = effects.pickups.filter(effect => state.time - effect.startedAt < .55);
+  const camera = state.cameraX;
+  const visible = (x, width = 50) => x + width > camera - 80 && x < camera + VIEW.width + 80;
+  const rect = (x, y, w, h, color) => {
+    ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
+  };
+  const label = (text, x, y, size = 13) => {
+    ctx.font = `600 ${size}px 'Segoe UI', sans-serif`;
+    ctx.lineWidth = 3; ctx.strokeStyle = '#143652';
+    ctx.strokeText(text, x, y); ctx.fillStyle = '#ffffff'; ctx.fillText(text, x, y);
+  };
+  ctx.save();
+  try {
+    ctx.setTransform(ctx.canvas.width / VIEW.width, 0, 0, ctx.canvas.height / VIEW.height, 0, 0);
+    drawBackground(ctx, camera, zoneAt(state.player.x), state.time, reducedMotion);
+    ctx.translate(-camera, 0);
+    for (const platform of LEVEL.platforms) {
+      if (visible(platform.x, platform.w)) drawPlatform(ctx, platform, state.time, reducedMotion);
+    }
+    for (const item of LEVEL.sparks) {
+      if (visible(item.x) && !state.collected.has(item.id)) {
+        drawCollectible(ctx, item, state.time, reducedMotion);
+      }
+    }
+    for (const hazard of LEVEL.hazards) {
+      if (!visible(hazard.x, hazard.w)) continue;
+      rect(hazard.x, hazard.y, hazard.w, hazard.h, '#641c49');
+      rect(hazard.x, hazard.y, hazard.w, 3, '#ff9eb9');
+      for (let x = hazard.x + 3; x < hazard.x + hazard.w - 3; x += 10) {
+        rect(x, hazard.y + 5, 5, 5, '#ff5a86');
+      }
+      label('!', hazard.x + hazard.w / 2 - 3, hazard.y + 22, 15);
+    }
+    LEVEL.checkpoints.forEach((checkpoint, index) => {
+      if (!visible(checkpoint.x)) return;
+      const active = index <= state.checkpointIndex;
+      rect(checkpoint.x - 3, checkpoint.y - 91, 6, 91, '#345375');
+      rect(checkpoint.x - 1, checkpoint.y - 91, 2, 91, '#e9fbff');
+      rect(checkpoint.x + 3, checkpoint.y - 88, 35, 23, active ? '#137f58' : '#546c96');
+      label(active ? '✓' : 'C', checkpoint.x + 13, checkpoint.y - 71, 16);
+      rect(checkpoint.x - 10, checkpoint.y - 5, 20, 5, '#e4f7ff');
+    });
+    for (const sign of LEVEL.signs) {
+      if (visible(sign.x, 350)) label(sign.text, sign.x, sign.y);
+    }
+    const goal = LEVEL.goal;
+    if (visible(goal.x, goal.w)) {
+      rect(goal.x, goal.y, 7, goal.h, '#566bad');
+      rect(goal.x + goal.w - 7, goal.y, 7, goal.h, '#566bad');
+      rect(goal.x + 2, goal.y, 2, goal.h, '#beffff');
+      rect(goal.x + goal.w - 5, goal.y, 2, goal.h, '#fbd2ff');
+      rect(goal.x, goal.y - 5, goal.w, 9, '#c1bdff');
+      rect(goal.x, goal.y + goal.h - 9, goal.w, 9, '#ecf7ff');
+      drawCollectible(ctx, { x: goal.x + goal.w / 2, y: goal.y + 48,
+        radius: 23, app: 'copilot', secret: false }, state.time, reducedMotion);
+      label('FINISH', goal.x + 9, goal.y - 15, 12);
+    }
+    drawCharacter(ctx, state.player, state.time, reducedMotion);
+    for (const effect of effects.pickups) {
+      if (visible(effect.item.x)) {
+        drawPickup(ctx, effect.item, state.time - effect.startedAt, 0, reducedMotion);
+      }
+    }
+  } finally {
+    ctx.restore();
+  }
+}
 
 // Renderer contract: player {x,y,vx,facing,boostTime}, cameraX,
 // collected Set of spark IDs, checkpointIndex, time (seconds), status.
 // Rendering never changes simulation state. Coordinates remain 1280 × 720.
 export function render(ctx, state, reducedMotion = false) {
+  return renderUpgrade(ctx, state, reducedMotion);
+}
+
+// Legacy renderer retained temporarily; it is not called by the application.
+function renderLegacy(ctx, state, reducedMotion = false) {
   const t = reducedMotion ? 0 : state.time;
   const camera = state.cameraX;
   const zone = zoneAt(state.player.x);
