@@ -31,3 +31,14 @@ Files in the approved proposal:
 - styles.css
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-7 -->
+### Merged change: Add handcrafted Microsoft-themed platform level
+
+Merged pull request #7: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/7
+
+Files in the approved proposal:
+- src/level.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
