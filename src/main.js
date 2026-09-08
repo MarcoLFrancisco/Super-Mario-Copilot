@@ -20,6 +20,77 @@ const audio = createAudio();
 const enabled = { music: false, effects: false };
 const items = new Map(LEVEL.sparks.map(item => [item.id, item]));
 let audioBusy = false;
+const speech = window.speechSynthesis;
+const speechAvailable = Boolean(speech && window.SpeechSynthesisUtterance);
+let voiceEnabled = false;
+let utterance = null;
+let speechTimer;
+let captionBoss = null;
+let captionId = 0;
+function cancelSpeech() {
+  clearTimeout(speechTimer);
+  if (utterance) {
+    utterance.onend = null; utterance.onerror = null;
+    utterance = null;
+    try { speech.cancel(); } catch { /* Captions remain available. */ }
+  }
+}
+function voiceControls() {
+  el('boss-voice-button').setAttribute('aria-pressed', String(voiceEnabled));
+  text('boss-voice-button', `Boss voice: ${voiceEnabled ? 'on' : 'off'}`);
+}
+function speakCaption(caption) {
+  cancelSpeech();
+  if (!voiceEnabled || !speechAvailable || document.hidden || !document.hasFocus()) return;
+  if (!playing() && state.status !== 'complete') return;
+  try {
+    const line = new SpeechSynthesisUtterance(caption.text);
+    line.lang = 'en-US'; line.rate = 1.05; line.pitch = .8; line.volume = .65;
+    const voices = speech.getVoices();
+    const local = voices.find(v => v.localService && /^en(?:-|$)/i.test(v.lang));
+    if (local) line.voice = local;
+    utterance = line;
+    line.onend = () => {
+      if (utterance === line) { clearTimeout(speechTimer); utterance = null; }
+    };
+    line.onerror = () => {
+      if (utterance !== line) return;
+      cancelSpeech(); voiceEnabled = false; voiceControls(); audioControls();
+      text('boss-voice-status', 'Speech unavailable or blocked. Captions remain available; you can retry the voice toggle.');
+    };
+    speech.speak(line);
+    // Do not leave delayed browser speech queued beyond its caption window.
+    speechTimer = setTimeout(cancelSpeech, Math.max(1, caption.remaining) * 1000);
+  } catch {
+    cancelSpeech(); voiceEnabled = false; voiceControls(); audioControls();
+    text('boss-voice-status', 'Speech unavailable. Dialogue captions still work.');
+  }
+}
+function syncDialogue() {
+  const boss = started && state.stage === 'boss' ? state.boss : null;
+  if (boss !== captionBoss) {
+    cancelSpeech(); captionBoss = boss; captionId = 0;
+    text('boss-caption', '');
+  }
+  const caption = boss?.dialogue.current;
+  el('boss-dialogue-panel').hidden = !boss;
+  if (caption && caption.id !== captionId) {
+    captionId = caption.id;
+    text('boss-caption', caption.text);
+    speakCaption(caption);
+  } else if (!caption) {
+    cancelSpeech();
+    // Retain the last line for reading until the next line or encounter reset.
+  }
+}
+el('boss-voice-button').addEventListener('click', () => {
+  if (!speechAvailable) return;
+  voiceEnabled = !voiceEnabled;
+  cancelSpeech(); voiceControls(); audioControls();
+  text('boss-voice-status', voiceEnabled
+    ? 'Voice enabled for new boss lines. Resume if paused. Local English voices are preferred; your browser may use an online voice.'
+    : 'Boss voice off. Dialogue captions remain available.');
+});
 const keys = new Map();
 const pointers = new Map();
 let jumpPressed = false;
@@ -82,6 +153,8 @@ function panels() {
   audio.setStatus(started ? state.status : 'idle');
 }
 function start() {
+  cancelSpeech(); captionBoss = null; captionId = 0;
+  text('boss-caption', ''); el('boss-dialogue-panel').hidden = true;
   audio.setStatus('idle'); audio.reset();
   state = createState(); started = true; previous = 0;
   if (enabled.music || enabled.effects) void audio.unlock();
@@ -90,6 +163,7 @@ function start() {
 }
 function pause(value, focus = true) {
   if (!started || state.status === 'complete') return;
+  if (value) cancelSpeech();
   setPaused(state, value); clearInput(); previous = 0; panels();
   if (!value && (enabled.music || enabled.effects)) void audio.unlock();
   if (focus) (value ? el('resume-button') : canvas).focus({ preventScroll: true });
@@ -101,7 +175,7 @@ function audioControls() {
     el(`${bus}-button`).setAttribute('aria-pressed', String(enabled[bus]));
     text(`${bus}-button`, `${bus === 'music' ? 'Music' : 'Effects'}: ${enabled[bus] ? 'on' : 'off'}`);
   }
-  const any = enabled.music || enabled.effects;
+  const any = enabled.music || enabled.effects || voiceEnabled;
   el('sound-button').setAttribute('aria-pressed', String(any));
   text('sound-button', any ? 'Mute all sound' : 'Enable all sound');
 }
@@ -109,13 +183,20 @@ async function toggleAudio(bus) {
   if (audioBusy) return;
   audioBusy = true;
   try {
-    const next = bus ? !enabled[bus] : !(enabled.music || enabled.effects);
+    const next = bus ? !enabled[bus] : !(enabled.music || enabled.effects || voiceEnabled);
     if (next && !await audio.unlock()) {
       text('audio-status', 'Audio unavailable. Gameplay still works without sound. Try enabling audio again.');
       return;
     }
     if (bus) enabled[bus] = next;
-    else enabled.music = enabled.effects = next;
+    else {
+      enabled.music = enabled.effects = next;
+      // Speech requires its own opt-in, but Mute all must silence it too.
+      if (!next) {
+        voiceEnabled = false; cancelSpeech(); voiceControls();
+        text('boss-voice-status', 'Boss voice off. Dialogue captions remain available.');
+      }
+    }
     audioControls();
     text('audio-status', 'Audio preferences updated. Music plays during gameplay; resume if paused. Volume zero is silent.');
   } finally { audioBusy = false; }
@@ -168,15 +249,17 @@ controls.forEach(button => {
   });
 });
 window.addEventListener('blur', () => {
+  cancelSpeech();
   clearInput();
   if (playing()) pause(true, false);
   audio.setStatus('paused');
 });
 window.addEventListener('pagehide', event => {
+  cancelSpeech();
   if (!event.persisted) void audio.dispose();
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { clearInput(); if (playing()) pause(true); }
+  if (document.hidden) { cancelSpeech(); clearInput(); if (playing()) pause(true); }
 });
 function frame(now) {
   const dt = previous ? (now - previous) / 1000 : 0;
@@ -224,6 +307,7 @@ function frame(now) {
       }
     }
   }
+  syncDialogue();
   render(ctx, state, motion.matches); hud();
   requestAnimationFrame(frame);
 }
@@ -232,6 +316,11 @@ if (ctx) {
   el('start-button').disabled = false;
   el('sound-button').disabled = false;
   el('audio-settings').disabled = false;
+  el('boss-voice-button').disabled = !speechAvailable;
+  voiceControls();
+  text('boss-voice-status', speechAvailable
+    ? 'Optional boss voice starts off. Captions work without speech. Enable voice separately; resume after changing controls.'
+    : 'Browser speech is unavailable. Boss dialogue captions still work.');
   audioControls();
   text('audio-status', 'Enable music and effects independently below, or use Enable all sound. Audio starts off and pauses with gameplay.');
   canvas.setAttribute('aria-describedby', 'keyboard-help combat-help game-objective');
