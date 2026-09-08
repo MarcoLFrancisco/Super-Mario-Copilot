@@ -9,7 +9,7 @@ The optional soundtrack is an original synthesized arrangement with melody, bass
 - A current browser with JavaScript modules, Canvas 2D, and Pointer Events support. Web Audio is optional.
 - VS Code for editing, plus a local static HTTP server.
 - The launch instructions below use an installed Python 3 interpreter solely as a development server. Python is not a game dependency.
-- No package installation, build step, Microsoft account, API key, or external service is required.
+- No package installation, build step, Microsoft account, or API key is required. Gameplay and synthesized music need no external service. Optional browser speech may use an online voice supplied by your browser or operating system.
 
 Repository inspection confirms a static HTML/CSS/JavaScript application. There is no package manifest, repository-defined server command, automated test suite, or build configuration. The commands below use Python's standard-library HTTP server; they have not been executed or verified on your computer. Runtime and browser compatibility checks remain outstanding.
 
@@ -40,7 +40,7 @@ The version check should report Python 3; the second command should remain runni
 6. Expect a styled title screen with an enabled **Start adventure** button and a ready message. Start the adventure to focus the canvas.
 7. Stop the development server with **Ctrl+C** in the VS Code terminal when finished. This server is for local development, not production hosting.
 
-If Start remains disabled or the page is blank, inspect the browser developer console and Network panel. Confirm `styles.css` and all fifteen `src/*.js` modules load successfully from the repository root, then reload. No package installation or build step was added for the upgrade. No `npm install`, `npm run dev`, or `npm test` command is defined by this repository.
+If Start remains disabled or the page is blank, inspect the browser developer console and Network panel. Confirm `styles.css` and all sixteen `src/*.js` modules load successfully from the repository root, then reload. No package installation or build step was added for the upgrade. No `npm install`, `npm run dev`, or `npm test` command is defined by this repository.
 
 ## Controls and game rules
 
@@ -53,7 +53,8 @@ If Start remains disabled or the page is blank, inspect the browser developer co
 | Touch movement | Hold the on-screen left/right buttons |
 | Touch actions | Press Jump or Boost; hold Fire after acquiring a blaster |
 | Debug Blaster | Hold F while the canvas is focused, or hold the on-screen Fire button |
-| All audio | Enable all sound / Mute all sound in the header |
+| Header audio | Enable music/effects, or mute all sound including boss voice |
+| Optional boss speech | Boss voice toggle in Sound studio; separate opt-in |
 | Independent audio | Music and Effects buttons plus volume sliders in Sound studio |
 
 Movement keys work while the game canvas has focus. Losing canvas/window focus or hiding the browser tab pauses play. Resume to refocus the canvas. Touch controls appear on narrow screens or devices reporting a coarse pointer.
@@ -80,17 +81,36 @@ The world beacon now enters a separate datacenter arena instead of ending the ga
 
 Watch warnings, then fire during exposed-core windows. The right arena platform gives access to the core's height. Shielded shots do not damage it. Losing all health restarts the boss encounter with full health and a blaster, retaining world collectibles and score. Arena minions award no points, preventing repeat-reset farming.
 
+### Moving core and personality
+
+The boss now moves through bounded hover paths, tracks Mario with its eyes, winds up its arms before attacks, and recoils when hit. Its actual collision rectangle moves with the visible core. Decorative arms and rings are not collision targets. During exposure it moves back toward the right platform's firing height; reachability still requires play-testing.
+
+Short event-driven lines accompany entrance, attacks, vulnerability, phase changes, and defeat. For example: “I predicted everything. Except a plumber.” Higher-priority dialogue can interrupt ordinary chatter; cooldowns limit repeated lines. Not every event necessarily produces a caption.
+
+Speech bubbles appear above the boss. A separate **The Hallucination Engine says** panel below Sound studio retains the latest line for reading, including the defeat line, until another line or encounter reset. Captions work with voice disabled. Mouth animation follows caption activity, not actual speech phonemes.
+
+The reduced-motion preference suppresses decorative blinking, ring rotation, and mouth oscillation. Gameplay movement, eye tracking, and attack-state poses remain so the encounter stays mechanically consistent.
+
 ## Music and effects
 
 1. Start with a comfortable device volume. Audio starts off on each page load.
 2. Click **Enable all sound**, or independently enable **Music** and **Effects** in Sound studio. Browser audio requires this user interaction.
 3. Start or resume the adventure. Music plays during active gameplay, not on the title screen. Moving focus from the canvas to an audio control pauses gameplay; resume after changing preferences.
 4. Adjust the independent sliders. Their initial settings are 45% music and 65% effects, but neither bus plays until enabled. A zero slider value is silent even if its button says on.
-5. **Mute all sound** disables both buses. If either is enabled, the header button mutes both; use the individual buttons for selective playback.
+5. **Mute all sound** disables music, effects, and boss voice. **Enable all sound** enables music and effects only; speech requires its own opt-in. Use the individual controls for selective playback.
 
 Effects include app-specific collectible tones, jump/boost sweeps, a respawn sound, checkpoint jingles, and a completion fanfare. Background music stops at completion while the enabled effects bus plays the fanfare. Pausing, hiding the tab, or losing window focus silences playback. Restart resets the musical sequence. Preferences are not saved across reloads.
 
 If audio activation fails, the page reports it and gameplay remains available without sound. Check browser/site mute settings, device output, volume sliders, and the paused state before retrying. No downloaded audio, external music service, or credentials are required.
+
+### Optional spoken boss dialogue
+
+- In Sound studio, click **Boss voice: off** to enable speech, then resume if changing focus paused the game. New boss lines are spoken when gameplay is active and the page is focused; enabling voice does not replay the current line.
+- Browser Speech Synthesis support is required only for voice. If unsupported, its button stays disabled while captions remain available. A browser may block playback despite exposing the API; the game reports failure and lets you retry.
+- An available local English voice is preferred. Otherwise the browser chooses a voice, which may use an online service. Voice quality, latency, and offline availability depend on the browser/OS. No microphone, supplied credentials, paid API, or Microsoft environment is required. Leave voice off if you do not want possible online synthesis.
+- Speech has its own toggle and fixed application volume, independent of the music/effects sliders. It is not muted by setting those sliders to zero. Use its toggle or **Mute all sound**.
+- New captions replace pending speech rather than building a queue. Pause, restart, encounter reset, window blur, tab hiding, and navigation cancel the current line. Resume waits for new dialogue instead of replaying an interrupted line.
+- Speech is limited to the caption's remaining display window; a slow or delayed voice may be cut short. Captions retain the complete sentence. The defeat caption remains readable outside the completion overlay.
 
 ## Local manual validation
 
@@ -122,7 +142,18 @@ No automated test suite or test command was added. Perform these additional loca
 - **Boss audio:** enable music and expect a different arrangement on arena entry, with changing instrumentation across phases. Check Word pickups, firing, brick breaks, power-ups, damage, and boss warnings. Restart and switch tabs repeatedly to check for overlapping or lingering sounds. Audio quality has not been auditioned by the assistant.
 - **Mobile/UI:** hold movement and Fire while tapping Jump on a real touch device when available. Check control wrapping, boss guidance, expanded/collapsed counters, and scrolling to every final-result row. Device emulation is not proof of real-device compatibility.
 
-Do not treat the generated implementation or merged PRs as proof these checks pass. Validate before deployment.
+### Animated boss and speech checks
+
+Use the local server and VS Code working-directory instructions above. No new setup commands, build configuration, or automated tests were added. These are expected results to check, not recorded passes:
+
+- **Moving target:** follow the core through each phase and verify shots/contact align with its rectangle, not the decorative arms. Confirm exposed windows remain hittable from the right platform and knockback does not move it out of reach.
+- **Expressions:** check tracking eyes, windup arms, hit reactions, and mouth animation. Enable reduced motion and verify decorative animation stops while core movement and essential warnings remain.
+- **Dialogue:** observe entrance, attacks, exposure, phase changes, and defeat. Check readable bubbles without covering attack instructions, limited repetition, and the retained caption beneath Sound studio. Test narrow screens and browser zoom.
+- **Optional voice:** verify voice starts off; captions work without it; enabling music/effects alone does not enable speech. Enable voice separately and check available browser voices. An unavailable or blocked voice must not prevent gameplay.
+- **Cancellation:** while a line speaks, pause, switch tabs/windows, restart, mute all, or disable voice. Expect speech to stop without stale lines playing later. Test defeat speech and boss-checkpoint reset separately.
+- **Accessibility:** check the external caption panel with a screen reader. Optional synthesized voice can overlap assistive speech; leave boss voice off when testing caption announcements alone. Full nonvisual gameplay accessibility is not established.
+
+No browser execution, voice audition, or successful test results are claimed for this upgrade. Online browser voices and publishing are external checks, separate from the local game/server checks. Do not treat generated implementation or merged PRs as proof these checks pass. Validate before deployment.
 
 For an existing manually uploaded static site, update it only after validation. Upload `index.html`, `styles.css`, and the complete `src/` folder to that same site's deployment interface. Keep `index.html` at the upload root; exclude `.git`, credentials, and private files. No build command is needed. Hosting is external to local VS Code checks, and deployed JavaScript is visible to visitors.
 
@@ -145,9 +176,10 @@ Additional expansion modules:
 - `src/encounters.js`: immutable patrols, reward blocks, combat settings, and boss arena definitions.
 - `src/blocks.js`: solid collisions, brick destruction, and one-time rewards.
 - `src/combat.js`: health, enemies, projectiles, stomps, and timed protection.
-- `src/boss.js`: boss warnings, attacks, vulnerability windows, and defeat logic.
+- `src/boss.js`: moving core, reactions, warnings, attacks, vulnerability windows, and defeat logic.
+- `src/boss-dialogue.js`: simulation-timed dialogue selection, priorities, cooldowns, and encounter-local repetition tracking.
 - `src/enemy-art.js`: enemies, projectiles, and power-up illustrations.
-- `src/boss-art.js`: datacenter background, core artwork, and attack telegraphs.
+- `src/boss-art.js`: datacenter background, expressive core artwork, attack telegraphs, and speech bubbles. `src/main.js` connects retained accessible captions and optional browser speech with lifecycle cancellation.
 
 The engine distinguishes `world` and `boss` stages. Audio exposes `setStage(stage, phase)` for the original boss arrangement; combat cues use the existing effects bus. `level.js` exports category labels, totals, and `productivityCounts(collected)` for the HUD and results.
 
