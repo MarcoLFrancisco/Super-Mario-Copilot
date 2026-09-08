@@ -386,3 +386,14 @@ Files in the approved proposal:
 - src/level.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-51 -->
+### Merged change: Integrate bricks, combat, and boss-stage simulation
+
+Merged pull request #51: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/51
+
+Files in the approved proposal:
+- src/engine.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
