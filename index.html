@@ -43,6 +43,33 @@
         <div class="hud-item"><dt>Copilot boost</dt><dd id="boost-value">Ready</dd></div>
       </dl>
 
+      <section class="combat-dashboard" aria-label="Combat and productivity">
+        <dl class="combat-stats">
+          <div><dt>Health</dt><dd id="health-value">—</dd></div>
+          <div><dt>Debug Blaster</dt><dd id="weapon-value">—</dd></div>
+          <div><dt>Microsoft protection</dt><dd id="protection-value">—</dd></div>
+        </dl>
+        <details class="productivity-panel" open>
+          <summary>Productivity scoreboard</summary>
+          <p id="productivity-help">In-game achievements only; no real Microsoft files or messages are changed.</p>
+          <dl class="productivity-grid" aria-describedby="productivity-help">
+            <div data-app="outlook"><dt>Emails reviewed</dt><dd id="count-outlook">—</dd></div>
+            <div data-app="excel"><dt>Excel files created</dt><dd id="count-excel">—</dd></div>
+            <div data-app="word"><dt>Word docs created</dt><dd id="count-word">—</dd></div>
+            <div data-app="teams"><dt>Teams conversations completed</dt><dd id="count-teams">—</dd></div>
+            <div data-app="copilot"><dt>Copilot prompts completed</dt><dd id="count-copilot">—</dd></div>
+          </dl>
+        </details>
+        <section id="boss-hud" class="boss-hud" aria-labelledby="boss-title" hidden>
+          <h3 id="boss-title">The Hallucination Engine</h3>
+          <label for="boss-health">AI core health</label>
+          <progress id="boss-health" max="24" value="24">24 / 24</progress>
+          <span id="boss-health-value">24 / 24</span>
+          <p id="boss-phase">Awaiting encounter</p>
+          <p id="boss-hint">Watch attack warnings and fire when the core is exposed.</p>
+        </section>
+      </section>
+
       <div class="game-viewport" id="game-viewport">
         <canvas id="game-canvas" width="1280" height="720" tabindex="0" aria-label="Copilot Cloud Quest platform game" aria-describedby="keyboard-help game-objective">
           This game requires a browser with Canvas and JavaScript support. Controls and the game objective are provided below.
@@ -51,10 +78,10 @@
         <section class="game-overlay" id="start-panel" aria-labelledby="start-title">
           <p class="eyebrow">Your next great idea is one jump away</p>
           <h2 id="start-title">Jump into the connected cloud.</h2>
-          <p id="game-objective">Guide Mario across Excel terraces, Outlook mailways, and Teams skybridges. Collect Excel sheets, Outlook emails, Teams conversations, and Copilot icons. Discover upper routes with double-value collectibles and reach the Copilot beacon.</p>
+          <p id="game-objective">Guide Mario through the connected cloud. Collect five kinds of app items, break code bricks, and battle software bugs. Reach the Copilot beacon to challenge the Hallucination Engine.</p>
           <ul class="feature-pills" aria-label="Adventure features">
             <li>Handcrafted world</li>
-            <li>Four app collectible types</li>
+            <li>Five productivity counters</li>
             <li>Friendly checkpoints</li>
           </ul>
           <button id="start-button" class="primary-button" type="button" disabled>Start adventure</button>
@@ -73,12 +100,19 @@
 
         <section class="game-overlay" id="complete-panel" aria-labelledby="complete-title" hidden>
           <p class="eyebrow">Idea delivered</p>
-          <h2 id="complete-title">You lit the Copilot beacon!</h2>
+          <h2 id="complete-title">The AI core is patched!</h2>
           <p id="completion-summary">The cloud is shining a little brighter.</p>
           <dl class="results">
             <div><dt>Final score</dt><dd id="final-score">0</dd></div>
             <div><dt>Items collected</dt><dd id="final-sparks">0</dd></div>
             <div><dt>Best combo</dt><dd id="final-combo">×1</dd></div>
+          </dl>
+          <dl class="productivity-grid final-productivity" aria-label="Final productivity achievements">
+            <div data-app="outlook"><dt>Emails reviewed</dt><dd id="final-outlook">—</dd></div>
+            <div data-app="excel"><dt>Excel files created</dt><dd id="final-excel">—</dd></div>
+            <div data-app="word"><dt>Word docs created</dt><dd id="final-word">—</dd></div>
+            <div data-app="teams"><dt>Teams conversations completed</dt><dd id="final-teams">—</dd></div>
+            <div data-app="copilot"><dt>Copilot prompts completed</dt><dd id="final-copilot">—</dd></div>
           </dl>
           <button id="replay-button" class="primary-button" type="button">Explore again</button>
         </section>
@@ -86,6 +120,8 @@
 
       <div id="game-controls" class="controls-bar">
         <p id="keyboard-help"><strong>Move</strong> <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> <span aria-hidden="true">·</span> <strong>Jump</strong> <kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> <span aria-hidden="true">·</span> <strong>Boost</strong> <kbd>Shift</kbd> <span aria-hidden="true">·</span> <strong>Pause</strong> <kbd>Esc</kbd></p>
+        <p id="combat-help"><strong>Fire:</strong> hold <kbd>F</kbd> or the Fire button after collecting a Debug Blaster. Hit bricks from below for rewards. Stomp robots and worms; avoid drone contact. Microsoft pickups protect you for 10 seconds, but not from falls.</p>
+        <p id="combat-controls-status" role="status">Combat HUD and firing controls await the main integration step.</p>
         <div class="touch-controls" id="touch-controls" role="group" aria-label="On-screen game controls">
           <div class="direction-controls">
             <button id="move-left" type="button" data-action="left" aria-label="Move left" disabled>←</button>
@@ -94,12 +130,13 @@
           <div class="action-controls">
             <button id="boost-button" type="button" data-action="boost" disabled>Boost</button>
             <button id="jump-button" type="button" data-action="jump" disabled>Jump</button>
+            <button id="fire-button" type="button" data-action="fire" aria-describedby="combat-help combat-controls-status" disabled>Fire</button>
           </div>
         </div>
       </div>
       <section class="controls-bar" aria-labelledby="audio-title" aria-describedby="audio-status">
         <h3 id="audio-title">Sound studio</h3>
-        <p id="audio-status" role="status">The new music and effects controls await the next integration step. The header Sound button still controls the existing action tones.</p>
+        <p id="audio-status" role="status">Loading audio controls. Music and effects start off and require user activation.</p>
         <fieldset id="audio-settings" disabled>
           <legend>Independent music and effects controls</legend>
           <p>
