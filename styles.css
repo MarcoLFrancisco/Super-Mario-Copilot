@@ -164,6 +164,134 @@ kbd { display: inline-block; font: inherit; font-size: .72rem; background: #2231
   .guide-card { padding: 18px; }
   .touch-controls button { min-width: 48px; padding: 10px; }
 }
+/* Combat expansion: labels remain explicit rather than relying on color. */
+.combat-dashboard {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(120deg, #13223b, #171c37);
+}
+.combat-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.combat-stats > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #08152a66;
+}
+.combat-stats dd, .productivity-grid dd { font-variant-numeric: tabular-nums; }
+#health-value { color: #ffb0c2; }
+#weapon-value { color: #9bf5df; }
+#protection-value { color: #ffe19a; }
+.productivity-panel { margin-top: 12px; }
+.productivity-panel summary {
+  min-height: 44px;
+  padding: 11px 4px;
+  color: #d6eaff;
+  font-weight: 650;
+  cursor: pointer;
+  border-radius: 6px;
+}
+#productivity-help { color: var(--muted); font-size: .75rem; margin-bottom: 10px; }
+.productivity-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+  width: 100%;
+}
+.productivity-grid > div {
+  --item-color: #a2e8ff;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--item-color);
+  border-radius: 10px;
+  background: #0a162bba;
+}
+.productivity-grid [data-app='outlook'] { --item-color: #68c9ff; }
+.productivity-grid [data-app='excel'] { --item-color: #6cdbb1; }
+.productivity-grid [data-app='word'] { --item-color: #8eb7ff; }
+.productivity-grid [data-app='teams'] { --item-color: #c2b3ff; }
+.productivity-grid [data-app='copilot'] { --item-color: #f1a9df; }
+.productivity-grid dt { line-height: 1.5; overflow-wrap: anywhere; }
+.productivity-grid dd { color: var(--item-color); font-size: 1.15rem; }
+.boss-hud {
+  display: grid;
+  grid-template-columns: auto minmax(80px, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 16px;
+  margin-top: 14px;
+  border: 1px solid #d49bff80;
+  border-radius: 12px;
+  background: linear-gradient(110deg, #342247, #142640);
+}
+.boss-hud h3, #boss-phase, #boss-hint { grid-column: 1 / -1; }
+.boss-hud label, #boss-health-value { font-size: .8rem; }
+#boss-health-value { font-variant-numeric: tabular-nums; color: #ffe1eb; }
+#boss-phase { color: #ffdaa2; font-weight: 700; }
+#boss-hint { color: #d0def4; font-size: .8rem; }
+#boss-health {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 16px;
+  overflow: hidden;
+  border: 1px solid #ffffff40;
+  border-radius: 999px;
+  background: #10172c;
+  accent-color: #e09ac8;
+}
+#boss-health::-webkit-progress-bar { background: #10172c; }
+#boss-health::-webkit-progress-value { background: linear-gradient(90deg, #938bff, #f29dc4); }
+#boss-health::-moz-progress-bar { background: linear-gradient(90deg, #938bff, #f29dc4); }
+#combat-help, #combat-controls-status { margin-top: 9px; font-size: .78rem; color: var(--muted); }
+#combat-help strong { color: #e5f5ff; }
+#fire-button { background: #633551; border-color: #f5a6cb99; }
+#fire-button:hover:not(:disabled) { background: #85466d; }
+.touch-controls { flex-wrap: wrap; }
+.touch-controls .direction-controls, .touch-controls .action-controls { gap: 8px; }
+.touch-controls button { flex-shrink: 0; }
+/* Safe alignment prevents a tall overlay's first rows scrolling out of reach. */
+.game-overlay { justify-content: flex-start; }
+.game-overlay > * { flex-shrink: 0; }
+.game-overlay > :first-child { margin-top: auto; }
+.game-overlay > :last-child { margin-bottom: auto; }
+.final-productivity { max-width: 900px; text-align: left; }
+#complete-panel .results { gap: 12px 24px; padding: 6px; }
+#complete-panel h2 { font-size: clamp(1.6rem, 3.5vw, 2.8rem); }
+#audio-settings { min-width: 0; margin: 12px 0 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+#audio-settings legend { font-size: .8rem; padding: 0 6px; }
+#audio-settings p { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+#audio-settings p + p { margin-top: 10px; }
+#audio-settings input[type='range'] { min-height: 44px; width: min(220px, 100%); accent-color: var(--cyan); }
+#music-help, #effects-help, #audio-status { font-size: .78rem; color: var(--muted); }
+@media (max-width: 960px) {
+  .productivity-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .combat-dashboard { padding: 12px 16px; }
+  .combat-stats { gap: 6px; }
+  .combat-stats > div { padding: 8px; }
+  .combat-stats dt { letter-spacing: .03em; line-height: 1.5; }
+  .combat-stats dd { font-size: .85rem; }
+  .productivity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .productivity-grid > div { padding: 9px; }
+  .productivity-grid dd { font-size: 1rem; }
+  .boss-hud { padding: 12px; gap: 8px; }
+  .boss-hud label { grid-column: 1 / -1; }
+  #boss-health { grid-column: 1 / 3; }
+  .touch-controls { gap: 12px; }
+  .touch-controls .action-controls { margin-left: auto; }
+  .touch-controls button { min-width: 48px; min-height: 54px; padding: 10px; }
+}
+@media (forced-colors: active) {
+  .productivity-grid > div, .combat-stats > div, .boss-hud { border: 1px solid CanvasText; }
+  #boss-health { appearance: auto; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
