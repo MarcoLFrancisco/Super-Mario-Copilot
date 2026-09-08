@@ -80,6 +80,39 @@ export function drawBossWarnings(c, boss) {
   c.restore();
 }
 
+function drawDialogueBubble(c, boss) {
+  const caption = boss.dialogue.current;
+  if (!caption) return;
+  c.save();
+  c.font = "bold 17px 'Segoe UI', sans-serif";
+  const rows = [];
+  let row = '';
+  for (const word of caption.text.split(' ')) {
+    const candidate = row ? `${row} ${word}` : word;
+    if (row && c.measureText(candidate).width > 330) {
+      rows.push(row); row = word;
+    } else row = candidate;
+  }
+  if (row) rows.push(row);
+  const width = 366, height = 39 + rows.length * 23;
+  const x = Math.max(16, Math.min(ARENA.width - width - 16, boss.x + boss.w / 2 - width / 2));
+  const y = Math.max(151, boss.y - height - 40);
+  const anchor = Math.max(x + 22, Math.min(x + width - 22, boss.x + boss.w / 2));
+  c.shadowColor = '#00000066'; c.shadowBlur = 12;
+  rect(c, x, y, width, height, '#eff8ff');
+  c.shadowBlur = 0;
+  c.strokeStyle = '#8be6ec'; c.lineWidth = 2; c.strokeRect(x, y, width, height);
+  c.beginPath(); c.moveTo(anchor - 9, y + height);
+  c.lineTo(anchor, y + height + 14); c.lineTo(anchor + 9, y + height);
+  c.closePath(); c.fillStyle = '#eff8ff'; c.fill();
+  c.textAlign = 'left'; c.fillStyle = '#476687';
+  c.font = "bold 10px 'Segoe UI', sans-serif";
+  c.fillText('HALLUCINATION ENGINE', x + 17, y + 18);
+  c.font = "bold 17px 'Segoe UI', sans-serif"; c.fillStyle = '#172940';
+  rows.forEach((text, i) => c.fillText(text, x + 17, y + 42 + i * 23));
+  c.restore();
+}
+
 export function drawBoss(c, boss, reducedMotion = false) {
   const t = reducedMotion ? 0 : boss.age;
   const exposed = boss.mode === 'exposed';
@@ -89,7 +122,9 @@ export function drawBoss(c, boss, reducedMotion = false) {
   glow.addColorStop(0, color + '55'); glow.addColorStop(1, color + '00');
   rect(c, -170, -170, 340, 340, glow);
   for (const side of [-1, 1]) {
-    const elbow = 22 + Math.sin(t * 1.8) * 8;
+    const windup = boss.mode === 'warning' ? boss.windup : 0;
+    const strike = reducedMotion ? (boss.mode === 'attack' ? 8 : 0) : boss.attackPulse * 55;
+    const elbow = 22 + Math.sin(t * 1.8) * 8 - windup * 48 + strike;
     line(c, [[side * 55, -12], [side * 100, elbow], [side * 85, 99]], '#151f36', 15);
     line(c, [[side * 55, -12], [side * 100, elbow], [side * 85, 99]], '#8392b8', 8);
     ellipse(c, side * 100, elbow, 9, 9, '#bcc9e3');
@@ -109,16 +144,55 @@ export function drawBoss(c, boss, reducedMotion = false) {
   for (const x of [-61, 61]) for (const y of [-70, 70]) ellipse(c, x, y, 3, 3, '#d0dded');
   rect(c, -54, -56, 108, 86, '#0b1932');
   for (let i = 0; i < 5; i++) line(c, [[-45, -43 + i * 14], [45, -43 + i * 14]], '#87b6e51c');
-  label(c, boss.defeated ? '✓' : exposed ? '{ }' : 'AI', 0, 1, 38, color);
+  const caption = boss.dialogue.current;
+  const mood = boss.defeated ? 'defeated' : boss.recoil > 0 ? 'hurt'
+    : exposed ? 'worried' : boss.mode === 'warning' || boss.phase === 2 ? 'angry'
+    : caption?.mood ?? 'smug';
+  const blinking = !reducedMotion && !boss.defeated && boss.age % 4.7 > 4.55;
+  const eyeHeight = blinking ? 1.5 : mood === 'worried' ? 11 : 8;
+  for (const side of [-1, 1]) {
+    const x = side * 25;
+    if (boss.defeated) {
+      line(c, [[x - 9, -17], [x - 2, -10], [x + 10, -24]], color, 3);
+    } else if (mood === 'hurt') {
+      line(c, [[x - 7, -23], [x + 7, -11]], '#ffd4df', 3);
+      line(c, [[x + 7, -23], [x - 7, -11]], '#ffd4df', 3);
+    } else {
+      ellipse(c, x, -18, 12, eyeHeight, '#d4f7ff');
+      if (!blinking) {
+        ellipse(c, x + boss.lookX * 5, -18 + boss.lookY * 3, 4, 5, '#253b64');
+        ellipse(c, x + boss.lookX * 5 + 1, -20 + boss.lookY * 3, 1, 1, '#ffffff');
+      }
+    }
+    const tilt = mood === 'angry' ? -side * 6 : mood === 'worried' ? side * 5 : -side * 2;
+    line(c, [[x - 11, -35 + tilt], [x + 11, -35 - tilt]], color, 3);
+  }
+  const talking = Boolean(caption) && !boss.defeated;
+  if (talking) {
+    // Caption-driven mouth movement does not claim phoneme synchronization.
+    for (let i = 0; i < 7; i++) {
+      const h = reducedMotion ? 5 : 3 + Math.abs(Math.sin(t * 14 + i * 1.7)) * 10;
+      rect(c, -23 + i * 7, 8 - h / 2, 4, h, color);
+    }
+  } else if (mood === 'worried') {
+    ellipse(c, 0, 8, 8, 6, color, false);
+  } else {
+    line(c, [[-22, 3], [-12, boss.defeated ? 13 : 8], [12, 8], [22, 2]], color, 3);
+  }
   label(c, boss.defeated ? 'VERIFIED' : exposed ? 'PATCH NOW' : 'SHIELDED', 0, 54, 12, color);
   if (!exposed && !boss.defeated) {
     for (let x = -48; x < 50; x += 16) line(c, [[x, -51], [x, 25]], '#a5c6ff33');
   }
-  for (const [i, message] of ['FACT? NULL', 'TRUST: 0%', 'RETRY...'].entries()) {
-    const x = -185 + i * 92, y = -160 + (i % 2) * 24;
-    rect(c, x, y, 86, 29, '#24314be8');
-    line(c, [[x, y], [x + 86, y]], color, 2);
-    label(c, message, x + 43, y + 19, 10, color);
+  if (!boss.dialogue.current) {
+    for (const [i, message] of ['FACT? NULL', 'TRUST: 0%', 'RETRY...'].entries()) {
+      const x = -185 + i * 92, y = -160 + (i % 2) * 24;
+      rect(c, x, y, 86, 29, '#24314be8');
+      line(c, [[x, y], [x + 86, y]], color, 2);
+      label(c, message, x + 43, y + 19, 10, color);
+    }
   }
   c.restore();
+  // Draw in arena coordinates so bubbles stay inside the viewport and below
+  // the attack-guidance banner, without altering the core's collision shape.
+  drawDialogueBubble(c, boss);
 }
