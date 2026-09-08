@@ -364,3 +364,14 @@ Files in the approved proposal:
 - src/boss-art.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-47 -->
+### Merged change: Prepare Word document collectible artwork
+
+Merged pull request #47: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/47
+
+Files in the approved proposal:
+- src/collectibles.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
