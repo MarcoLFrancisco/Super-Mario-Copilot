@@ -607,3 +607,14 @@ Files in the approved proposal:
 - src/main.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-77 -->
+### Merged change: Document animated boss dialogue and optional browser speech
+
+Merged pull request #77: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/77
+
+Files in the approved proposal:
+- README.md
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
