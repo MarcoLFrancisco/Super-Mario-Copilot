@@ -320,3 +320,14 @@ Files in the approved proposal:
 - src/blocks.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-39 -->
+### Merged change: Add software enemy combat and timed protection
+
+Merged pull request #39: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/39
+
+Files in the approved proposal:
+- src/combat.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
