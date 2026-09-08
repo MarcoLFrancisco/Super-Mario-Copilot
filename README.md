@@ -1,6 +1,8 @@
 # Copilot Cloud Quest
 
-An original browser platformer inspired by Copilot and Microsoft productivity apps. Explore Excel terraces, Outlook mailways, Teams skybridges, and the Copilot beacon. Graphics are drawn procedurally using Canvas; app motifs are illustrative, not official Microsoft icon assets. This project is not affiliated with Microsoft or Nintendo.
+An unofficial Mario browser platformer through Microsoft-themed worlds. Collect Excel sheets, Outlook emails, Teams conversation bubbles, and Copilot ribbon icons across layered landscapes and dimensional platforms. Mario and the app illustrations are custom procedural Canvas artwork, not imported official sprites or icon assets. Mario belongs to Nintendo; Microsoft application names and marks belong to Microsoft. This project is not affiliated with or endorsed by either company.
+
+The optional soundtrack is an original synthesized arrangement with melody, bass, chords, percussion, and gameplay jingles. It does not use Nintendo recordings. All implementation files are present, but graphics, gameplay, browser compatibility, and audio quality still require manual validation; repository inspection is not a successful runtime test.
 
 ## Implementation and prerequisites
 
@@ -38,7 +40,7 @@ The version check should report Python 3; the second command should remain runni
 6. Expect a styled title screen with an enabled **Start adventure** button and a ready message. Start the adventure to focus the canvas.
 7. Stop the development server with **Ctrl+C** in the VS Code terminal when finished. This server is for local development, not production hosting.
 
-If Start remains disabled or the page is blank, inspect the browser developer console and Network panel. Confirm `styles.css` and all four `src/*.js` modules load successfully from the repository root, then reload. No `npm install`, `npm run dev`, or `npm test` command is defined by this repository.
+If Start remains disabled or the page is blank, inspect the browser developer console and Network panel. Confirm `styles.css` and all nine `src/*.js` modules load successfully from the repository root, then reload. No package installation or build step was added for the upgrade. No `npm install`, `npm run dev`, or `npm test` command is defined by this repository.
 
 ## Controls and game rules
 
@@ -50,24 +52,40 @@ If Start remains disabled or the page is blank, inspect the browser developer co
 | Pause/resume | Escape or the Pause/Resume controls |
 | Touch movement | Hold the on-screen left/right buttons |
 | Touch actions | Press Jump or Boost |
-| Optional audio | Sound button; starts off and requires user activation |
+| All audio | Enable all sound / Mute all sound in the header |
+| Independent audio | Music and Effects buttons plus volume sliders in Sound studio |
 
 Movement keys work while the game canvas has focus. Losing canvas/window focus or hiding the browser tab pauses play. Resume to refocus the canvas. Touch controls appear on narrow screens or devices reporting a coarse pointer.
 
-Platforms are one-way: jump through their undersides and land on top. Touch checkpoint beacons to activate them. Falling or touching a pink glitch returns you to your last checkpoint, retaining score and collected sparks but resetting the current combo. Collect sparks within 2.5 seconds of one another to increase the multiplier up to ×8; upper-route sparks award double points. Reach the final beacon to show results. Restart and Explore again reset the run. Progress is in memory only and is lost on reload.
+Platforms are one-way: jump through their undersides and land on top. Touch checkpoint flags to activate them. Falling or touching a pink glitch returns Mario to the last checkpoint, retaining score and app collectibles but resetting the current combo. Collect items within 2.5 seconds of one another to increase the multiplier up to ×8; upper-route items with golden rings award double points. Reach the final Copilot beacon to show results. Restart and Explore again reset the run. Progress is in memory only and is lost on reload.
+
+## Music and effects
+
+1. Start with a comfortable device volume. Audio starts off on each page load.
+2. Click **Enable all sound**, or independently enable **Music** and **Effects** in Sound studio. Browser audio requires this user interaction.
+3. Start or resume the adventure. Music plays during active gameplay, not on the title screen. Moving focus from the canvas to an audio control pauses gameplay; resume after changing preferences.
+4. Adjust the independent sliders. Their initial settings are 45% music and 65% effects, but neither bus plays until enabled. A zero slider value is silent even if its button says on.
+5. **Mute all sound** disables both buses. If either is enabled, the header button mutes both; use the individual buttons for selective playback.
+
+Effects include app-specific collectible tones, jump/boost sweeps, a respawn sound, checkpoint jingles, and a completion fanfare. Background music stops at completion while the enabled effects bus plays the fanfare. Pausing, hiding the tab, or losing window focus silences playback. Restart resets the musical sequence. Preferences are not saved across reloads.
+
+If audio activation fails, the page reports it and gameplay remains available without sound. Check browser/site mute settings, device output, volume sliders, and the paused state before retrying. No downloaded audio, external music service, or credentials are required.
 
 ## Local manual validation
 
 There are **no automated tests and no test command**. The following are expected results to verify, not recorded passes. Run these checks in the browser launched above and record the browser/version, viewport, failures, and console errors.
 
 - **Startup:** styling and scenery appear, Start becomes enabled, and no application-loading errors appear in the console. Pause and completion overlays are hidden initially.
-- **Movement:** start, move both directions, and release each key. The explorer should stop rather than continue moving. Jump onto and through platforms; test edges and optional upper routes.
+- **Mario and scenery:** confirm Mario replaces the robot, with a red cap, moustache, overalls, and running/jumping poses. Check both facing directions, boost trails, layered backgrounds, and platform details. Inspect sprite alignment with landing surfaces; visual changes did not change the player collision dimensions.
+- **Movement:** start, move both directions, and release each key. Mario should stop rather than continue moving. Jump onto and through platforms; test edges and optional upper routes.
 - **Boost:** press Shift while facing each direction. Movement should burst forward, the HUD should count down, and another boost should become available afterward.
-- **Scoring:** collect sparks and confirm each disappears once, increases the count and score, and builds a combo when collected quickly. Wait longer than 2.5 seconds of active play and expect ×1.
-- **Recovery:** activate a later checkpoint, fall, and touch a glitch. Expect respawn at the activated checkpoint, retained sparks/score, and a reset combo. Previously collected sparks must not award points again.
+- **Collectibles and scoring:** inspect Excel sheets, Outlook envelopes, Teams conversations, and Copilot ribbons in their respective zones. Confirm each disappears once with a short pickup effect, increases the count and score, and builds a combo when collected quickly. Check double-value upper-route items. Wait longer than 2.5 seconds of active play and expect ×1.
+- **Recovery:** activate a later checkpoint, fall, and touch a glitch. Expect respawn at the activated checkpoint, retained items/score, and a reset combo. Previously collected items must not award points again.
 - **Pause and focus:** use Escape, Pause, Resume, switch tabs, and move focus away from the canvas. Verify simulation pauses, Resume restores keyboard play, and movement is not stuck after returning. Check mouse interactions with the header controls specifically because canvas blur also pauses the game.
 - **Completion:** traverse the entire main route to the final beacon. Confirm results match the HUD and Explore again resets the run. Full-level reachability and difficulty need actual play-testing.
-- **Audio:** enable sound with the button and resume if focus loss paused play. Expect short action tones; disable sound and expect silence. Unavailable audio must not prevent gameplay.
+- **Audio activation and controls:** verify silence on initial load. Enable music only and play: expect background music without action effects. Enable effects only: expect action sounds without music. Enable both, change each slider, test zero volume, and mute all. Resume after interacting with controls if canvas focus loss paused play. Unavailable audio must not prevent gameplay.
+- **Soundtrack quality:** listen through several loops for timing gaps, clicks, distortion, and balance between melody, bass, chords, and percussion. Compare pickup sounds across all four app zones and check jump, boost, respawn, checkpoint, and victory sounds. These sounds have not been auditioned by the assistant.
+- **Audio lifecycle:** pause/resume repeatedly, switch tabs, switch windows, and restart several times. Expect silence while paused/hidden and no overlapping soundtrack instances after restart. At completion, expect background music to stop and the enabled victory fanfare to play. Check desktop and real mobile browsers separately; browser audio policies differ.
 - **Responsive/touch:** check desktop and narrow layouts, then a real touch device if available. Hold a direction while tapping Jump; release or cancel touches and verify movement stops. Browser device emulation alone does not establish real-device compatibility. The loopback server is accessible only on the computer running it; real-device testing requires a separately configured reachable static host, not an external Microsoft service.
 - **Accessibility:** check visible keyboard focus, readable controls, and checkpoint/completion announcements with assistive technology. Enable the OS reduced-motion preference: decorative time-based animation should stop while gameplay movement remains. Canvas gameplay is visual; full nonvisual accessibility is not established.
 
@@ -78,9 +96,16 @@ Do not treat the generated implementation or merged PRs as proof these checks pa
 - `index.html`: game shell, HUD, menus, instructions, and canvas.
 - `styles.css`: responsive interface, overlays, focus styling, and touch controls.
 - `src/level.js`: immutable world data, app palette, viewport, and physics constants.
-- `src/art.js`: procedural renderer; `render(context, state, reducedMotion)` reads simulation state without changing it.
+- `src/art.js`: `render(context, state, reducedMotion)` integrates graphics and transient pickup effects without changing simulation state. The old renderer remains in the file but is inactive.
+- `src/character.js`: procedural Mario drawing from the engine player state.
+- `src/collectibles.js`: app-item illustrations and short pickup effects.
+- `src/scenery.js`: viewport-space backgrounds and world-space platforms.
+- `src/music.js`: original score, voice definitions, and checkpoint/completion jingles; no playback side effects.
+- `src/audio.js`: `createAudio()` provides user-activated `unlock()`, independent `setVolume()`, `setStatus()`, event-driven `effect()`, `reset()`, and `dispose()`.
 - `src/engine.js`: `createState()`, `setPaused(state, paused)`, and `update(state, input, dt)`; updates use seconds and return gameplay events.
-- `src/main.js`: DOM integration, input, animation loop, optional audio, and UI updates.
+- `src/main.js`: DOM integration, input, animation loop, audio controls/lifecycle, and UI updates.
+
+Internal names such as `LEVEL.sparks`, `spark` events, and `sparks-value` DOM IDs are retained for compatibility; the displayed collectibles are now Microsoft-themed items, not stars.
 
 All development checks above are local VS Code/browser work. No Exchange environment, Microsoft 365 tenant, Copilot API, authentication, or credentials are involved; Microsoft applications are visual themes rather than service integrations.
 
