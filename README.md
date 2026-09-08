@@ -53,3 +53,14 @@ Files in the approved proposal:
 - src/art.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-11 -->
+### Merged change: Add platform physics, checkpoints, and scoring engine
+
+Merged pull request #11: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/11
+
+Files in the approved proposal:
+- src/engine.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
