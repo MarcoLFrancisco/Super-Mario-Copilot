@@ -331,3 +331,14 @@ Files in the approved proposal:
 - src/combat.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-41 -->
+### Merged change: Add AI boss phases, telegraphed attacks, and vulnerability windows
+
+Merged pull request #41: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/41
+
+Files in the approved proposal:
+- src/boss.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
