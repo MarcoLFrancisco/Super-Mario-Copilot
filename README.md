@@ -15,7 +15,7 @@ Repository inspection confirms a static HTML/CSS/JavaScript application. There i
 
 ## Open and run in VS Code
 
-1. Download or clone this repository and ensure your local copy includes the merged implementation PRs.
+1. Download or clone this repository and ensure your local copy includes the merged implementation PRs. For an existing clone, select the default branch where the PRs were merged, run `git status`, then `git pull --ff-only` from the repository root. Resolve any reported local-change or branch issues without discarding work. ZIP downloads must be downloaded again to receive updates.
 2. In VS Code choose **File → Open Folder** and select the repository root: the folder containing `index.html`, `styles.css`, `README.md`, and `src/`. Do not open only `src/`.
 3. Choose **Terminal → New Terminal**. Its working directory must be that same repository root.
 4. Check your Python installation and start a loopback-only development server using the applicable commands.
@@ -40,7 +40,7 @@ The version check should report Python 3; the second command should remain runni
 6. Expect a styled title screen with an enabled **Start adventure** button and a ready message. Start the adventure to focus the canvas.
 7. Stop the development server with **Ctrl+C** in the VS Code terminal when finished. This server is for local development, not production hosting.
 
-If Start remains disabled or the page is blank, inspect the browser developer console and Network panel. Confirm `styles.css` and all nine `src/*.js` modules load successfully from the repository root, then reload. No package installation or build step was added for the upgrade. No `npm install`, `npm run dev`, or `npm test` command is defined by this repository.
+If Start remains disabled or the page is blank, inspect the browser developer console and Network panel. Confirm `styles.css` and all fifteen `src/*.js` modules load successfully from the repository root, then reload. No package installation or build step was added for the upgrade. No `npm install`, `npm run dev`, or `npm test` command is defined by this repository.
 
 ## Controls and game rules
 
@@ -51,13 +51,34 @@ If Start remains disabled or the page is blank, inspect the browser developer co
 | Copilot boost | Shift; boosts in the facing direction with a 1.5-second cooldown |
 | Pause/resume | Escape or the Pause/Resume controls |
 | Touch movement | Hold the on-screen left/right buttons |
-| Touch actions | Press Jump or Boost |
+| Touch actions | Press Jump or Boost; hold Fire after acquiring a blaster |
+| Debug Blaster | Hold F while the canvas is focused, or hold the on-screen Fire button |
 | All audio | Enable all sound / Mute all sound in the header |
 | Independent audio | Music and Effects buttons plus volume sliders in Sound studio |
 
 Movement keys work while the game canvas has focus. Losing canvas/window focus or hiding the browser tab pauses play. Resume to refocus the canvas. Touch controls appear on narrow screens or devices reporting a coarse pointer.
 
-Platforms are one-way: jump through their undersides and land on top. Touch checkpoint flags to activate them. Falling or touching a pink glitch returns Mario to the last checkpoint, retaining score and app collectibles but resetting the current combo. Collect items within 2.5 seconds of one another to increase the multiplier up to ×8; upper-route items with golden rings award double points. Reach the final Copilot beacon to show results. Restart and Explore again reset the run. Progress is in memory only and is lost on reload.
+Ordinary platforms are one-way; code bricks are solid on all sides. Hit ordinary bricks from underneath to break them. Question-mark reward bricks release a power-up beneath the block once, then remain solid. Touch the released Debug Blaster to enable firing.
+
+Mario has three health points. Enemies, hostile projectiles, and pink glitches cause damage, with a brief damage-protection period. Stomp glitch robots and malware worms from above or shoot them; spam drones cannot be stomped. Falling or losing all health returns Mario to the checkpoint and resets the current combo. World respawns retain the blaster, score, collected items, defeated enemies, and used/broken bricks while restoring health.
+
+Four-color Microsoft-style pickups grant ten seconds of protection, shown by an aura and countdown. Contact defeats ordinary enemies while protected. Protection does not prevent falling and does not bypass the boss shield. Pausing freezes gameplay timers.
+
+Collect app items within 2.5 seconds of one another to increase the multiplier up to ×8; golden-ring upper-route items award double points. Restart and Explore again reset the run. Progress is in memory only and is lost on reload.
+
+### Productivity scoreboard
+
+Five counters show collected/available totals: **Emails reviewed**, **Excel files created**, **Word docs created**, **Teams conversations completed**, and **Copilot prompts completed**. Word documents appear along selected longer trails throughout the world. These are in-game achievements, not real Microsoft actions. Counts derive from unique collected item IDs, survive checkpoint recovery, and appear in the final results. Combat rewards and enemy defeats do not increment them.
+
+### Final boss: The Hallucination Engine
+
+The world beacon now enters a separate datacenter arena instead of ending the game. The arena supplies a blaster and its own checkpoint. Defeat the AI core to unlock final results.
+
+- **Token Storm:** dodge projectile bursts.
+- **Agent Swarm:** leave the marked column before it activates and fight summoned robots.
+- **Context Collapse:** jump over floor waves or climb to elevated platforms.
+
+Watch warnings, then fire during exposed-core windows. The right arena platform gives access to the core's height. Shielded shots do not damage it. Losing all health restarts the boss encounter with full health and a blaster, retaining world collectibles and score. Arena minions award no points, preventing repeat-reset farming.
 
 ## Music and effects
 
@@ -80,16 +101,30 @@ There are **no automated tests and no test command**. The following are expected
 - **Movement:** start, move both directions, and release each key. Mario should stop rather than continue moving. Jump onto and through platforms; test edges and optional upper routes.
 - **Boost:** press Shift while facing each direction. Movement should burst forward, the HUD should count down, and another boost should become available afterward.
 - **Collectibles and scoring:** inspect Excel sheets, Outlook envelopes, Teams conversations, and Copilot ribbons in their respective zones. Confirm each disappears once with a short pickup effect, increases the count and score, and builds a combo when collected quickly. Check double-value upper-route items. Wait longer than 2.5 seconds of active play and expect ×1.
-- **Recovery:** activate a later checkpoint, fall, and touch a glitch. Expect respawn at the activated checkpoint, retained items/score, and a reset combo. Previously collected items must not award points again.
+- **Recovery:** activate a later checkpoint and fall. Expect restored health, retained items/score, and a reset combo. Touch a glitch to check damage and temporary protection; expect respawn only when health reaches zero. Previously collected items must not award points again.
 - **Pause and focus:** use Escape, Pause, Resume, switch tabs, and move focus away from the canvas. Verify simulation pauses, Resume restores keyboard play, and movement is not stuck after returning. Check mouse interactions with the header controls specifically because canvas blur also pauses the game.
-- **Completion:** traverse the entire main route to the final beacon. Confirm results match the HUD and Explore again resets the run. Full-level reachability and difficulty need actual play-testing.
+- **Completion:** traverse the main route, enter the boss arena, and defeat all three phases. Confirm results appear only after boss defeat, match the HUD, and reset on Explore again. Full-level reachability and difficulty need actual play-testing.
 - **Audio activation and controls:** verify silence on initial load. Enable music only and play: expect background music without action effects. Enable effects only: expect action sounds without music. Enable both, change each slider, test zero volume, and mute all. Resume after interacting with controls if canvas focus loss paused play. Unavailable audio must not prevent gameplay.
 - **Soundtrack quality:** listen through several loops for timing gaps, clicks, distortion, and balance between melody, bass, chords, and percussion. Compare pickup sounds across all four app zones and check jump, boost, respawn, checkpoint, and victory sounds. These sounds have not been auditioned by the assistant.
 - **Audio lifecycle:** pause/resume repeatedly, switch tabs, switch windows, and restart several times. Expect silence while paused/hidden and no overlapping soundtrack instances after restart. At completion, expect background music to stop and the enabled victory fanfare to play. Check desktop and real mobile browsers separately; browser audio policies differ.
 - **Responsive/touch:** check desktop and narrow layouts, then a real touch device if available. Hold a direction while tapping Jump; release or cancel touches and verify movement stops. Browser device emulation alone does not establish real-device compatibility. The loopback server is accessible only on the computer running it; real-device testing requires a separately configured reachable static host, not an external Microsoft service.
 - **Accessibility:** check visible keyboard focus, readable controls, and checkpoint/completion announcements with assistive technology. Enable the OS reduced-motion preference: decorative time-based animation should stop while gameplay movement remains. Canvas gameplay is visual; full nonvisual accessibility is not established.
 
+### Expansion checks
+
+No automated test suite or test command was added. Perform these additional local browser checks; expected outcomes below are not recorded passes:
+
+- **Bricks:** test landing, side contact, underside hits, and seams between blocks. Ordinary bricks should break once; reward blocks should release one accessible pickup and remain solid afterward. Check that the first blaster can actually be collected.
+- **Combat:** patrols should stay on their platforms. Test stomps, drone warning indicators, firing both directions, projectile collisions, damage grace, and releasing Fire/F. Confirm firing is unavailable before acquiring a blaster.
+- **Protection:** collect a Microsoft-style pickup, verify the ten-second countdown, survive enemy contact, then verify damage resumes after expiry. Falling must still respawn Mario. Pause and confirm the timer stops.
+- **Counters:** collect all five types, including Word documents. The sum of category counts must equal the overall item count. Respawning must not add counts; combat rewards must not affect them. Verify final results and new-run resets.
+- **Boss:** verify arena entry, automatic blaster, health bar, attack warnings, shielded versus exposed damage, all three phases, and victory. Die during each phase and check arena reset without score farming. Test boss shots from the right platform rather than assuming reachability.
+- **Boss audio:** enable music and expect a different arrangement on arena entry, with changing instrumentation across phases. Check Word pickups, firing, brick breaks, power-ups, damage, and boss warnings. Restart and switch tabs repeatedly to check for overlapping or lingering sounds. Audio quality has not been auditioned by the assistant.
+- **Mobile/UI:** hold movement and Fire while tapping Jump on a real touch device when available. Check control wrapping, boss guidance, expanded/collapsed counters, and scrolling to every final-result row. Device emulation is not proof of real-device compatibility.
+
 Do not treat the generated implementation or merged PRs as proof these checks pass. Validate before deployment.
+
+For an existing manually uploaded static site, update it only after validation. Upload `index.html`, `styles.css`, and the complete `src/` folder to that same site's deployment interface. Keep `index.html` at the upload root; exclude `.git`, credentials, and private files. No build command is needed. Hosting is external to local VS Code checks, and deployed JavaScript is visible to visitors.
 
 ## File map and shared interfaces
 
@@ -104,6 +139,17 @@ Do not treat the generated implementation or merged PRs as proof these checks pa
 - `src/audio.js`: `createAudio()` provides user-activated `unlock()`, independent `setVolume()`, `setStatus()`, event-driven `effect()`, `reset()`, and `dispose()`.
 - `src/engine.js`: `createState()`, `setPaused(state, paused)`, and `update(state, input, dt)`; updates use seconds and return gameplay events.
 - `src/main.js`: DOM integration, input, animation loop, audio controls/lifecycle, and UI updates.
+
+Additional expansion modules:
+
+- `src/encounters.js`: immutable patrols, reward blocks, combat settings, and boss arena definitions.
+- `src/blocks.js`: solid collisions, brick destruction, and one-time rewards.
+- `src/combat.js`: health, enemies, projectiles, stomps, and timed protection.
+- `src/boss.js`: boss warnings, attacks, vulnerability windows, and defeat logic.
+- `src/enemy-art.js`: enemies, projectiles, and power-up illustrations.
+- `src/boss-art.js`: datacenter background, core artwork, and attack telegraphs.
+
+The engine distinguishes `world` and `boss` stages. Audio exposes `setStage(stage, phase)` for the original boss arrangement; combat cues use the existing effects bus. `level.js` exports category labels, totals, and `productivityCounts(collected)` for the HUD and results.
 
 Internal names such as `LEVEL.sparks`, `spark` events, and `sparks-value` DOM IDs are retained for compatibility; the displayed collectibles are now Microsoft-themed items, not stars.
 
