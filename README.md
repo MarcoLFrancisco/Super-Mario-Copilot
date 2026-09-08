@@ -342,3 +342,14 @@ Files in the approved proposal:
 - src/boss.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-43 -->
+### Merged change: Add software enemy artwork and combat pickup graphics
+
+Merged pull request #43: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/43
+
+Files in the approved proposal:
+- src/enemy-art.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
