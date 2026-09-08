@@ -309,3 +309,14 @@ Files in the approved proposal:
 - src/encounters.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-37 -->
+### Merged change: Add solid brick collisions and one-time reward spawning
+
+Merged pull request #37: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/37
+
+Files in the approved proposal:
+- src/blocks.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
