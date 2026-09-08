@@ -2,6 +2,92 @@ import { LEVEL, VIEW, APPS, PHYSICS, zoneAt } from './level.js';
 import { drawCharacter } from './character.js';
 import { drawCollectible, drawPickup } from './collectibles.js';
 import { drawBackground, drawPlatform } from './scenery.js';
+import { ARENA } from './encounters.js';
+import { drawEnemy, drawProjectile, drawPowerup } from './enemy-art.js';
+import { drawArena, drawBossWarnings, drawBoss } from './boss-art.js';
+
+function drawCombatScene(ctx, state, reducedMotion, visible) {
+  const { combat, blocks, player } = state;
+  for (const block of blocks.blocks) {
+    if (block.broken || !visible(block.x, block.w)) continue;
+    ctx.save();
+    const bump = reducedMotion ? 0 : Math.sin(block.bump / .18 * Math.PI) * 4;
+    ctx.translate(block.x, block.y - bump);
+    const reward = block.kind === 'reward';
+    ctx.fillStyle = block.used ? '#58677c' : reward ? '#b97722' : APPS[block.app].dark;
+    ctx.fillRect(0, 0, block.w, block.h);
+    ctx.fillStyle = block.used ? '#97a6b7' : reward ? '#ffe19a' : APPS[block.app].color;
+    ctx.fillRect(1, 1, block.w - 2, 3);
+    ctx.strokeStyle = '#13263e'; ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, block.w - 2, block.h - 2);
+    if (reward) {
+      ctx.font = 'bold 22px monospace'; ctx.textAlign = 'center';
+      ctx.fillStyle = block.used ? '#ced8e4' : '#fff6d9';
+      ctx.fillText(block.used ? '·' : '?', block.w / 2, 24);
+    } else {
+      ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(32, 16);
+      ctx.moveTo(16, 0); ctx.lineTo(16, 16);
+      ctx.moveTo(8, 16); ctx.lineTo(8, 32);
+      ctx.moveTo(24, 16); ctx.lineTo(24, 32); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  if (!reducedMotion) {
+    ctx.save();
+    for (const piece of blocks.debris) {
+      if (!visible(piece.x, 16)) continue;
+      ctx.globalAlpha = Math.max(0, piece.life / .6);
+      ctx.fillStyle = APPS[piece.app].color;
+      ctx.fillRect(piece.x, piece.y, 12, 12);
+    }
+    ctx.restore();
+  }
+  for (const item of [...combat.pickups, ...blocks.pickups]) {
+    if (visible(item.x, item.w)) drawPowerup(ctx, item, state.time, reducedMotion);
+  }
+  if (state.stage === 'boss') {
+    drawBossWarnings(ctx, state.boss);
+    drawBoss(ctx, state.boss, reducedMotion);
+  }
+  for (const enemy of combat.enemies) {
+    if (visible(enemy.x, enemy.w)) drawEnemy(ctx, enemy, reducedMotion);
+  }
+  for (const shot of combat.shots) {
+    if (visible(shot.x, shot.w)) drawProjectile(ctx, shot);
+  }
+  ctx.save();
+  if (combat.protection > 0 || combat.grace > 0) {
+    const x = player.x + PHYSICS.playerWidth / 2;
+    const y = player.y + PHYSICS.playerHeight / 2;
+    const colors = combat.protection > 0
+      ? ['#f35325', '#81bc06', '#05a6f0', '#ffba08'] : ['#d6f5ff'];
+    colors.forEach((color, i) => {
+      const start = i * Math.PI * 2 / colors.length;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 25, 32, 0, start, start + Math.PI * 2 / colors.length);
+      ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.stroke();
+    });
+    if (combat.protection > 0) {
+      ctx.font = "bold 12px 'Segoe UI', sans-serif";
+      ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#12253e'; ctx.lineWidth = 3;
+      const remaining = `${combat.protection.toFixed(1)}s`;
+      ctx.strokeText(remaining, x, player.y - 14);
+      ctx.fillText(remaining, x, player.y - 14);
+    }
+  }
+  // Steady translucency conveys damage grace without rapid flashing.
+  if (combat.grace > 0 && combat.protection <= 0) ctx.globalAlpha = .65;
+  drawCharacter(ctx, player, state.time, reducedMotion);
+  if (combat.blaster) {
+    const x = player.facing < 0 ? player.x - 6 : player.x + PHYSICS.playerWidth - 5;
+    ctx.fillStyle = '#465e99'; ctx.fillRect(x, player.y + 25, 11, 6);
+    ctx.fillStyle = '#9dffe5';
+    ctx.fillRect(player.facing < 0 ? x : x + 8, player.y + 26, 3, 4);
+  }
+  ctx.restore();
+}
 
 // Transient visuals stay outside simulation state and reset with each run.
 const visuals = new WeakMap();
@@ -18,7 +104,8 @@ function renderUpgrade(ctx, state, reducedMotion) {
     }
   }
   effects.pickups = effects.pickups.filter(effect => state.time - effect.startedAt < .55);
-  const camera = state.cameraX;
+  const arena = state.stage === 'boss';
+  const camera = arena ? 0 : state.cameraX;
   const visible = (x, width = 50) => x + width > camera - 80 && x < camera + VIEW.width + 80;
   const rect = (x, y, w, h, color) => {
     ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
@@ -31,11 +118,13 @@ function renderUpgrade(ctx, state, reducedMotion) {
   ctx.save();
   try {
     ctx.setTransform(ctx.canvas.width / VIEW.width, 0, 0, ctx.canvas.height / VIEW.height, 0, 0);
-    drawBackground(ctx, camera, zoneAt(state.player.x), state.time, reducedMotion);
+    if (arena) drawArena(ctx, state.time, reducedMotion);
+    else drawBackground(ctx, camera, zoneAt(state.player.x), state.time, reducedMotion);
     ctx.translate(-camera, 0);
-    for (const platform of LEVEL.platforms) {
+    for (const platform of arena ? ARENA.platforms : LEVEL.platforms) {
       if (visible(platform.x, platform.w)) drawPlatform(ctx, platform, state.time, reducedMotion);
     }
+    if (!arena) {
     for (const item of LEVEL.sparks) {
       if (visible(item.x) && !state.collected.has(item.id)) {
         drawCollectible(ctx, item, state.time, reducedMotion);
@@ -72,10 +161,11 @@ function renderUpgrade(ctx, state, reducedMotion) {
       rect(goal.x, goal.y + goal.h - 9, goal.w, 9, '#ecf7ff');
       drawCollectible(ctx, { x: goal.x + goal.w / 2, y: goal.y + 48,
         radius: 23, app: 'copilot', secret: false }, state.time, reducedMotion);
-      label('FINISH', goal.x + 9, goal.y - 15, 12);
+      label('AI CORE', goal.x + 9, goal.y - 15, 12);
     }
-    drawCharacter(ctx, state.player, state.time, reducedMotion);
-    for (const effect of effects.pickups) {
+    }
+    drawCombatScene(ctx, state, reducedMotion, visible);
+    for (const effect of arena ? [] : effects.pickups) {
       if (visible(effect.item.x)) {
         drawPickup(ctx, effect.item, state.time - effect.startedAt, 0, reducedMotion);
       }
