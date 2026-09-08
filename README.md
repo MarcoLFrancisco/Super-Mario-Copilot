@@ -185,3 +185,14 @@ Files in the approved proposal:
 - src/character.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-19 -->
+### Merged change: Add Microsoft-themed collectible graphics and pickup effects
+
+Merged pull request #19: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/19
+
+Files in the approved proposal:
+- src/collectibles.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
