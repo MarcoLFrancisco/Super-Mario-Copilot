@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#09112b">
+  <meta name="description" content="An original cloud-hopping platform adventure inspired by Copilot and Microsoft productivity apps.">
+  <title>Copilot Cloud Quest</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./src/main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#game-controls">Skip to game controls</a>
+  <main class="app-shell">
+    <header class="masthead">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">✦</span>
+        <div>
+          <p class="eyebrow">A productivity-powered platform adventure</p>
+          <h1>Copilot <span>Cloud Quest</span></h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="sound-button" type="button" aria-pressed="false" disabled>Sound: off</button>
+        <button id="pause-button" type="button" aria-controls="pause-panel" disabled>Pause</button>
+      </div>
+    </header>
+
+    <section class="game-card" aria-labelledby="level-title">
+      <header class="level-header">
+        <div>
+          <p class="eyebrow">World 01 · The connected cloud</p>
+          <h2 id="level-title">From Inbox to Infinity</h2>
+        </div>
+        <span class="difficulty-badge">Explore · Collect · Create</span>
+      </header>
+
+      <dl class="hud" aria-label="Game statistics">
+        <div class="hud-item"><dt>Score</dt><dd id="score-value">0</dd></div>
+        <div class="hud-item"><dt>Prompt sparks</dt><dd><span id="sparks-value">0</span> / <span id="sparks-total">—</span></dd></div>
+        <div class="hud-item"><dt>Combo</dt><dd id="combo-value">×1</dd></div>
+        <div class="hud-item"><dt>Checkpoint</dt><dd id="checkpoint-value">Launchpad</dd></div>
+        <div class="hud-item"><dt>Copilot boost</dt><dd id="boost-value">Ready</dd></div>
+      </dl>
+
+      <div class="game-viewport" id="game-viewport">
+        <canvas id="game-canvas" width="1280" height="720" tabindex="0" aria-label="Copilot Cloud Quest platform game" aria-describedby="keyboard-help game-objective">
+          This game requires a browser with Canvas and JavaScript support. Controls and the game objective are provided below.
+        </canvas>
+
+        <section class="game-overlay" id="start-panel" aria-labelledby="start-title">
+          <p class="eyebrow">Your next great idea is one jump away</p>
+          <h2 id="start-title">Jump into the connected cloud.</h2>
+          <p id="game-objective">Guide your cloud explorer across Excel terraces, Outlook mailways, and Teams skybridges. Collect prompt sparks, discover hidden routes, and reach the Copilot beacon.</p>
+          <ul class="feature-pills" aria-label="Adventure features">
+            <li>Handcrafted world</li>
+            <li>Hidden spark trails</li>
+            <li>Friendly checkpoints</li>
+          </ul>
+          <button id="start-button" class="primary-button" type="button" disabled>Start adventure</button>
+          <p id="load-status" role="status">Game shell ready. The remaining game files must be integrated before play is available.</p>
+        </section>
+
+        <section class="game-overlay" id="pause-panel" aria-labelledby="pause-title" hidden>
+          <p class="eyebrow">Take your time</p>
+          <h2 id="pause-title">Cloud connection paused</h2>
+          <p>Your progress is safe for this session. Ready for another leap?</p>
+          <div class="overlay-actions">
+            <button id="resume-button" class="primary-button" type="button">Resume adventure</button>
+            <button id="restart-button" type="button">Restart level</button>
+          </div>
+        </section>
+
+        <section class="game-overlay" id="complete-panel" aria-labelledby="complete-title" hidden>
+          <p class="eyebrow">Idea delivered</p>
+          <h2 id="complete-title">You lit the Copilot beacon!</h2>
+          <p id="completion-summary">The cloud is shining a little brighter.</p>
+          <dl class="results">
+            <div><dt>Final score</dt><dd id="final-score">0</dd></div>
+            <div><dt>Sparks discovered</dt><dd id="final-sparks">0</dd></div>
+            <div><dt>Best combo</dt><dd id="final-combo">×1</dd></div>
+          </dl>
+          <button id="replay-button" class="primary-button" type="button">Explore again</button>
+        </section>
+      </div>
+
+      <div id="game-controls" class="controls-bar">
+        <p id="keyboard-help"><strong>Move</strong> <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> <span aria-hidden="true">·</span> <strong>Jump</strong> <kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> <span aria-hidden="true">·</span> <strong>Boost</strong> <kbd>Shift</kbd> <span aria-hidden="true">·</span> <strong>Pause</strong> <kbd>Esc</kbd></p>
+        <div class="touch-controls" id="touch-controls" role="group" aria-label="On-screen game controls">
+          <div class="direction-controls">
+            <button id="move-left" type="button" data-action="left" aria-label="Move left" disabled>←</button>
+            <button id="move-right" type="button" data-action="right" aria-label="Move right" disabled>→</button>
+          </div>
+          <div class="action-controls">
+            <button id="boost-button" type="button" data-action="boost" disabled>Boost</button>
+            <button id="jump-button" type="button" data-action="jump" disabled>Jump</button>
+          </div>
+        </div>
+      </div>
+      <p id="game-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+    </section>
+
+    <section class="field-guide" aria-labelledby="guide-title">
+      <div>
+        <p class="eyebrow">Field guide</p>
+        <h2 id="guide-title">A workspace worth exploring</h2>
+      </div>
+      <div class="guide-grid">
+        <article class="guide-card" data-app="excel">
+          <span class="app-token" aria-hidden="true">X</span>
+          <h3>Excel terraces</h3>
+          <p>Find your footing on luminous cell platforms. Look above the obvious path for extra sparks.</p>
+        </article>
+        <article class="guide-card" data-app="outlook">
+          <span class="app-token" aria-hidden="true">O</span>
+          <h3>Outlook mailways</h3>
+          <p>Follow the floating envelopes through the cloud. Checkpoint beacons make missed jumps forgiving.</p>
+        </article>
+        <article class="guide-card" data-app="teams">
+          <span class="app-token" aria-hidden="true">T</span>
+          <h3>Teams skybridges</h3>
+          <p>Hop across the meeting skyline and keep your spark streak going to build a bigger combo.</p>
+        </article>
+        <article class="guide-card" data-app="copilot">
+          <span class="app-token" aria-hidden="true">✦</span>
+          <h3>Copilot boost</h3>
+          <p>Use a burst of forward momentum to reach farther platforms. Watch the HUD for boost readiness.</p>
+        </article>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <p>Original fan-made platform adventure. Not affiliated with or endorsed by Microsoft or Nintendo. Microsoft application names belong to their respective owners; app motifs are illustrative, not official assets.</p>
+      <p>No sign-in, purchases, or external Microsoft services required.</p>
+    </footer>
+  </main>
+  <noscript><p class="noscript-message">Enable JavaScript to play Copilot Cloud Quest. No account is required.</p></noscript>
+</body>
+</html>
