@@ -174,3 +174,14 @@ Files in the approved proposal:
 - README.md
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-17 -->
+### Merged change: Add animated Canvas Mario character module
+
+Merged pull request #17: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/17
+
+Files in the approved proposal:
+- src/character.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
