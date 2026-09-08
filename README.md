@@ -42,3 +42,14 @@ Files in the approved proposal:
 - src/level.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-9 -->
+### Merged change: Add procedural cloud-world graphics and explorer renderer
+
+Merged pull request #9: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/9
+
+Files in the approved proposal:
+- src/art.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
