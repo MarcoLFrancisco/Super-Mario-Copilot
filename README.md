@@ -452,3 +452,14 @@ Files in the approved proposal:
 - styles.css
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-63 -->
+### Merged change: Connect combat controls, productivity scoreboard, and boss audio
+
+Merged pull request #63: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/63
+
+Files in the approved proposal:
+- src/main.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
