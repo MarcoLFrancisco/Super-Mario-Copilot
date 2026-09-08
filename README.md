@@ -509,3 +509,14 @@ Files in the approved proposal:
 - src/main.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-65 -->
+### Merged change: Document combat expansion, productivity counters, and boss validation
+
+Merged pull request #65: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/65
+
+Files in the approved proposal:
+- README.md
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
