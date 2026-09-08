@@ -1,7 +1,11 @@
 import { LEVEL, VIEW, PHYSICS as P } from './level.js';
+import { ARENA } from './encounters.js';
+import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
+import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat } from './combat.js';
+import { createBoss, updateBoss, hitBoss } from './boss.js';
 
 // Public API: createState(), setPaused(state, boolean), update(state,input,dt).
-// Input: held left/right, one-frame jumpPressed/boostPressed booleans.
+// Input: held left/right/fire, one-frame jumpPressed/boostPressed booleans.
 // dt is seconds. update returns event objects for audio and announcements.
 // Status is playing/paused/complete. Restart by replacing state with createState().
 const STEP = 1 / 120;
@@ -24,7 +28,8 @@ export function createState() {
     player, cameraX: cameraTarget(player), collected: new Set(),
     checkpointIndex: 0, score: 0, combo: 1, bestCombo: 1,
     comboTimer: 0, deaths: 0, time: 0, status: 'playing',
-    accumulator: 0, pendingJump: false, pendingBoost: false
+    accumulator: 0, pendingJump: false, pendingBoost: false,
+    stage: 'world', blocks: createBlocks(), combat: createCombat(), boss: null
   };
 }
 
@@ -37,10 +42,28 @@ export function setPaused(state, paused) {
   state.player.jumpBuffer = 0;
 }
 
+function enterArena(state) {
+  state.stage = 'boss';
+  state.player = makePlayer(ARENA.spawn);
+  state.cameraX = 0;
+  state.blocks = createBlocks([]);
+  state.combat = createCombat({ enemies: [], pickups: [] });
+  state.combat.blaster = ARENA.grantBlaster;
+  state.boss = createBoss();
+  state.pendingJump = false;
+  state.pendingBoost = false;
+}
+
 function respawn(state, events) {
-  const checkpoint = LEVEL.checkpoints[state.checkpointIndex];
-  state.player = makePlayer(checkpoint.spawn);
-  state.cameraX = cameraTarget(state.player);
+  const checkpoint = state.stage === 'boss'
+    ? { name: ARENA.checkpointName, spawn: ARENA.spawn }
+    : LEVEL.checkpoints[state.checkpointIndex];
+  if (state.stage === 'boss') enterArena(state);
+  else {
+    state.player = makePlayer(checkpoint.spawn);
+    state.cameraX = cameraTarget(state.player);
+    resetCombat(state.combat);
+  }
   state.combo = 1;
   state.comboTimer = 0;
   state.deaths += 1;
@@ -52,7 +75,11 @@ function respawn(state, events) {
 
 function tick(state, input, events) {
   const p = state.player;
+  const arena = state.stage === 'boss';
+  const world = arena ? ARENA : LEVEL;
+  const combatEvents = [];
   state.time += STEP;
+  updateBlocks(state.blocks, STEP);
   state.comboTimer = Math.max(0, state.comboTimer - STEP);
   if (state.comboTimer === 0) state.combo = 1;
   p.boostCooldown = Math.max(0, p.boostCooldown - STEP);
@@ -86,15 +113,18 @@ function tick(state, input, events) {
   }
 
   const oldX = p.x;
+  const oldY = p.y;
   const oldBottom = p.y + P.playerHeight;
-  p.x = clamp(p.x + p.vx * STEP, 0, LEVEL.width - P.playerWidth);
+  p.x = clamp(p.x + p.vx * STEP, 0, world.width - P.playerWidth);
+  resolveBlockX(state.blocks, p, oldX);
   p.vy = Math.min(p.vy + P.gravity * STEP, P.maxFallSpeed);
   p.y += p.vy * STEP;
   p.grounded = false;
-  if (p.vy >= 0) {
+  const contact = resolveBlockY(state.blocks, p, oldY, events);
+  if (p.vy >= 0 && !contact.ceiling) {
     const newBottom = p.y + P.playerHeight;
     let landing = null;
-    for (const platform of LEVEL.platforms) {
+    for (const platform of world.platforms) {
       if (oldBottom > platform.y + .01 || newBottom < platform.y) continue;
       const fraction = newBottom === oldBottom ? 0
         : clamp((platform.y - oldBottom) / (newBottom - oldBottom), 0, 1);
@@ -110,11 +140,46 @@ function tick(state, input, events) {
     }
   }
 
-  const box = body(p);
-  if (p.y > LEVEL.deathY || LEVEL.hazards.some(h => overlaps(box, h))) {
+  if (p.y > world.deathY) {
     respawn(state, events);
     return;
   }
+  for (const reward of collectBlockRewards(state.blocks, p)) {
+    grantPower(state.combat, reward, combatEvents);
+  }
+  if (arena) updateBoss(state.boss, state.combat, p, STEP, combatEvents);
+  updateCombat(state.combat, p, input, STEP, oldBottom, combatEvents, state.blocks.blocks);
+  if (!arena) {
+    const hazard = LEVEL.hazards.find(h => overlaps(body(p), h));
+    if (hazard) hurtPlayer(state.combat, p, hazard.x + hazard.w / 2, combatEvents);
+  }
+  // World enemies remain defeated across respawns. Arena summons award no
+  // points, preventing score farming when the boss encounter is reset.
+  for (const event of combatEvents) {
+    if (event.type === 'enemyDefeated') {
+      if (arena) event.points = 0;
+      else state.score += event.points;
+    }
+  }
+  events.push(...combatEvents);
+  if (state.combat.health <= 0) {
+    respawn(state, events);
+    return;
+  }
+  if (arena) {
+    const bossEvents = [];
+    hitBoss(state.boss, state.combat, bossEvents);
+    events.push(...bossEvents);
+    if (state.boss.defeated) {
+      const victory = bossEvents.find(event => event.type === 'bossDefeated');
+      state.score += victory?.points ?? 0;
+      state.status = 'complete';
+      p.vx = 0; p.boostTime = 0;
+      events.push({ type: 'complete', score: state.score, sparks: state.collected.size });
+    }
+    return;
+  }
+  const box = body(p);
   for (let i = state.checkpointIndex + 1; i < LEVEL.checkpoints.length; i++) {
     const c = LEVEL.checkpoints[i];
     if (overlaps(box, { x: c.x - 28, y: c.y - 110, w: 56, h: 110 })) {
@@ -138,10 +203,8 @@ function tick(state, input, events) {
   }
   state.cameraX += (cameraTarget(p) - state.cameraX) * (1 - Math.exp(-8 * STEP));
   if (overlaps(box, LEVEL.goal)) {
-    state.status = 'complete';
-    p.vx = 0;
-    p.boostTime = 0;
-    events.push({ type: 'complete', score: state.score, sparks: state.collected.size });
+    enterArena(state);
+    events.push({ type: 'bossEnter', name: ARENA.name });
   }
 }
 
