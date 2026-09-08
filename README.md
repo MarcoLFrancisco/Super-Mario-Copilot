@@ -419,3 +419,14 @@ Files in the approved proposal:
 - src/music.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-57 -->
+### Merged change: Add combat audio cues and stage-aware boss music switching
+
+Merged pull request #57: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/57
+
+Files in the approved proposal:
+- src/audio.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
