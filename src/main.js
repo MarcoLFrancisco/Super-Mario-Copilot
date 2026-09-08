@@ -1,4 +1,5 @@
-import { LEVEL } from './level.js';
+import { LEVEL, PRODUCTIVITY, PRODUCTIVITY_TOTALS, productivityCounts } from './level.js';
+import { ARENA, COMBAT } from './encounters.js';
 import { createState, setPaused, update } from './engine.js';
 import { render } from './art.js';
 import { createAudio } from './audio.js';
@@ -23,23 +24,51 @@ const keys = new Map();
 const pointers = new Map();
 let jumpPressed = false;
 let boostPressed = false;
+let fireUntil = 0;
 const mapping = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
-  Space: 'jump', KeyW: 'jump', ArrowUp: 'jump', ShiftLeft: 'boost', ShiftRight: 'boost' };
+  Space: 'jump', KeyW: 'jump', ArrowUp: 'jump', ShiftLeft: 'boost', ShiftRight: 'boost', KeyF: 'fire' };
 const playing = () => started && state.status === 'playing';
 const announce = message => text('game-announcement', message);
 function clearInput() {
-  keys.clear(); pointers.clear(); jumpPressed = false; boostPressed = false;
+  keys.clear(); pointers.clear(); jumpPressed = false; boostPressed = false; fireUntil = 0;
 }
 function press(action) {
   if (action === 'jump') jumpPressed = true;
   if (action === 'boost') boostPressed = true;
+  // Preserve a quick tap until at least one simulation step can consume it.
+  if (action === 'fire') fireUntil = performance.now() + 100;
 }
 function hud() {
   text('score-value', state.score.toLocaleString());
   text('sparks-value', state.collected.size);
   text('sparks-total', LEVEL.sparks.length);
   text('combo-value', `×${state.combo}`);
-  text('checkpoint-value', LEVEL.checkpoints[state.checkpointIndex].name);
+  text('checkpoint-value', state.stage === 'boss' ? ARENA.checkpointName : LEVEL.checkpoints[state.checkpointIndex].name);
+  text('health-value', `${state.combat.health} / ${COMBAT.maxHealth}`);
+  text('weapon-value', state.combat.blaster ? 'Ready · F to fire' : 'Find a reward brick');
+  text('protection-value', state.combat.protection > 0 ? `${state.combat.protection.toFixed(1)}s` : 'Inactive');
+  const counts = productivityCounts(state.collected);
+  for (const app of Object.keys(PRODUCTIVITY)) {
+    text(`count-${app}`, `${counts[app]} / ${PRODUCTIVITY_TOTALS[app]}`);
+  }
+  el('fire-button').disabled = !playing() || !state.combat.blaster;
+  el('boss-hud').hidden = !started || state.stage !== 'boss';
+  if (state.boss) {
+    const boss = state.boss;
+    el('boss-health').max = boss.maxHealth;
+    el('boss-health').value = boss.health;
+    text('boss-health', `${boss.health} / ${boss.maxHealth}`);
+    text('boss-health-value', `${boss.health} / ${boss.maxHealth}`);
+    text('boss-phase', `${ARENA.phases[boss.phase].name} · ${boss.mode}`);
+    const tips = {
+      intro: 'Prepare: climb toward the right platform. Your blaster is ready.',
+      warning: ['Token burst incoming: keep moving.', 'Leave the marked column; agents are incoming.', 'Energy waves incoming: jump or climb.'][boss.phase],
+      attack: 'Dodge the attacks. The core is shielded.',
+      exposed: 'Core exposed! Hold F or Fire from the right platform.',
+      defeated: 'Core patched. Review your final productivity results.'
+    };
+    text('boss-hint', tips[boss.mode] || 'Watch the arena warnings.');
+  }
   text('boost-value', state.player.boostCooldown > 0 ? `${state.player.boostCooldown.toFixed(1)}s` : 'Ready');
 }
 function panels() {
@@ -57,7 +86,7 @@ function start() {
   state = createState(); started = true; previous = 0;
   if (enabled.music || enabled.effects) void audio.unlock();
   clearInput(); panels(); hud(); canvas.focus({ preventScroll: true });
-  announce('Adventure started. Reach the Copilot beacon.');
+  announce('Adventure started. Hit reward bricks for a blaster. Reach the beacon and defeat the AI core.');
 }
 function pause(value, focus = true) {
   if (!started || state.status === 'complete') return;
@@ -154,8 +183,10 @@ function frame(now) {
   previous = now;
   if (playing()) {
     const held = new Set([...keys.values(), ...pointers.values()]);
-    const events = update(state, { left: held.has('left'), right: held.has('right'), jumpPressed, boostPressed }, dt);
+    const events = update(state, { left: held.has('left'), right: held.has('right'),
+      fire: held.has('fire') || now < fireUntil, jumpPressed, boostPressed }, dt);
     jumpPressed = false; boostPressed = false;
+    audio.setStage(state.stage, state.boss?.phase ?? 0);
     if (state.status === 'complete') audio.setStatus('complete');
     const played = new Set();
     for (const event of events) {
@@ -163,13 +194,31 @@ function frame(now) {
       const key = event.type === 'spark' ? `${event.type}:${app}` : event.type;
       if (!played.has(key)) { audio.effect(event, app); played.add(key); }
       if (event.type === 'checkpoint') announce(`Checkpoint reached: ${event.name}.`);
-      if (event.type === 'respawn') announce(`Back at ${event.name}. Your app collectibles and score are kept.`);
+      if (event.type === 'respawn') {
+        clearInput();
+        announce(`Back at ${event.name}. Health restored; your app collectibles and score are kept.`);
+      }
+      if (event.type === 'bossEnter') {
+        clearInput();
+        announce('AI core checkpoint reached. Blaster equipped. Dodge warnings and shoot during exposed-core windows.');
+      }
+      if (event.type === 'damage') announce(`Hit! ${event.health} health remaining.`);
+      if (event.type === 'powerup') announce(event.kind === 'microsoft'
+        ? 'Microsoft protection active for 10 seconds. Falls still cause respawn.'
+        : 'Debug Blaster equipped. Hold F or Fire to shoot.');
+      if (event.type === 'blockReward') announce('Reward released beneath the block. Touch it to collect.');
+      if (event.type === 'bossWarning' || event.type === 'bossPhase') announce(`${event.name}. Watch the arena warning.`);
+      if (event.type === 'bossExposed') announce('Core exposed! Fire from the right platform.');
       if (event.type === 'complete') {
         clearInput();
         text('final-score', state.score.toLocaleString());
         text('final-sparks', `${state.collected.size} / ${LEVEL.sparks.length}`);
         text('final-combo', `×${state.bestCombo}`);
-        text('completion-summary', `Mario reached the beacon! You collected ${state.collected.size} of ${LEVEL.sparks.length} app items.`);
+        const counts = productivityCounts(state.collected);
+        for (const app of Object.keys(PRODUCTIVITY)) {
+          text(`final-${app}`, `${counts[app]} / ${PRODUCTIVITY_TOTALS[app]}`);
+        }
+        text('completion-summary', `Mario patched the Hallucination Engine! You collected ${state.collected.size} of ${LEVEL.sparks.length} app items.`);
         panels(); el('replay-button').focus({ preventScroll: true });
         announce('Level complete! Your results are ready.');
       }
@@ -185,7 +234,9 @@ if (ctx) {
   el('audio-settings').disabled = false;
   audioControls();
   text('audio-status', 'Enable music and effects independently below, or use Enable all sound. Audio starts off and pauses with gameplay.');
-  text('load-status', 'Mario is ready! Audio is optional. Enable sound, then start your adventure.');
+  canvas.setAttribute('aria-describedby', 'keyboard-help combat-help game-objective');
+  text('combat-controls-status', 'Combat controls ready. Hold F or Fire after collecting a blaster. The boss arena supplies one automatically.');
+  text('load-status', 'Mario is ready! Break reward bricks, collect app items, and challenge the AI core. Audio is optional.');
   requestAnimationFrame(frame);
 } else {
   text('load-status', 'Canvas graphics are unavailable. Please use a browser with Canvas 2D support.');
