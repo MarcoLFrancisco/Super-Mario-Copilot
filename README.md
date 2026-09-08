@@ -564,3 +564,14 @@ Files in the approved proposal:
 - index.html
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-75 -->
+### Merged change: Connect accessible boss captions and optional browser speech
+
+Merged pull request #75: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/75
+
+Files in the approved proposal:
+- src/main.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
