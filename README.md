@@ -520,3 +520,14 @@ Files in the approved proposal:
 - README.md
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-67 -->
+### Merged change: Add event-driven AI boss dialogue and repetition controls
+
+Merged pull request #67: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/67
+
+Files in the approved proposal:
+- src/boss-dialogue.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
