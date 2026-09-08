@@ -553,3 +553,14 @@ Files in the approved proposal:
 - src/boss-art.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-73 -->
+### Merged change: Prepare optional boss voice control and accessible dialogue captions
+
+Merged pull request #73: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/73
+
+Files in the approved proposal:
+- index.html
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
