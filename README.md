@@ -542,3 +542,14 @@ Files in the approved proposal:
 - src/boss.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-71 -->
+### Merged change: Animate boss expressions, attack poses, and dialogue bubbles
+
+Merged pull request #71: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/71
+
+Files in the approved proposal:
+- src/boss-art.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
