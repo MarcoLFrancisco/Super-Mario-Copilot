@@ -150,8 +150,17 @@
             <label for="effects-volume">Effects volume</label>
             <input id="effects-volume" type="range" min="0" max="100" step="5" value="65" aria-describedby="effects-help">
           </p>
-          <p id="effects-help">App-specific pickups, jumping, boosts, checkpoint jingles, and a victory fanfare. New audio playback will require user activation.</p>
+          <p id="effects-help">App-specific pickups, jumping, boosts, checkpoint jingles, and a victory fanfare. Audio playback requires user activation.</p>
+          <p>
+            <button id="boss-voice-button" type="button" aria-pressed="false" aria-describedby="boss-voice-help boss-voice-status" disabled>Boss voice: off</button>
+          </p>
+          <p id="boss-voice-help">Optional browser-synthesized speech with its own toggle. Voice availability and quality depend on your browser and operating system; some voices may use an online speech service. No microphone or API key is needed. Dialogue captions do not require voice playback.</p>
+          <p id="boss-voice-status" role="status">Boss voice and accessible captions await the next integration step. Canvas speech bubbles are already available during the encounter.</p>
         </fieldset>
+      </section>
+      <section id="boss-dialogue-panel" class="controls-bar" aria-labelledby="boss-dialogue-title" hidden>
+        <h3 id="boss-dialogue-title">The Hallucination Engine says</h3>
+        <p id="boss-caption" role="status" aria-live="polite" aria-atomic="true"></p>
       </section>
       <p id="game-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
     </section>
