@@ -163,3 +163,14 @@ Files in the approved proposal:
 - src/main.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-15 -->
+### Merged change: Document local setup, game controls, and manual validation
+
+Merged pull request #15: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/15
+
+Files in the approved proposal:
+- README.md
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
