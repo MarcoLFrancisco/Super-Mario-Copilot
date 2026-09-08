@@ -251,3 +251,14 @@ Files in the approved proposal:
 - index.html
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-31 -->
+### Merged change: Connect soundtrack, independent audio controls, and collectible sounds
+
+Merged pull request #31: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/31
+
+Files in the approved proposal:
+- src/main.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
