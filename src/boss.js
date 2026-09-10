@@ -20,31 +20,28 @@ const phaseFor = boss => Math.max(0, ARENA.phases.findIndex(p => boss.health > p
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 function moveCore(boss, player, dt) {
   const exposed = boss.mode === 'exposed';
-  const attacking = boss.mode === 'attack';
-  const phaseSpeed = .8 + boss.phase * .25;
-  // The whole path stays beyond the right platform's edge (x=950).
-  // Core bounds always include the platform's standing-shot height (~496).
-  // Motion is gameplay, not renderer-only displacement: shots and contact
-  // damage use these same x/y coordinates, including the recoil response.
-  const targetX = exposed ? ARENA.boss.x
-    : 1040 + Math.sin(boss.age * phaseSpeed) * (attacking ? 55 : 30);
-  const targetY = exposed ? ARENA.boss.y
-    : 375 + Math.sin(boss.age * phaseSpeed * .75 + boss.phase) * 30;
-  const stiffness = exposed ? 28 : 12;
-  const damping = exposed ? 11 : 7;
-  boss.vx += ((targetX - boss.x) * stiffness - boss.vx * damping) * dt;
-  boss.vy += ((targetY - boss.y) * stiffness - boss.vy * damping) * dt;
-  boss.vx = clamp(boss.vx, -100, 100);
-  boss.vy = clamp(boss.vy, -75, 75);
+  const returning = boss.mode === 'returning';
+  const home = ARENA.boss;
+  // Ascend before crossing platforms; descend only outside their right edge.
+  const overhead = boss.y <= 190;
+  const aligned = Math.abs(boss.x - home.x) < 8;
+  const targetX = exposed ? home.x : returning
+    ? (overhead || aligned ? home.x : boss.x)
+    : (overhead ? 570 + Math.cos(boss.age * .8) * 450 : boss.x);
+  const targetY = exposed || (returning && aligned) ? home.y : 150;
+  boss.vx += ((targetX - boss.x) * 18 - boss.vx * 9) * dt;
+  boss.vy += ((targetY - boss.y) * 18 - boss.vy * 9) * dt;
+  boss.vx = clamp(boss.vx, -360, 360);
+  boss.vy = clamp(boss.vy, -230, 230);
   const x = boss.x + boss.vx * dt, y = boss.y + boss.vy * dt;
-  boss.x = clamp(x, 975, 1100);
-  boss.y = clamp(y, 340, 415);
+  boss.x = clamp(x, 100, ARENA.width - boss.w - 30);
+  boss.y = clamp(y, 120, home.y);
   if (boss.x !== x) boss.vx = 0;
   if (boss.y !== y) boss.vy = 0;
   boss.lookX = clamp((player.x + P.playerWidth / 2 - boss.x - boss.w / 2) / 300, -1, 1);
   boss.lookY = clamp((player.y + P.playerHeight / 2 - boss.y - boss.h / 2) / 180, -1, 1);
   boss.windup = boss.mode === 'warning'
-    ? clamp(1 - boss.timer / ARENA.phases[boss.phase].warningTime, 0, 1) : 0;
+    ? clamp(1 - boss.timer / Math.max(1.8, ARENA.phases[boss.phase].warningTime), 0, 1) : 0;
   boss.recoil = Math.max(0, boss.recoil - dt);
   boss.attackPulse = Math.max(0, boss.attackPulse - dt);
 }
@@ -55,7 +52,7 @@ function clearThreats(combat) {
 function warn(boss, player, events) {
   boss.phase = phaseFor(boss);
   const phase = ARENA.phases[boss.phase];
-  boss.mode = 'warning'; boss.timer = phase.warningTime;
+  boss.mode = 'warning'; boss.timer = Math.max(1.8, phase.warningTime);
   boss.cycle += 1; boss.zones = [];
   if (phase.attack === 'agents') {
     const x = Math.max(0, Math.min(ARENA.width - 100, player.x - 32));
@@ -67,7 +64,7 @@ function warn(boss, player, events) {
 }
 function summon(boss, combat) {
   combat.enemies = combat.enemies.filter(enemy => !enemy.dead);
-  const count = Math.min(ARENA.phases[boss.phase].summonCount,
+  const count = Math.min(2, ARENA.phases[boss.phase].summonCount,
     ARENA.maxMinions - combat.enemies.length);
   for (let i = 0; i < count; i++) {
     const x = ARENA.summonPoints[i];
@@ -78,24 +75,26 @@ function summon(boss, combat) {
   }
 }
 function attack(boss, combat, player) {
-  boss.attackPulse = .3;
   const phase = ARENA.phases[boss.phase];
+  if (combat.shots.filter(s => s.owner === 'enemy' && s.life > 0).length >= 2) return;
   if (phase.attack === 'tokens') {
-    const x = boss.x - 12, y = boss.y + boss.h / 2;
-    const angle = Math.atan2(player.y + P.playerHeight / 2 - y,
-      player.x + P.playerWidth / 2 - x);
-    for (const offset of [-.22, 0, .22]) {
-      spawnShot(combat, { owner: 'enemy', kind: 'token', x, y,
-        vx: Math.cos(angle + offset) * phase.projectileSpeed,
-        vy: Math.sin(angle + offset) * phase.projectileSpeed,
-        w: 14, h: 14, life: 5 });
-    }
+    const x = boss.x + boss.w / 2 - 7, y = boss.y + boss.h;
+    const dx = player.x + P.playerWidth / 2 - x;
+    const dy = player.y + P.playerHeight / 2 - y;
+    if (Math.hypot(dx, dy) < 180) return;
+    const angle = Math.atan2(dy, dx);
+    const speed = Math.min(150, phase.projectileSpeed);
+    spawnShot(combat, { owner: 'enemy', kind: 'token', x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      w: 14, h: 14, life: 4 });
   } else if (phase.attack === 'waves') {
-    // Low floor wave can be jumped or avoided on elevated platforms.
+    // Enter at the arena edge instead of appearing beneath the player.
+    if (player.x > ARENA.width - 260) return;
     spawnShot(combat, { owner: 'enemy', kind: 'wave',
-      x: boss.x, y: 604, w: 32, h: 26,
-      vx: -phase.waveSpeed, vy: 0, life: 5 });
+      x: ARENA.width - 34, y: 604, w: 32, h: 26,
+      vx: -Math.min(170, phase.waveSpeed), vy: 0, life: 7 });
   }
+  boss.attackPulse = .3;
 }
 export function updateBoss(boss, combat, player, dt, events) {
   if (boss.defeated || combat.health <= 0 || !Number.isFinite(dt) || dt <= 0) return;
@@ -110,7 +109,7 @@ export function updateBoss(boss, combat, player, dt, events) {
     if (boss.timer === 0) warn(boss, player, events);
   } else if (boss.mode === 'warning') {
     if (boss.timer === 0) {
-      boss.mode = 'attack'; boss.timer = phase.attackDuration; boss.shotTimer = 0;
+      boss.mode = 'attack'; boss.timer = phase.attackDuration; boss.shotTimer = .5;
       boss.attackPulse = .4;
       if (phase.attack === 'agents') summon(boss, combat);
       events.push({ type: 'bossAttack', phase: boss.phase });
@@ -126,12 +125,19 @@ export function updateBoss(boss, combat, player, dt, events) {
     if (phase.attack !== 'agents') {
       boss.shotTimer -= step;
       if (boss.shotTimer <= 0 && boss.timer > 0) {
-        attack(boss, combat, player); boss.shotTimer += phase.interval;
+        attack(boss, combat, player); boss.shotTimer += Math.max(1.8, phase.interval);
       }
     }
     if (boss.timer === 0) {
-      boss.mode = 'exposed'; boss.timer = ARENA.boss.vulnerableDuration;
+      boss.mode = 'returning';
       boss.zones = []; clearThreats(combat);
+    }
+  } else if (boss.mode === 'returning') {
+    // Start the firing window only when the core reaches platform height.
+    if (Math.abs(boss.x - ARENA.boss.x) < 8 && Math.abs(boss.y - ARENA.boss.y) < 8) {
+      boss.x = ARENA.boss.x; boss.y = ARENA.boss.y;
+      boss.vx = 0; boss.vy = 0;
+      boss.mode = 'exposed'; boss.timer = Math.max(5, ARENA.boss.vulnerableDuration);
       events.push({ type: 'bossExposed', duration: boss.timer });
       sayBoss(boss.dialogue, 'exposed', events);
     }
@@ -155,7 +161,7 @@ export function hitBoss(boss, combat, events) {
     boss.health = Math.max(0, boss.health - shot.damage);
     boss.grace = ARENA.boss.damageGrace;
     boss.recoil = .28;
-    boss.vx = shot.vx < 0 ? -85 : 85;
+    boss.vx = 0; // Visual recoil remains; the exposed target stays reachable.
     events.push({ type: 'bossHit', health: boss.health, maxHealth: boss.maxHealth });
     if (boss.health === 0) {
       boss.defeated = true; boss.mode = 'defeated'; boss.timer = 0;
