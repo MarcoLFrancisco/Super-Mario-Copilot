@@ -618,3 +618,14 @@ Files in the approved proposal:
 - README.md
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-82 -->
+### Merged change: Add procedural Marco and helper character artwork
+
+Merged pull request #82: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/82
+
+Files in the approved proposal:
+- src/party-art.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
