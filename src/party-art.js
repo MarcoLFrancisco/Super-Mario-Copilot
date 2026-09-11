@@ -28,7 +28,10 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
   const outfit = CHARACTERS.marco.appearance;
   ctx.save();
   try {
-    if (actor.id === 'mario') drawCharacter(ctx, actor, time, reducedMotion);
+    if (actor.id === 'mario') {
+      drawCharacter(ctx, actor, time, reducedMotion,
+        attack?.kind === 'kick' ? extension : null);
+    }
     ctx.translate(actor.x + P.playerWidth / 2, actor.y);
     ctx.scale(P.playerWidth / 34 * (facing < 0 ? -1 : 1), P.playerHeight / 46);
     const oval = (x, y, rx, ry, color) => {
@@ -71,7 +74,8 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
     if (marco) {
       const skin = gradient('#ffdbb8', '#c98a66', 10, 20);
       const jeans = gradient('#5287cf', outfit.jeans, 31, 13);
-      leg(-5, stride * .55, '#21467f');
+      // Keep the supporting leg steady throughout the kickboxing pose.
+      leg(-5, attack?.kind === 'kick' ? 0 : stride * .55, '#21467f');
       leg(5, attack?.kind === 'kick' ? -1.48 * extension : -stride * .55, jeans);
       oval(-10, 27, 3, 6, outfit.shirt);
       oval(-10 - stride * 2, 32, 2.6, 3, skin);
@@ -106,7 +110,8 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
       line([[-10, 28], [-17, 25], [-19, 29]], '#716b80', 2);
       oval(-19, 30, 2, 3, '#303343');
       leg(-7, attack ? extension * 1.6 : stride * .5, '#787589', true);
-      leg(6, -stride * .5, '#a3a1ad', true);
+      // Plant the supporting leg during the kick instead of continuing its run cycle.
+      leg(6, attack ? 0 : -stride * .5, '#a3a1ad', true);
       oval(-1, 29, 12, 9, gradient('#b4b1bf', '#706e80', 21, 16));
       oval(8, 20, 6, 10, '#a3a0ae');
       oval(4, 7, 2.5, 7, '#9691a5');
@@ -122,13 +127,12 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
       line([[12, 22], [16, 22]], '#645668', .8);
       poly([[4, 23], [12, 25], [7, 29], [2, 26]], '#25d9d2');
     }
-    if (actor.id === 'mario' && attack) {
-      leg(5, -1.48 * extension, '#438fff');
-    }
     // A steady contact marker remains with reduced motion; decorative arcs do not.
     if (active) {
       const direction = spec.backward ? -1 : 1;
-      const tip = direction * (13 + spec.reach * 34 / P.playerWidth);
+      // Match the hitbox's outer edge relative to the actor's center,
+      // converting world pixels into this sprite's local coordinates.
+      const tip = direction * (P.playerWidth / 2 - 4 + spec.reach) * 34 / P.playerWidth;
       const y = (spec.top + spec.height / 2) * 46 / P.playerHeight;
       line([[tip - 3, y], [tip + 3, y]], '#e4fffc', 2);
       if (!reducedMotion) {

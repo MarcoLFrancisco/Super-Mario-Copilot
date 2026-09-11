@@ -1,6 +1,6 @@
 # Copilot Cloud Quest
 
-An unofficial Mario browser platformer through Microsoft-themed worlds. Collect Excel sheets, Outlook emails, Teams conversation bubbles, and Copilot ribbon icons across layered landscapes and dimensional platforms. Mario and the app illustrations are custom procedural Canvas artwork, not imported official sprites or icon assets. Mario belongs to Nintendo; Microsoft application names and marks belong to Microsoft. This project is not affiliated with or endorsed by either company.
+An unofficial browser platformer starring Marco through Microsoft-themed worlds, with Donkey and Mario as surprise-box helpers. Marco has black hair, a baseball cap, a T-shirt, jeans, and polarized-style sunglasses. Collect Excel sheets, Outlook emails, Word documents, Teams conversation bubbles, and Copilot ribbon icons across layered landscapes and dimensional platforms. Characters and app illustrations are custom procedural Canvas artwork, not imported official sprites or icon assets. The sunglasses are illustrative, not an official Ray-Ban asset. Mario belongs to Nintendo; Microsoft application names and marks belong to Microsoft. This project is not affiliated with or endorsed by those brands.
 
 The optional soundtrack is an original synthesized arrangement with melody, bass, chords, percussion, and gameplay jingles. It does not use Nintendo recordings. All implementation files are present, but graphics, gameplay, browser compatibility, and audio quality still require manual validation; repository inspection is not a successful runtime test.
 
@@ -40,7 +40,7 @@ The version check should report Python 3; the second command should remain runni
 6. Expect a styled title screen with an enabled **Start adventure** button and a ready message. Start the adventure to focus the canvas.
 7. Stop the development server with **Ctrl+C** in the VS Code terminal when finished. This server is for local development, not production hosting.
 
-If Start remains disabled or the page is blank, inspect the browser developer console and Network panel. Confirm `styles.css` and all sixteen `src/*.js` modules load successfully from the repository root, then reload. No package installation or build step was added for the upgrade. No `npm install`, `npm run dev`, or `npm test` command is defined by this repository.
+If Start remains disabled or the page is blank, inspect the browser developer console and Network panel. Confirm `styles.css` and all eighteen `src/*.js` modules, including `party.js` and `party-art.js`, load successfully from the repository root, then reload. No package installation or build step was added for the upgrade. No `npm install`, `npm run dev`, or `npm test` command is defined by this repository.
 
 ## Controls and game rules
 
@@ -51,7 +51,9 @@ If Start remains disabled or the page is blank, inspect the browser developer co
 | Copilot boost | Shift; boosts in the facing direction with a 1.5-second cooldown |
 | Pause/resume | Escape or the Pause/Resume controls |
 | Touch movement | Hold the on-screen left/right buttons |
-| Touch actions | Press Jump or Boost; hold Fire after acquiring a blaster |
+| Touch actions | Press Jump, Boost, Attack, or Helpers; hold Fire after acquiring a blaster |
+| Marco kickboxing | Tap J or Attack to alternate punches and forward kicks; holding does not repeat |
+| Helper attacks | Tap K or Helpers to command unlocked companions: Donkey kicks backward, Mario kicks forward |
 | Debug Blaster | Hold F while the canvas is focused, or hold the on-screen Fire button |
 | Header audio | Enable music/effects, or mute all sound including boss voice |
 | Optional boss speech | Boss voice toggle in Sound studio; separate opt-in |
@@ -61,7 +63,17 @@ Movement keys work while the game canvas has focus. Losing canvas/window focus o
 
 Ordinary platforms are one-way; code bricks are solid on all sides. Hit ordinary bricks from underneath to break them. Question-mark reward bricks release a power-up beneath the block once, then remain solid. Touch the released Debug Blaster to enable firing.
 
-Mario has three health points. Enemies, hostile projectiles, and pink glitches cause damage, with a brief damage-protection period. Stomp glitch robots and malware worms from above or shoot them; spam drones cannot be stomped. Falling or losing all health returns Mario to the checkpoint and resets the current combo. World respawns retain the blaster, score, collected items, defeated enemies, and used/broken bricks while restoring health.
+Marco has three health points. Enemies, hostile projectiles, and pink glitches cause damage, with a brief damage-protection period. Punch, kick, or shoot ordinary enemies; glitch robots and malware worms can also be stomped from above, but spam drones cannot. Falling or losing all health returns Marco to the checkpoint and resets the current combo. World respawns retain the blaster, score, collected items, defeated enemies, used/broken bricks, and unlocked helpers while restoring health.
+
+### Marco and surprise-box helpers
+
+Hit the dedicated question-mark boxes from underneath, then touch the reward beneath the block. Donkey's box is on the launch platform; Mario's is on the first Outlook platform. Each unlock happens once and updates the helper status. These rewards do not increment productivity counters or replace the existing blaster rewards.
+
+Helpers follow Marco as support companions, not independently controlled physics characters. They have no separate health or contact damage. Tap Helpers to command both unlocked companions; each attacks only when its own cooldown permits. Donkey strikes behind his facing direction, while Mario kicks forward. Marco's punches deal one damage, forward kicks deal two, and Donkey's backward kick deals three. Cooldowns are 0.36, 0.46, and 0.85 seconds respectively. Inputs during a cooldown are not queued for a later swing.
+
+Melee has short range, hits each enemy at most once per swing, and is blocked by intact solid bricks. An attacking helper keeps its original facing and side relative to Marco until the swing ends. The contact marker indicates the attack's outer boundary. Marco's visible facing and blaster direction stay locked during his melee pose. Pink environmental glitches are hazards, not destructible enemies; the boss core still requires the blaster during exposed windows.
+
+Helpers remain unlocked through world recovery, arena entry, and boss recovery. Recovery cancels current attacks and resets their cooldowns. Pause freezes attack timers and disables gameplay controls. Restart or Explore again creates a fresh run with both helpers locked; reloading also loses session progress.
 
 Four-color Microsoft-style pickups grant ten seconds of protection, shown by an aura and countdown. Contact defeats ordinary enemies while protected. Protection does not prevent falling and does not bypass the boss shield. Pausing freezes gameplay timers.
 
@@ -83,7 +95,7 @@ Watch warnings, then fire during exposed-core windows. The right arena platform 
 
 ### Moving core and personality
 
-The boss now moves through bounded hover paths, tracks Mario with its eyes, winds up its arms before attacks, and recoils when hit. Its actual collision rectangle moves with the visible core. Decorative arms and rings are not collision targets. During exposure it moves back toward the right platform's firing height; reachability still requires play-testing.
+The boss now moves through bounded hover paths, tracks Marco with its eyes, winds up its arms before attacks, and recoils when hit. Its actual collision rectangle moves with the visible core. Decorative arms and rings are not collision targets. During exposure it moves back toward the right platform's firing height; reachability still requires play-testing.
 
 Short event-driven lines accompany entrance, attacks, vulnerability, phase changes, and defeat. For example: “I predicted everything. Except a plumber.” Higher-priority dialogue can interrupt ordinary chatter; cooldowns limit repeated lines. Not every event necessarily produces a caption.
 
@@ -117,8 +129,8 @@ If audio activation fails, the page reports it and gameplay remains available wi
 There are **no automated tests and no test command**. The following are expected results to verify, not recorded passes. Run these checks in the browser launched above and record the browser/version, viewport, failures, and console errors.
 
 - **Startup:** styling and scenery appear, Start becomes enabled, and no application-loading errors appear in the console. Pause and completion overlays are hidden initially.
-- **Mario and scenery:** confirm Mario replaces the robot, with a red cap, moustache, overalls, and running/jumping poses. Check both facing directions, boost trails, layered backgrounds, and platform details. Inspect sprite alignment with landing surfaces; visual changes did not change the player collision dimensions.
-- **Movement:** start, move both directions, and release each key. Mario should stop rather than continue moving. Jump onto and through platforms; test edges and optional upper routes.
+- **Marco and scenery:** confirm Marco is the leader, with black hair, baseball cap, T-shirt, jeans, and polarized-style sunglasses. Check both facing directions, running/jumping poses, boost trails, layered backgrounds, and platform details. Inspect sprite alignment with landing surfaces; character artwork uses the existing player collision dimensions.
+- **Movement:** start, move both directions, and release each key. Marco should stop rather than continue moving. Jump onto and through platforms; test edges and optional upper routes.
 - **Boost:** press Shift while facing each direction. Movement should burst forward, the HUD should count down, and another boost should become available afterward.
 - **Collectibles and scoring:** inspect Excel sheets, Outlook envelopes, Teams conversations, and Copilot ribbons in their respective zones. Confirm each disappears once with a short pickup effect, increases the count and score, and builds a combo when collected quickly. Check double-value upper-route items. Wait longer than 2.5 seconds of active play and expect ×1.
 - **Recovery:** activate a later checkpoint and fall. Expect restored health, retained items/score, and a reset combo. Touch a glitch to check damage and temporary protection; expect respawn only when health reaches zero. Previously collected items must not award points again.
@@ -136,11 +148,23 @@ No automated test suite or test command was added. Perform these additional loca
 
 - **Bricks:** test landing, side contact, underside hits, and seams between blocks. Ordinary bricks should break once; reward blocks should release one accessible pickup and remain solid afterward. Check that the first blaster can actually be collected.
 - **Combat:** patrols should stay on their platforms. Test stomps, drone warning indicators, firing both directions, projectile collisions, damage grace, and releasing Fire/F. Confirm firing is unavailable before acquiring a blaster.
-- **Protection:** collect a Microsoft-style pickup, verify the ten-second countdown, survive enemy contact, then verify damage resumes after expiry. Falling must still respawn Mario. Pause and confirm the timer stops.
+- **Protection:** collect a Microsoft-style pickup, verify the ten-second countdown, survive enemy contact, then verify damage resumes after expiry. Falling must still respawn Marco. Pause and confirm the timer stops.
 - **Counters:** collect all five types, including Word documents. The sum of category counts must equal the overall item count. Respawning must not add counts; combat rewards must not affect them. Verify final results and new-run resets.
 - **Boss:** verify arena entry, automatic blaster, health bar, attack warnings, shielded versus exposed damage, all three phases, and victory. Die during each phase and check arena reset without score farming. Test boss shots from the right platform rather than assuming reachability.
 - **Boss audio:** enable music and expect a different arrangement on arena entry, with changing instrumentation across phases. Check Word pickups, firing, brick breaks, power-ups, damage, and boss warnings. Restart and switch tabs repeatedly to check for overlapping or lingering sounds. Audio quality has not been auditioned by the assistant.
 - **Mobile/UI:** hold movement and Fire while tapping Jump on a real touch device when available. Check control wrapping, boss guidance, expanded/collapsed counters, and scrolling to every final-result row. Device emulation is not proof of real-device compatibility.
+
+### Marco and helper checks
+
+Use the same local server and browser instructions above. No automated tests or test command were added. These are expected results, not recorded passes:
+
+- **Unlocks:** start with Marco alone and Helpers disabled. Reach each dedicated box, hit its underside, and collect its reward. Expect the correct companion, status update, and announcement exactly once, without changing productivity counts. Confirm existing blaster rewards remain available.
+- **Kickboxing:** tap J or Attack repeatedly with time between swings. Expect alternating punches and kicks, no automatic repetition while held, and no extra hits on the same enemy during one swing. Test maximum range, both facing directions, and intact bricks blocking damage.
+- **Helpers:** unlock Donkey and Mario, then tap K or Helpers. Expect Donkey to kick backward and Mario forward. Test each helper alone where available and both together; enemy defeat scoring must occur once per enemy. Mario's kick should animate his existing leg rather than add a third leg.
+- **Turning and graphics:** reverse Marco during a helper swing. The helper must keep its starting side relative to Marco until the swing finishes. Check both directions and world boundaries. Verify contact markers match the attack boundary, including reduced motion. Fire during Marco's melee pose and confirm shots match his visible facing.
+- **Box landings:** land on helper boxes and ordinary solid bricks, including near one-way platforms. Expect stable grounding, aligned feet, and the ability to jump again without falling through the box.
+- **Recovery and lifecycle:** unlock both helpers, activate a checkpoint, and fall or lose health. Expect helpers to remain unlocked with no stale attacks. Verify they also survive arena entry and boss recovery. Pause mid-swing: timers must freeze and Helpers remain disabled until active play resumes. Restart and Explore again must lock both helpers.
+- **Touch and regression:** on a real touch device, hold movement while tapping Attack or Helpers; verify cooldowns, release/cancellation, and control readability. Recheck collectibles, blaster access, enemy damage, and all boss phases. Emulation alone does not establish real-device compatibility.
 
 ### Animated boss and speech checks
 
@@ -163,7 +187,9 @@ For an existing manually uploaded static site, update it only after validation. 
 - `styles.css`: responsive interface, overlays, focus styling, and touch controls.
 - `src/level.js`: immutable world data, app palette, viewport, and physics constants.
 - `src/art.js`: `render(context, state, reducedMotion)` integrates graphics and transient pickup effects without changing simulation state. The old renderer remains in the file but is inactive.
-- `src/character.js`: procedural Mario drawing from the engine player state.
+- `src/character.js`: procedural Mario helper drawing, including an optional kick pose.
+- `src/party.js`: character definitions, helper unlocks, following positions, attack timing/hitboxes, per-swing hit tracking, and recovery reset contracts.
+- `src/party-art.js`: procedural Marco/Donkey artwork and shared party rendering; delegates Mario artwork to `character.js` without changing simulation state.
 - `src/collectibles.js`: app-item illustrations and short pickup effects.
 - `src/scenery.js`: viewport-space backgrounds and world-space platforms.
 - `src/music.js`: original score, voice definitions, and checkpoint/completion jingles; no playback side effects.
@@ -175,7 +201,7 @@ Additional expansion modules:
 
 - `src/encounters.js`: immutable patrols, reward blocks, combat settings, and boss arena definitions.
 - `src/blocks.js`: solid collisions, brick destruction, and one-time rewards.
-- `src/combat.js`: health, enemies, projectiles, stomps, and timed protection.
+- `src/combat.js`: health, enemies, projectiles, stomps, timed protection, and party melee damage with solid-brick obstruction.
 - `src/boss.js`: moving core, reactions, warnings, attacks, vulnerability windows, and defeat logic.
 - `src/boss-dialogue.js`: simulation-timed dialogue selection, priorities, cooldowns, and encounter-local repetition tracking.
 - `src/enemy-art.js`: enemies, projectiles, and power-up illustrations.
@@ -627,5 +653,16 @@ Merged pull request #82: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/
 
 Files in the approved proposal:
 - src/party-art.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-101 -->
+### Merged change: Add physics-based platform navigation for independent companions
+
+Merged pull request #101: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/101
+
+Files in the approved proposal:
+- src/party-navigation.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
