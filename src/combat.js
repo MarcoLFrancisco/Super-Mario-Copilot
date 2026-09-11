@@ -113,7 +113,11 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
     for (const strike of activePartyAttacks(party)) {
       for (const enemy of combat.enemies) {
         if (enemy.dead || !overlaps(strike, enemy)) continue;
-        const target = Math.max(enemy.x, Math.min(strike.originX, enemy.x + enemy.w));
+        // Trace to the actual strike/enemy overlap, not an enemy edge
+        // outside the hitbox when a target overlaps the actor's center.
+        const contactLeft = Math.max(strike.x, enemy.x);
+        const contactRight = Math.min(strike.x + strike.w, enemy.x + enemy.w);
+        const target = (contactLeft + contactRight) / 2;
         const left = Math.min(player.x + P.playerWidth / 2, strike.originX, target);
         const right = Math.max(player.x + P.playerWidth / 2, strike.originX, target);
         const corridor = { x: left, y: strike.y, w: Math.max(1, right - left), h: strike.h };
