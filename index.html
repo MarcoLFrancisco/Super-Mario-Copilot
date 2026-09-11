@@ -78,7 +78,7 @@
         <section class="game-overlay" id="start-panel" aria-labelledby="start-title">
           <p class="eyebrow">Your next great idea is one jump away</p>
           <h2 id="start-title">Jump into the connected cloud.</h2>
-          <p id="game-objective">Explore the connected cloud with Marco, Mario, and Donkey. Your two companions move independently, jump between platforms, and attack nearby software bugs. Marco uses kickboxing, Mario kicks forward, and Donkey delivers a backward kick. Surprise boxes supply power-ups, not teammates: the whole team starts together. Collect Microsoft-app items and reach the Copilot beacon to challenge the Hallucination Engine.</p>
+          <p id="game-objective">Choose Marco, Mario, or Donkey and begin alone. Hit the recruitment surprise boxes from below on the launch platform and first Outlook island, then touch their rewards to recruit the other two characters. Recruited companions move independently, jump between platforms, and attack nearby software bugs. Marco uses kickboxing, Mario kicks forward, and Donkey delivers a backward kick. Other boxes still supply power-ups. Collect Microsoft-app items and reach the Copilot beacon to challenge the Hallucination Engine.</p>
           <fieldset id="character-selection" class="character-selection" aria-describedby="character-selection-help" disabled>
             <legend>Choose your character</legend>
             <div class="character-options">
@@ -88,15 +88,15 @@
               </label>
               <label class="character-option" for="character-mario">
                 <input id="character-mario" type="radio" name="character" value="mario">
-                <span><strong>Mario 🍄</strong><small>Forward kicks and platform hopping. Marco and Donkey join as companions.</small></span>
+                <span><strong>Mario 🍄</strong><small>Forward kicks and platform hopping. Start solo; recruit Marco and Donkey from surprise boxes.</small></span>
               </label>
               <label class="character-option" for="character-donkey">
                 <input id="character-donkey" type="radio" name="character" value="donkey">
-                <span><strong>Donkey 🐴</strong><small>Backward kicks: face away from the bug to strike it. Marco and Mario join as companions.</small></span>
+                <span><strong>Donkey 🐴</strong><small>Backward kicks: face away from the bug to strike it. Start solo; recruit Marco and Mario from surprise boxes.</small></span>
               </label>
             </div>
           </fieldset>
-          <p id="character-selection-help">Character selection is awaiting integration. Marco currently leads; Mario and Donkey accompany him automatically.</p>
+          <p id="character-selection-help">Choose your solo starting character. The other two join only after you collect their surprise-box rewards. Restart keeps your selection and resets recruitment.</p>
           <ul class="feature-pills" aria-label="Adventure features">
             <li>Handcrafted world</li>
             <li>Five productivity counters</li>
@@ -139,12 +139,12 @@
       <div id="game-controls" class="controls-bar">
         <p id="keyboard-help"><strong>Move</strong> <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> <span aria-hidden="true">·</span> <strong>Jump</strong> <kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> <span aria-hidden="true">·</span> <strong>Boost</strong> <kbd>Shift</kbd> <span aria-hidden="true">·</span> <strong>Pause</strong> <kbd>Esc</kbd></p>
         <p id="combat-help"><strong>Fire:</strong> hold <kbd>F</kbd> or the Fire button after collecting a Debug Blaster. Hit bricks from below for rewards. Stomp robots and worms; avoid drone contact. Microsoft pickups protect you for 10 seconds, but not from falls.</p>
-        <p id="party-help">Tap J or Attack for your character's melee move: Marco alternates punches and kicks, Mario kicks forward, and Donkey kicks backward. Companions follow independently and attack nearby bugs automatically; tap K or Helpers to request an attack. Release and tap again after each cooldown. Intact bricks block short-range strikes. Stranded companions regroup after a delay. Use the blaster for the boss core.</p>
+        <p id="party-help">Tap J or Attack for your character's melee move: Marco alternates punches and kicks, Mario kicks forward, and Donkey kicks backward. Start alone; hit recruitment boxes from below and touch their rewards. Recruited companions follow independently and attack nearby bugs automatically; tap K or Helpers to request an attack. Helpers is unavailable until a recruit is active. Release and tap again after each cooldown. Intact bricks block short-range strikes. Stranded companions regroup after a delay. Recruitment survives checkpoint recovery but resets on a new run. Use the blaster for the boss core.</p>
         <div class="overlay-actions" role="group" aria-label="Melee controls" aria-describedby="party-help">
           <button type="button" data-action="attack" style="touch-action: none" disabled>Attack · J</button>
           <button id="helper-button" type="button" data-action="helper" style="touch-action: none" aria-describedby="party-help party-status" disabled>Helpers · K</button>
         </div>
-        <p id="party-status">Leader: Marco · Companions: Mario + Donkey</p>
+        <p id="party-status">Leader: Marco · Recruited: 0 / 2 · Donkey (find surprise box) + Mario (find surprise box)</p>
         <p id="combat-controls-status" role="status">Loading combat controls.</p>
         <div class="touch-controls" id="touch-controls" role="group" aria-label="On-screen game controls">
           <div class="direction-controls">

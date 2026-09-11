@@ -141,10 +141,15 @@ function hud() {
   }
   el('fire-button').disabled = !playing() || !state.combat.blaster;
   const helpers = companionIds(state.party);
+  const recruited = helpers.filter(id => state.party.unlocked.has(id));
   el('helper-button').disabled = !playing()
-    || helpers.every(id => state.party.actors[id].recovering);
-  const names = helpers.map(id => `${CHARACTERS[id].name}${state.party.actors[id].recovering ? ' (regrouping)' : ''}`);
-  text('party-status', `Leader: ${CHARACTERS[state.party.leader].name} · Companions: ${names.join(' + ')}`);
+    || !recruited.some(id => !state.party.actors[id].recovering);
+  const names = helpers.map(id => {
+    const status = !state.party.unlocked.has(id) ? 'find surprise box'
+      : state.party.actors[id].recovering ? 'regrouping' : 'active';
+    return `${CHARACTERS[id].name} (${status})`;
+  });
+  text('party-status', `Leader: ${CHARACTERS[state.party.leader].name} · Recruited: ${recruited.length} / ${helpers.length} · ${names.join(' + ')}`);
   el('boss-hud').hidden = !started || state.stage !== 'boss';
   if (state.boss) {
     const boss = state.boss;
@@ -188,12 +193,12 @@ function start() {
     });
   }
   clearInput(); panels(); hud(); canvas.focus({ preventScroll: true });
-  announce(`${CHARACTERS[state.party.leader].name} leads! Your companions follow and attack automatically. Tap J or Attack for your melee move; K or Helpers requests companion attacks.`);
+  announce(`${CHARACTERS[state.party.leader].name} starts solo! Hit the two recruitment surprise boxes from below and collect their rewards to recruit ${companionIds(state.party).map(id => CHARACTERS[id].name).join(' and ')}. Tap J or Attack for your melee move; recruited companions fight automatically.`);
 }
 function pause(value, focus = true) {
   if (!started || state.status === 'complete') return;
   if (value) cancelSpeech();
-  setPaused(state, value); clearInput(); previous = 0; panels();
+  setPaused(state, value); clearInput(); previous = 0; panels(); hud();
   if (!value && (enabled.music || enabled.effects)) void audio.unlock();
   if (focus) (value ? el('resume-button') : canvas).focus({ preventScroll: true });
   announce(value ? 'Adventure paused.' : 'Adventure resumed.');
@@ -319,6 +324,7 @@ function frame(now) {
       if (event.type === 'powerup') announce(event.kind === 'microsoft'
         ? 'Microsoft protection active for 10 seconds. Falls still cause respawn.'
         : 'Debug Blaster equipped. Hold F or Fire to shoot.');
+      if (event.type === 'helperUnlocked') announce(`${event.name} recruited! They move independently and attack nearby bugs automatically. Tap K or Helpers to request an attack.`);
       if (event.type === 'partyRecover') announce(`${CHARACTERS[event.character].name} regrouped with the team.`);
       if (event.type === 'blockReward') announce('Reward released beneath the block. Touch it to collect.');
       if (event.type === 'bossWarning' || event.type === 'bossPhase') announce(`${event.name}. Watch the arena warning.`);
@@ -347,7 +353,7 @@ if (ctx) {
     if (started) return;
     state = createState(selectedCharacter());
     hud();
-    text('load-status', `${CHARACTERS[state.party.leader].name} selected. Both companions join automatically. Press Start when ready.`);
+    text('load-status', `${CHARACTERS[state.party.leader].name} selected. Start solo; discover ${companionIds(state.party).map(id => CHARACTERS[id].name).join(' and ')} in surprise boxes. Press Start when ready.`);
   });
   state = createState(selectedCharacter());
   panels(); hud();
@@ -362,9 +368,9 @@ if (ctx) {
   audioControls();
   text('audio-status', 'Music and effects are enabled by default and begin when you press Start. Mute before starting for silent play. Audio pauses with gameplay; boss voice remains opt-in.');
   canvas.setAttribute('aria-describedby', 'keyboard-help combat-help party-help party-status game-objective');
-  text('character-selection-help', 'Choose who you control before Start. The other two follow and defend automatically. Restart and Explore again keep your choice; reload to choose another character.');
+  text('character-selection-help', 'Choose who you control before Start. Begin alone and recruit the other two from surprise boxes. Recruits move and fight independently. Restart and Explore again keep your choice but reset recruitment; reload to choose another character.');
   text('combat-controls-status', 'Tap J or Attack: Marco punches/kicks, Mario kicks forward, Donkey kicks backward. K or Helpers requests companion attacks. Hold F or Fire with a blaster; the arena supplies one.');
-  text('load-status', 'Choose Marco, Mario, or Donkey. The whole team starts together! Sound begins on Start unless muted.');
+  text('load-status', 'Choose Marco, Mario, or Donkey and start solo. Two surprise boxes recruit your teammates. Sound begins on Start unless muted.');
   requestAnimationFrame(frame);
 } else {
   text('load-status', 'Canvas graphics are unavailable. Please use a browser with Canvas 2D support.');
