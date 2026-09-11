@@ -214,7 +214,10 @@ function assignSupportTargets(party, player, context) {
   const claimed = new Set();
   const actors = companionIds(party)
     .filter(id => party.unlocked.has(id) && !party.actors[id].recovering)
-    .map(id => party.actors[id]);
+    .map(id => party.actors[id])
+    // Retain committed swings, but let a ready teammate take the next target
+    // instead of reserving scarce support slots throughout another's cooldown.
+    .filter(actor => actor.attack || actor.cooldown <= 0);
   let slots = Math.max(0, Math.floor(context.supportSlots ?? 0));
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const candidates = actor => (context.enemies || []).filter(enemy => !enemy.dead
