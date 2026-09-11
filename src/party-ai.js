@@ -16,6 +16,14 @@ export function createCompanionAI(slot = 0) {
     recovering: false, recoveryTime: 0, mode: 'follow' };
 }
 
+// Ordinary support targets must intersect the next move's vertical strike
+// band. Navigation closes horizontal gaps; it does not execute aerial combos.
+// Do not let an unreachable drone reserve support while ground bugs are nearby.
+export function inMeleeBand(actor, enemy, spec) {
+  return Boolean(spec) && actor.y + spec.top < enemy.y + enemy.h
+    && actor.y + spec.top + spec.height > enemy.y;
+}
+
 function attackIntent(actor, enemy, spec, blocks) {
   const center = actor.x + P.playerWidth / 2;
   const direction = enemy.x + enemy.w / 2 < center ? -1 : 1;
@@ -81,7 +89,7 @@ export function decideCompanion(ai, actor, context, dt) {
 
   // Keep a nearby living target, but never pursue beyond the leader's vicinity.
   const candidates = alive.filter(e => distance(e, leader) < 330
-    && distance(e, actor) < 300 && Math.abs(e.y - actor.y) < 150
+    && distance(e, actor) < 300 && inMeleeBand(actor, e, spec)
     && (context.assignedTargetId === undefined || e.id === context.assignedTargetId));
   // The core has a separate support budget, independent of minion defeats.
   // Stay near the leader; approach its stationary recovery position early.

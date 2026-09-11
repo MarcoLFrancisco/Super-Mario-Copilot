@@ -8,7 +8,7 @@ import { createBoss, hitBoss, bossSupportTarget } from '../src/boss.js';
 import { ARENA } from '../src/encounters.js';
 import { createCompanionAI, decideCompanion } from '../src/party-ai.js';
 import { resetActorBody, stepActor } from '../src/actor-physics.js';
-import { nextAttackKind, updateParty } from '../src/party.js';
+import { nextAttackKind, updateParty, updateCompanions } from '../src/party.js';
 
 const emptyCombat = () => createCombat({ enemies: [], pickups: [] });
 const context = s => ({ world: LEVEL, blocks: s.blocks.blocks, enemies: [] });
@@ -174,6 +174,45 @@ export async function runTests({ test, assert }) {
       if (intent.attackPressed) { attacked = true; break; }
     }
     assert(attacked, 'AI must close the gap and request a punch automatically');
+  });
+
+  await test('Unreachable drones release support targets to hittable ground enemies', () => {
+    const world = { width: 800, hazards: [], platforms: [
+      { id: 'floor', x: 0, y: 300, w: 800, h: 30 }
+    ] };
+    const s = createState('mario');
+    const combat = createCombat({ pickups: [], enemies: [
+      { id: 'overhead', kind: 'drone', x: 220, y: 182,
+        minX: 220, maxX: 220, speed: 0 },
+      { id: 'ground', kind: 'robot', x: 250, y: 266,
+        minX: 250, maxX: 250, speed: 0 }
+    ] });
+    const actor = s.party.actors.marco;
+    s.party.unlocked.add('marco');
+    resetActorBody(actor, { x: 200, y: 300 - P.playerHeight });
+    Object.assign(actor, { facing: 1, recovering: false, ai: createCompanionAI() });
+    Object.assign(s.player, { x: 100, y: actor.y, vx: 0, vy: 0, facing: 1 });
+    // Simulate a retained drone claim, not just a favorable initial selection.
+    actor.ai.targetId = 'overhead';
+    const standalone = createCompanionAI();
+    standalone.targetId = 'overhead';
+    decideCompanion(standalone, actor, { world, leader: s.player, blocks: [],
+      enemies: combat.enemies, spec: ATTACKS.punch, allowPlanning: false }, 1 / 60);
+    assert(standalone.targetId === 'ground', 'Standalone AI must release an unreachable target');
+    const events = [];
+    for (let frame = 0; frame < 240 && !combat.enemies[1].dead; frame++) {
+      updateParty(s.party, s.player, 1 / 60, world.width);
+      updateCompanions(s.party, s.player, 1 / 60, { world, blocks: [],
+        enemies: combat.enemies, supportSlots: helperAllowance(combat) }, events);
+      assert(actor.ai.targetId !== 'overhead', 'Coordinator must not reserve the aerial target');
+      updateCombat(combat, s.player, {}, 1 / 60,
+        s.player.y + P.playerHeight, events, [], s.party);
+    }
+    assert(combat.enemies[1].dead && !combat.enemies[0].dead,
+      'Automatic support defeats the reachable robot, not the overhead drone');
+    assert(combat.contribution.helperKills === 1, 'Support allowance is still enforced');
+    assert(events.some(e => e.type === 'enemyDefeated' && e.id === 'ground'
+      && e.helper && e.actorId === 'marco'), 'Defeat is attributed to the recruited helper');
   });
 
   await test('Marco automatically approaches and damages the exposed boss', () => {

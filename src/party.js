@@ -1,6 +1,6 @@
 import { PHYSICS as P } from './level.js';
 import { stepActor, resetActorBody, findSafeLanding } from './actor-physics.js';
-import { createCompanionAI, decideCompanion } from './party-ai.js';
+import { createCompanionAI, decideCompanion, inMeleeBand } from './party-ai.js';
 
 // Simulation-only party contract. Combat owns damage, defeat events and score.
 // Keep party state through checkpoint/arena recovery; recreate on full restart.
@@ -219,7 +219,8 @@ function assignSupportTargets(party, player, context) {
   const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const candidates = actor => (context.enemies || []).filter(enemy => !enemy.dead
     && !claimed.has(enemy.id) && distance(enemy, player) < 330
-    && distance(enemy, actor) < 300 && Math.abs(enemy.y - actor.y) < 150);
+    && distance(enemy, actor) < 300
+    && inMeleeBand(actor, enemy, ATTACKS[nextAttackKind(actor)]));
   for (const retain of [true, false]) {
     for (const actor of actors) {
       if (slots === 0 || assignments.has(actor.id)) continue;
