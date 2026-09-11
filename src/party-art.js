@@ -28,7 +28,10 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
   const outfit = CHARACTERS.marco.appearance;
   ctx.save();
   try {
-    if (actor.id === 'mario') drawCharacter(ctx, actor, time, reducedMotion);
+    if (actor.id === 'mario') {
+      drawCharacter(ctx, actor, time, reducedMotion,
+        attack?.kind === 'kick' ? extension : null);
+    }
     ctx.translate(actor.x + P.playerWidth / 2, actor.y);
     ctx.scale(P.playerWidth / 34 * (facing < 0 ? -1 : 1), P.playerHeight / 46);
     const oval = (x, y, rx, ry, color) => {
@@ -121,9 +124,6 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
       oval(17, 19, .8, .7, '#524657');
       line([[12, 22], [16, 22]], '#645668', .8);
       poly([[4, 23], [12, 25], [7, 29], [2, 26]], '#25d9d2');
-    }
-    if (actor.id === 'mario' && attack) {
-      leg(5, -1.48 * extension, '#438fff');
     }
     // A steady contact marker remains with reduced motion; decorative arcs do not.
     if (active) {
