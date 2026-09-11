@@ -3,10 +3,11 @@ import { ARENA } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
 import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat } from './combat.js';
 import { createBoss, updateBoss, hitBoss } from './boss.js';
-import { createParty, unlockHelper, syncParty, resetPartyMotion, updateParty, requestPartyAttacks } from './party.js';
+import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty } from './party.js';
+import { createPartyDialogue, updatePartyDialogue, sayParty, reactPartyDialogue, clearPartyCaption } from './party-dialogue.js';
 
-// Public API: createState(), setPaused(state, boolean), update(state,input,dt).
-// Input: held left/right/fire, one-frame jumpPressed/boostPressed booleans.
+// Public API: createState(leader = 'marco'), setPaused(state, boolean), update(state,input,dt).
+// Input: held left/right/fire; one-frame jumpPressed/boostPressed/attackPressed/helperPressed.
 // dt is seconds. update returns event objects for audio and announcements.
 // Status is playing/paused/complete. Restart by replacing state with createState().
 const STEP = 1 / 120;
@@ -23,15 +24,24 @@ function makePlayer(spawn) {
     coyote: P.coyoteTime, jumpBuffer: 0, boostTime: 0, boostCooldown: 0 };
 }
 
-export function createState() {
+function partyContext(state) {
+  return { world: state.stage === 'boss' ? ARENA : LEVEL,
+    blocks: state.blocks.blocks, enemies: state.combat.enemies,
+    geometryVersion: `${state.stage}:${state.blocks.blocks.filter(b => b.broken).length}` };
+}
+
+export function createState(leader = 'marco') {
   const player = makePlayer(LEVEL.spawn);
-  return {
-    player, party: createParty(player), cameraX: cameraTarget(player), collected: new Set(),
+  const state = {
+    player, party: createParty(player, leader), cameraX: cameraTarget(player), collected: new Set(),
     checkpointIndex: 0, score: 0, combo: 1, bestCombo: 1,
     comboTimer: 0, deaths: 0, time: 0, status: 'playing',
     accumulator: 0, pendingJump: false, pendingBoost: false, pendingMelee: {},
-    stage: 'world', blocks: createBlocks(), combat: createCombat(), boss: null
+    stage: 'world', blocks: createBlocks(), combat: createCombat(), boss: null,
+    partyDialogue: createPartyDialogue(), partyStarted: false
   };
+  initializeIndependentParty(state.party, player, partyContext(state));
+  return state;
 }
 
 export function setPaused(state, paused) {
@@ -42,6 +52,8 @@ export function setPaused(state, paused) {
   state.pendingBoost = false;
   state.player.jumpBuffer = 0;
   state.pendingMelee = {};
+  state.party.manualAttack = false;
+  state.party.companionTime = 0;
 }
 
 function enterArena(state) {
@@ -53,7 +65,8 @@ function enterArena(state) {
   state.combat = createCombat({ enemies: [], pickups: [] });
   state.combat.blaster = ARENA.grantBlaster;
   state.boss = createBoss();
-  resetPartyMotion(state.party, state.player, ARENA.width);
+  resetPartyMotion(state.party, state.player, ARENA.width, partyContext(state));
+  clearPartyCaption(state.partyDialogue);
   state.pendingJump = false;
   state.pendingBoost = false;
 }
@@ -67,7 +80,8 @@ function respawn(state, events) {
     state.player = makePlayer(checkpoint.spawn);
     state.cameraX = cameraTarget(state.player);
     resetCombat(state.combat);
-    resetPartyMotion(state.party, state.player, LEVEL.width);
+    resetPartyMotion(state.party, state.player, LEVEL.width, partyContext(state));
+    clearPartyCaption(state.partyDialogue);
   }
   state.combo = 1;
   state.comboTimer = 0;
@@ -85,6 +99,7 @@ function tick(state, input, events) {
   const world = arena ? ARENA : LEVEL;
   const combatEvents = [];
   state.time += STEP;
+  updatePartyDialogue(state.partyDialogue, STEP);
   updateBlocks(state.blocks, STEP);
   state.comboTimer = Math.max(0, state.comboTimer - STEP);
   if (state.comboTimer === 0) state.combo = 1;
@@ -153,14 +168,13 @@ function tick(state, input, events) {
     return;
   }
   for (const reward of collectBlockRewards(state.blocks, p)) {
-    if (!unlockHelper(state.party, reward, combatEvents)) {
-      grantPower(state.combat, reward, combatEvents);
-    }
+    grantPower(state.combat, reward, combatEvents);
   }
   updateParty(state.party, p, STEP, world.width);
   requestPartyAttacks(state.party, state.pendingMelee, combatEvents);
   state.pendingMelee = {};
   if (arena) updateBoss(state.boss, state.combat, p, STEP, combatEvents);
+  updateCompanions(state.party, p, STEP, partyContext(state), combatEvents);
   updateCombat(state.combat, p, input, STEP, oldBottom, combatEvents, state.blocks.blocks, state.party);
   if (!arena) {
     const hazard = LEVEL.hazards.find(h => overlaps(body(p), h));
@@ -189,7 +203,13 @@ function tick(state, input, events) {
       state.score += victory?.points ?? 0;
       state.status = 'complete';
       p.vx = 0; p.boostTime = 0;
-      resetPartyMotion(state.party, p, world.width);
+      // Freeze the team in place for victory; do not relocate companions.
+      state.party.manualAttack = false;
+      state.party.companionTime = 0;
+      for (const actor of Object.values(state.party.actors)) {
+        actor.attack = null; actor.vx = 0; actor.vy = 0; actor.boostTime = 0;
+      }
+      syncParty(state.party, p, world.width);
       events.push({ type: 'complete', score: state.score, sparks: state.collected.size });
     }
     return;
@@ -237,5 +257,15 @@ export function update(state, input = {}, dt = 0) {
     tick(state, input, events);
   }
   if (state.status !== 'playing') state.accumulator = 0;
+  const present = visibleParty(state.party).map(actor => actor.id);
+  // Boss captions take precedence; do not queue party chatter behind them.
+  if (state.boss?.dialogue.current) {
+    clearPartyCaption(state.partyDialogue);
+  } else if (!state.partyStarted) {
+    sayParty(state.partyDialogue, 'start', present, events, state.party.leader);
+    state.partyStarted = true;
+  } else {
+    reactPartyDialogue(state.partyDialogue, events.slice(), present, events);
+  }
   return events;
 }
