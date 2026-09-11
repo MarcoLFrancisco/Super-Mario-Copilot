@@ -74,6 +74,50 @@ export async function runTests({ test, assert }) {
     assert(swing(createState('mario').party, 'mario', 200, 200).attack.kind === 'kick', 'Mario kicks');
   });
 
+  for (const id of ['marco', 'mario', 'donkey']) {
+    await test(`${id}: automatic melee plants both running approaches through windup`, () => {
+      for (const direction of [-1, 1]) {
+        const world = { width: 800, hazards: [], platforms: [
+          { id: 'floor', x: 0, y: 300, w: 800, h: 30 }
+        ] };
+        const s = createState(id === 'marco' ? 'mario' : 'marco');
+        const actor = s.party.actors[id];
+        s.party.unlocked.add(id);
+        resetActorBody(actor, { x: 300, y: 300 - P.playerHeight });
+        Object.assign(actor, { vx: direction * P.speed, facing: direction,
+          recovering: false, ai: createCompanionAI() });
+        Object.assign(s.player, { x: 220, y: actor.y, vx: 0, vy: 0, facing: 1 });
+        const enemy = { id: 'close-target', dead: false,
+          x: direction > 0 ? actor.x + P.playerWidth + 1 : actor.x - 9,
+          y: actor.y, w: 8, h: P.playerHeight };
+        const startX = actor.x;
+        const events = [];
+        let connected = false;
+        for (let frame = 0; frame < 30; frame++) {
+          updateParty(s.party, s.player, 1 / 60, world.width);
+          updateCompanions(s.party, s.player, 1 / 60, {
+            world, blocks: [], enemies: [enemy], supportSlots: 1
+          }, events);
+          assert(actor.attack, 'In-range helper must start its automatic attack');
+          assert(actor.x === startX && actor.vx === 0,
+            'Committed attack must not coast beyond its checked position');
+          const strike = activePartyAttacks(s.party).find(box => box.actorId === id);
+          if (!strike) continue;
+          assert(strike.direction === direction,
+            'Donkey must face away while its back kick still points at the target');
+          assert(strike.x < enemy.x + enemy.w && strike.x + strike.w > enemy.x
+            && strike.y < enemy.y + enemy.h && strike.y + strike.h > enemy.y,
+            'Attack must retain target overlap when its damage window opens');
+          connected = true;
+          break;
+        }
+        assert(connected, 'Automatic attack must reach its active window');
+        assert(events.filter(event => event.type === 'melee').length === 1,
+          'Windup must not restart the attack');
+      }
+    });
+  }
+
   await test('One helper swing cannot overspend defeat allowance or duplicate rewards', () => {
     const s = createState();
     const c = emptyCombat();
