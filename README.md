@@ -655,3 +655,14 @@ Files in the approved proposal:
 - src/party-art.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-101 -->
+### Merged change: Add physics-based platform navigation for independent companions
+
+Merged pull request #101: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/101
+
+Files in the approved proposal:
+- src/party-navigation.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
