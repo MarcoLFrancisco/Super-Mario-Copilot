@@ -273,6 +273,11 @@ export function updateCompanions(party, player, dt, context, events = []) {
         actor.vy = 0;
         return;
       }
+      // AI checks melee reach before physics. Friction alone lets a running
+      // helper coast past that target during windup, with its strike facing
+      // locked the wrong way. Plant horizontal motion for the committed swing;
+      // gravity and platform/brick collisions still run normally.
+      if (actor.attack || intent.attackPressed) actor.vx = 0;
       stepActor(actor, intent, context.world, context.blocks || [], step);
       if (!actor.attack && intent.facing) actor.facing = intent.facing;
       if (intent.attackPressed) requestActorAttack(party, actor, events);
