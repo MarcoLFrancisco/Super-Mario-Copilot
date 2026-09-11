@@ -65,7 +65,8 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
     }
   }
   if (input.fire && combat.blaster && combat.cooldown === 0 && combat.health > 0) {
-    const facing = player.facing < 0 ? -1 : 1;
+    // Match Marco's visible direction, which stays locked during melee.
+    const facing = (party?.actors.marco.facing ?? player.facing) < 0 ? -1 : 1;
     if (spawnShot(combat, { owner: 'player', kind: 'patch',
       x: player.x + P.playerWidth / 2 - 5, y: player.y + 22,
       vx: facing * C.projectileSpeed, vy: 0, damage: C.projectileDamage })) {

@@ -81,10 +81,11 @@ function drawCombatScene(ctx, state, reducedMotion, visible) {
   if (combat.grace > 0 && combat.protection <= 0) ctx.globalAlpha = .65;
   drawParty(ctx, state.party, state.time, reducedMotion);
   if (combat.blaster) {
-    const x = player.facing < 0 ? player.x - 6 : player.x + PHYSICS.playerWidth - 5;
+    const facing = state.party.actors.marco.facing;
+    const x = facing < 0 ? player.x - 6 : player.x + PHYSICS.playerWidth - 5;
     ctx.fillStyle = '#465e99'; ctx.fillRect(x, player.y + 25, 11, 6);
     ctx.fillStyle = '#9dffe5';
-    ctx.fillRect(player.facing < 0 ? x : x + 8, player.y + 26, 3, 4);
+    ctx.fillRect(facing < 0 ? x : x + 8, player.y + 26, 3, 4);
   }
   ctx.restore();
 }
