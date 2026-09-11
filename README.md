@@ -666,3 +666,14 @@ Files in the approved proposal:
 - src/party-navigation.js
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+
+<!-- bumblebee-pr-104 -->
+### Merged change: Add event-driven Copilot jokes and character caption state
+
+Merged pull request #104: https://github.com/MarcoLFrancisco/Super-Mario-Copilot/pull/104
+
+Files in the approved proposal:
+- src/party-dialogue.js
+
+Bumblebee has not run automated tests or verified runtime behavior for this change.
