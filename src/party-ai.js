@@ -119,9 +119,12 @@ export function decideCompanion(ai, actor, context, dt) {
   if (ai.geometryVersion !== geometryVersion
       || (ai.goal && distance(goal, ai.goal) > 56)) ai.route = null;
   ai.geometryVersion = geometryVersion;
+  // Combat destinations leave a 12px gap. Marco's punch extends only 26px
+  // beyond his body, so follow-mode tolerance can stop him outside hit range.
+  const arrivalTolerance = enemy ? 4 : 20;
   // Finish active route commands before applying the idle arrival shortcut.
   // Proximity alone does not mean a planned platform crossing is complete.
-  if (!ai.route && distance(actor, goal) < 20 && supportingSurface(actor, world, blocks)) {
+  if (!ai.route && distance(actor, goal) < arrivalTolerance && supportingSurface(actor, world, blocks)) {
     ai.route = null;
     // Jump toward an overhead target only after validating a safe landing.
     if (!enemy || !spec || !allowPlanning || ai.cooldown > 0) return idle();
@@ -133,7 +136,7 @@ export function decideCompanion(ai, actor, context, dt) {
   if (!ai.route && ai.cooldown === 0 && allowPlanning) {
     ai.goal = goal;
     ai.route = createRouteCursor(planRoute(actor, goal, world, blocks,
-      { maxNodes: 80, radius: 850, tolerance: 16 }));
+      { maxNodes: 80, radius: 850, tolerance: enemy ? 4 : 16 }));
     ai.cooldown = .7 + ai.slot * .13;
   }
   if (!ai.route) return idle();
