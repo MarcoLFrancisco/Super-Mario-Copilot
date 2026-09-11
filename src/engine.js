@@ -2,7 +2,7 @@ import { LEVEL, VIEW, PHYSICS as P } from './level.js';
 import { ARENA } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
 import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat, helperAllowance } from './combat.js';
-import { createBoss, updateBoss, hitBoss } from './boss.js';
+import { createBoss, updateBoss, hitBoss, bossSupportTarget } from './boss.js';
 import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty, companionIds, unlockHelper } from './party.js';
 import { createPartyDialogue, updatePartyDialogue, sayParty, reactPartyDialogue, clearPartyCaption } from './party-dialogue.js';
 
@@ -28,6 +28,7 @@ function partyContext(state) {
   return { world: state.stage === 'boss' ? ARENA : LEVEL,
     blocks: state.blocks.blocks, enemies: state.combat.enemies,
     supportSlots: helperAllowance(state.combat),
+    bossTarget: state.boss ? bossSupportTarget(state.boss) : null,
     geometryVersion: `${state.stage}:${state.blocks.blocks.filter(b => b.broken).length}` };
 }
 
@@ -204,7 +205,7 @@ function tick(state, input, events) {
   syncParty(state.party, p, world.width);
   if (arena) {
     const bossEvents = [];
-    hitBoss(state.boss, state.combat, bossEvents);
+    hitBoss(state.boss, state.combat, bossEvents, state.party, state.blocks.blocks);
     events.push(...bossEvents);
     if (state.boss.defeated) {
       const victory = bossEvents.find(event => event.type === 'bossDefeated');
