@@ -96,14 +96,18 @@ const pointers = new Map();
 let jumpPressed = false;
 let boostPressed = false;
 let fireUntil = 0;
+let melee = {};
 const mapping = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
-  Space: 'jump', KeyW: 'jump', ArrowUp: 'jump', ShiftLeft: 'boost', ShiftRight: 'boost', KeyF: 'fire' };
+  Space: 'jump', KeyW: 'jump', ArrowUp: 'jump', ShiftLeft: 'boost', ShiftRight: 'boost', KeyF: 'fire', KeyJ: 'attack', KeyK: 'helper' };
 const playing = () => started && state.status === 'playing';
 const announce = message => text('game-announcement', message);
 function clearInput() {
+  melee = {};
   keys.clear(); pointers.clear(); jumpPressed = false; boostPressed = false; fireUntil = 0;
 }
 function press(action) {
+  if (action === 'attack') melee.attackPressed = true;
+  if (action === 'helper') melee.helperPressed = true;
   if (action === 'jump') jumpPressed = true;
   if (action === 'boost') boostPressed = true;
   // Preserve a quick tap until at least one simulation step can consume it.
@@ -267,7 +271,8 @@ function frame(now) {
   if (playing()) {
     const held = new Set([...keys.values(), ...pointers.values()]);
     const events = update(state, { left: held.has('left'), right: held.has('right'),
-      fire: held.has('fire') || now < fireUntil, jumpPressed, boostPressed }, dt);
+      fire: held.has('fire') || now < fireUntil, jumpPressed, boostPressed, ...melee }, dt);
+    melee = {};
     jumpPressed = false; boostPressed = false;
     audio.setStage(state.stage, state.boss?.phase ?? 0);
     if (state.status === 'complete') audio.setStatus('complete');
@@ -289,6 +294,7 @@ function frame(now) {
       if (event.type === 'powerup') announce(event.kind === 'microsoft'
         ? 'Microsoft protection active for 10 seconds. Falls still cause respawn.'
         : 'Debug Blaster equipped. Hold F or Fire to shoot.');
+      if (event.type === 'helperUnlocked') announce(`${event.name} joined Marco! Tap K or Helpers to attack.`);
       if (event.type === 'blockReward') announce('Reward released beneath the block. Touch it to collect.');
       if (event.type === 'bossWarning' || event.type === 'bossPhase') announce(`${event.name}. Watch the arena warning.`);
       if (event.type === 'bossExposed') announce('Core exposed! Fire from the right platform.');

@@ -3,7 +3,7 @@ import { ARENA } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
 import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat } from './combat.js';
 import { createBoss, updateBoss, hitBoss } from './boss.js';
-import { createParty, unlockHelper, syncParty, resetPartyMotion } from './party.js';
+import { createParty, unlockHelper, syncParty, resetPartyMotion, updateParty, requestPartyAttacks } from './party.js';
 
 // Public API: createState(), setPaused(state, boolean), update(state,input,dt).
 // Input: held left/right/fire, one-frame jumpPressed/boostPressed booleans.
@@ -29,7 +29,7 @@ export function createState() {
     player, party: createParty(player), cameraX: cameraTarget(player), collected: new Set(),
     checkpointIndex: 0, score: 0, combo: 1, bestCombo: 1,
     comboTimer: 0, deaths: 0, time: 0, status: 'playing',
-    accumulator: 0, pendingJump: false, pendingBoost: false,
+    accumulator: 0, pendingJump: false, pendingBoost: false, pendingMelee: {},
     stage: 'world', blocks: createBlocks(), combat: createCombat(), boss: null
   };
 }
@@ -41,9 +41,11 @@ export function setPaused(state, paused) {
   state.pendingJump = false;
   state.pendingBoost = false;
   state.player.jumpBuffer = 0;
+  state.pendingMelee = {};
 }
 
 function enterArena(state) {
+  state.pendingMelee = {};
   state.stage = 'boss';
   state.player = makePlayer(ARENA.spawn);
   state.cameraX = 0;
@@ -70,6 +72,7 @@ function respawn(state, events) {
   state.combo = 1;
   state.comboTimer = 0;
   state.deaths += 1;
+  state.pendingMelee = {};
   state.pendingJump = false;
   state.pendingBoost = false;
   // Keep collected sparks and score; repeated deaths cannot farm collectibles.
@@ -152,8 +155,11 @@ function tick(state, input, events) {
       grantPower(state.combat, reward, combatEvents);
     }
   }
+  updateParty(state.party, p, STEP, world.width);
+  requestPartyAttacks(state.party, state.pendingMelee, combatEvents);
+  state.pendingMelee = {};
   if (arena) updateBoss(state.boss, state.combat, p, STEP, combatEvents);
-  updateCombat(state.combat, p, input, STEP, oldBottom, combatEvents, state.blocks.blocks);
+  updateCombat(state.combat, p, input, STEP, oldBottom, combatEvents, state.blocks.blocks, state.party);
   if (!arena) {
     const hazard = LEVEL.hazards.find(h => overlaps(body(p), h));
     if (hazard) hurtPlayer(state.combat, p, hazard.x + hazard.w / 2, combatEvents);
@@ -220,6 +226,8 @@ export function update(state, input = {}, dt = 0) {
   if (state.status !== 'playing') return events;
   state.pendingJump ||= Boolean(input.jumpPressed);
   state.pendingBoost ||= Boolean(input.boostPressed);
+  state.pendingMelee.attackPressed ||= Boolean(input.attackPressed);
+  state.pendingMelee.helperPressed ||= Boolean(input.helperPressed);
   // Bound catch-up after stalls; small fixed steps keep collisions consistent.
   state.accumulator += Number.isFinite(dt) ? clamp(dt, 0, .1) : 0;
   while (state.accumulator >= STEP && state.status === 'playing') {
