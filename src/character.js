@@ -3,7 +3,7 @@ import { PHYSICS } from './level.js';
 // Draw in world coordinates after the caller applies its camera transform.
 // Uses engine player fields; never mutates state or changes collision bounds.
 // Custom procedural fan artwork, not an imported Nintendo sprite asset.
-export function drawCharacter(ctx, player, time = 0, reducedMotion = false) {
+export function drawCharacter(ctx, player, time = 0, reducedMotion = false, kickExtension = null) {
   const t = reducedMotion ? 0 : time;
   const airborne = !player.grounded;
   const speed = Math.min(1, Math.abs(player.vx) / PHYSICS.speed);
@@ -93,7 +93,10 @@ export function drawCharacter(ctx, player, time = 0, reducedMotion = false) {
   const jumpAngle = player.vy < 0 ? -.9 : -.5;
   arm(-8, 24, airborne ? .9 : -stride * .85, true);
   leg(-5, airborne ? .85 : stride * .65, true);
-  leg(5, airborne ? jumpAngle : -stride * .65);
+  // Pose the existing front leg for helper kicks; never add an extra limb.
+  leg(5, kickExtension === null
+    ? (airborne ? jumpAngle : -stride * .65)
+    : -1.48 * kickExtension);
   ellipse(0, 28, 10, 9, red);
   shape([[-8, 26], [-5, 28], [6, 28], [9, 26], [9, 36], [-8, 36]], blue);
   shape([[-7, 22], [-3.5, 22], [-3, 30], [-6.5, 30]], '#438aff');
