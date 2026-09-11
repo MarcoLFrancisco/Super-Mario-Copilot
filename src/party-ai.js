@@ -34,7 +34,8 @@ function attackIntent(actor, enemy, spec, blocks) {
 }
 
 // context: {leader, world, blocks, enemies, spec, geometryVersion,
-//           manualAttack, allowPlanning}. Arrays contain runtime objects.
+//           manualAttack, allowPlanning, assignedTargetId}. Arrays contain runtime
+// objects. null means follow only; undefined retains standalone target selection.
 // Give only one companion allowPlanning=true per tick to bound search work.
 // Increment geometryVersion after brick destruction or world transitions.
 // Call only while playing. A recovery result must be applied by party lifecycle
@@ -80,10 +81,13 @@ export function decideCompanion(ai, actor, context, dt) {
 
   // Keep a nearby living target, but never pursue beyond the leader's vicinity.
   const candidates = alive.filter(e => distance(e, leader) < 330
-    && distance(e, actor) < 300 && Math.abs(e.y - actor.y) < 150);
+    && distance(e, actor) < 300 && Math.abs(e.y - actor.y) < 150
+    && (context.assignedTargetId === undefined || e.id === context.assignedTargetId));
   const enemy = candidates.find(e => e.id === ai.targetId)
     || candidates.sort((a, b) => distance(a, actor) - distance(b, actor))[0];
-  ai.targetId = enemy?.id ?? null;
+  const targetId = enemy?.id ?? null;
+  if (ai.targetId !== targetId) ai.route = null;
+  ai.targetId = targetId;
   ai.mode = enemy ? 'defend' : 'follow';
   if (enemy && spec) {
     const attack = attackIntent(actor, enemy, spec, blocks);
