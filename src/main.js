@@ -127,6 +127,10 @@ function hud() {
     text(`count-${app}`, `${counts[app]} / ${PRODUCTIVITY_TOTALS[app]}`);
   }
   el('fire-button').disabled = !playing() || !state.combat.blaster;
+  const helpers = ['donkey', 'mario'].filter(id => state.party.unlocked.has(id))
+    .map(id => id === 'donkey' ? 'Donkey' : 'Mario');
+  el('helper-button').disabled = !playing() || helpers.length === 0;
+  text('party-status', `Leader: Marco · Helpers: ${helpers.join(' + ') || 'Find surprise boxes'}`);
   el('boss-hud').hidden = !started || state.stage !== 'boss';
   if (state.boss) {
     const boss = state.boss;
@@ -163,7 +167,7 @@ function start() {
   state = createState(); started = true; previous = 0;
   if (enabled.music || enabled.effects) void audio.unlock();
   clearInput(); panels(); hud(); canvas.focus({ preventScroll: true });
-  announce('Adventure started. Hit reward bricks for a blaster. Reach the beacon and defeat the AI core.');
+  announce('Marco’s adventure started. Tap J or Attack for kickboxing. Discover Donkey and Mario in surprise boxes, then tap K or Helpers. Find a blaster and reach the AI core.');
 }
 function pause(value, focus = true) {
   if (!started || state.status === 'complete') return;
@@ -307,7 +311,7 @@ function frame(now) {
         for (const app of Object.keys(PRODUCTIVITY)) {
           text(`final-${app}`, `${counts[app]} / ${PRODUCTIVITY_TOTALS[app]}`);
         }
-        text('completion-summary', `Mario patched the Hallucination Engine! You collected ${state.collected.size} of ${LEVEL.sparks.length} app items.`);
+        text('completion-summary', `Marco patched the Hallucination Engine! You collected ${state.collected.size} of ${LEVEL.sparks.length} app items.`);
         panels(); el('replay-button').focus({ preventScroll: true });
         announce('Level complete! Your results are ready.');
       }
@@ -329,9 +333,9 @@ if (ctx) {
     : 'Browser speech is unavailable. Boss dialogue captions still work.');
   audioControls();
   text('audio-status', 'Enable music and effects independently below, or use Enable all sound. Audio starts off and pauses with gameplay.');
-  canvas.setAttribute('aria-describedby', 'keyboard-help combat-help game-objective');
-  text('combat-controls-status', 'Combat controls ready. Hold F or Fire after collecting a blaster. The boss arena supplies one automatically.');
-  text('load-status', 'Mario is ready! Break reward bricks, collect app items, and challenge the AI core. Audio is optional.');
+  canvas.setAttribute('aria-describedby', 'keyboard-help combat-help party-help party-status game-objective');
+  text('combat-controls-status', 'Combat ready. Tap J or Attack for kickboxing; K or Helpers commands unlocked companions. Hold F or Fire after collecting a blaster. The boss arena supplies one automatically.');
+  text('load-status', 'Marco is ready! Discover Donkey and Mario in surprise boxes, collect app items, and challenge the AI core. Audio is optional.');
   requestAnimationFrame(frame);
 } else {
   text('load-status', 'Canvas graphics are unavailable. Please use a browser with Canvas 2D support.');
