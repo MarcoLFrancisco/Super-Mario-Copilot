@@ -110,7 +110,9 @@ export function decideCompanion(ai, actor, context, dt) {
   if (ai.geometryVersion !== geometryVersion
       || (ai.goal && distance(goal, ai.goal) > 56)) ai.route = null;
   ai.geometryVersion = geometryVersion;
-  if (distance(actor, goal) < 20 && supportingSurface(actor, world, blocks)) {
+  // Finish active route commands before applying the idle arrival shortcut.
+  // Proximity alone does not mean a planned platform crossing is complete.
+  if (!ai.route && distance(actor, goal) < 20 && supportingSurface(actor, world, blocks)) {
     ai.route = null;
     // Jump toward an overhead target only after validating a safe landing.
     if (!enemy || !spec || !allowPlanning || ai.cooldown > 0) return idle();
