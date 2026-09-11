@@ -1,5 +1,6 @@
 import { PHYSICS as P } from './level.js';
 import { COMBAT as C, ENCOUNTERS, ENEMY_TYPES } from './encounters.js';
+import { activePartyAttacks, claimPartyHit } from './party.js';
 
 export const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x
   && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -54,7 +55,7 @@ function hitEnemy(enemy, damage, events) {
 // not one-way platforms. The engine applies event points exactly once.
 // Boss logic can add shots before this call and inspect surviving player shots
 // afterward. Call only while playing; falling bypasses protection in engine.
-export function updateCombat(combat, player, input, dt, previousBottom, events, solids = []) {
+export function updateCombat(combat, player, input, dt, previousBottom, events, solids = [], party = null) {
   if (!Number.isFinite(dt) || dt <= 0) return;
   const step = Math.min(dt, 1 / 60);
   for (const key of ['grace', 'protection', 'cooldown']) combat[key] = Math.max(0, combat[key] - step);
@@ -105,6 +106,19 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
       if (target) { hitEnemy(target, shot.damage, events); shot.life = 0; }
     } else if (overlaps(shot, body(player))) {
       hurtPlayer(combat, player, shot.x + shot.w / 2, events); shot.life = 0;
+    }
+  }
+  if (party && combat.health > 0) {
+    for (const strike of activePartyAttacks(party)) {
+      for (const enemy of combat.enemies) {
+        if (enemy.dead || !overlaps(strike, enemy)) continue;
+        const target = Math.max(enemy.x, Math.min(strike.originX, enemy.x + enemy.w));
+        const left = Math.min(player.x + P.playerWidth / 2, strike.originX, target);
+        const right = Math.max(player.x + P.playerWidth / 2, strike.originX, target);
+        const corridor = { x: left, y: strike.y, w: Math.max(1, right - left), h: strike.h };
+        if (solids.some(b => !b.broken && overlaps(corridor, b))) continue;
+        if (claimPartyHit(party, strike, enemy.id)) hitEnemy(enemy, strike.damage, events);
+      }
     }
   }
   for (const enemy of combat.enemies) {

@@ -121,7 +121,12 @@
       <div id="game-controls" class="controls-bar">
         <p id="keyboard-help"><strong>Move</strong> <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> <span aria-hidden="true">·</span> <strong>Jump</strong> <kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> <span aria-hidden="true">·</span> <strong>Boost</strong> <kbd>Shift</kbd> <span aria-hidden="true">·</span> <strong>Pause</strong> <kbd>Esc</kbd></p>
         <p id="combat-help"><strong>Fire:</strong> hold <kbd>F</kbd> or the Fire button after collecting a Debug Blaster. Hit bricks from below for rewards. Stomp robots and worms; avoid drone contact. Microsoft pickups protect you for 10 seconds, but not from falls.</p>
-        <p id="combat-controls-status" role="status">Combat HUD and firing controls await the main integration step.</p>
+        <p id="party-help">Marco: tap J or Attack to alternate punches and kicks. Find Donkey and Mario in surprise boxes, then tap K or Helpers: Donkey kicks backward, Mario forward. Release and tap again after each cooldown. Short-range strikes cannot pass through bricks. Use the blaster for the boss core.</p>
+        <div class="overlay-actions" role="group" aria-label="Melee controls" aria-describedby="party-help">
+          <button type="button" data-action="attack" style="touch-action: none" disabled>Attack · J</button>
+          <button type="button" data-action="helper" style="touch-action: none" disabled>Helpers · K</button>
+        </div>
+        <p id="combat-controls-status" role="status">Loading combat controls.</p>
         <div class="touch-controls" id="touch-controls" role="group" aria-label="On-screen game controls">
           <div class="direction-controls">
             <button id="move-left" type="button" data-action="left" aria-label="Move left" disabled>←</button>
