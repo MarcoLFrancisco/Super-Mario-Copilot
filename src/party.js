@@ -1,4 +1,6 @@
 import { PHYSICS as P } from './level.js';
+import { stepActor, resetActorBody, findSafeLanding } from './actor-physics.js';
+import { createCompanionAI, decideCompanion } from './party-ai.js';
 
 // Simulation-only party contract. Combat owns damage, defeat events and score.
 // Keep party state through checkpoint/arena recovery; recreate on full restart.
@@ -27,21 +29,48 @@ function makeActor(id) {
     boostTime: 0, cooldown: 0, attack: null, nextKick: false };
 }
 
-export function createParty(player) {
-  const party = { leader: 'marco', unlocked: new Set(), sequence: 0,
+export function createParty(player, leader = 'marco') {
+  if (!Object.hasOwn(CHARACTERS, leader)) throw new RangeError('Unknown party leader');
+  const party = { leader, unlocked: new Set(), sequence: 0,
+    independent: false, companionTime: 0, planningTurn: 0, manualAttack: false,
     actors: Object.fromEntries(Object.keys(CHARACTERS).map(id => [id, makeActor(id)])) };
   syncParty(party, player);
   return party;
 }
 
-// Helpers are support companions anchored to the player's platforming body,
-// not independent physics actors. Consumers must not give them contact damage.
-// Pass the current world's width to keep their visible bodies inside its edges.
+export function companionIds(party) {
+  return Object.keys(CHARACTERS).filter(id => id !== party.leader);
+}
+
+// Engine calls once at run creation, with the actual world and runtime bricks.
+// Lifecycle recovery must subsequently supply the same context shape.
+export function initializeIndependentParty(party, player, context) {
+  party.independent = true;
+  party.unlocked = new Set(companionIds(party));
+  resetPartyMotion(party, player, context.world.width, context);
+}
+
+export function nextAttackKind(actor) {
+  return actor.id === 'donkey' ? 'backKick'
+    : actor.id === 'mario' || actor.nextKick ? 'kick' : 'punch';
+}
+
+export function requestActorAttack(party, actor, events = []) {
+  if (actor.recovering) return false;
+  const started = startAttack(party, actor, nextAttackKind(actor), events);
+  if (started && actor.id === 'marco') actor.nextKick = !actor.nextKick;
+  return started;
+}
+
+// The selected actor mirrors the engine's controlled body. Independent
+// companions retain their own coordinates; legacy attachment lasts only until
+// initializeIndependentParty is connected by the engine integration step.
 export function syncParty(party, player, worldWidth = Infinity) {
   const facing = player.facing < 0 ? -1 : 1;
   const maxX = Math.max(0, worldWidth - P.playerWidth);
   for (const actor of Object.values(party.actors)) {
-    const offset = CHARACTERS[actor.id].offset || 0;
+    if (party.independent && actor.id !== party.leader) continue;
+    const offset = actor.id === party.leader ? 0 : CHARACTERS[actor.id].offset || 0;
     const actorFacing = actor.attack ? actor.attack.facing : facing;
     // Lock the helper's side as well as its direction for the whole swing.
     // Turning Marco must not teleport an active strike across the party.
@@ -56,7 +85,8 @@ export function syncParty(party, player, worldWidth = Infinity) {
 }
 
 export function visibleParty(party) {
-  return [party.actors.marco, ...HELPER_IDS.filter(id => party.unlocked.has(id))
+  return [party.actors[party.leader], ...companionIds(party)
+    .filter(id => party.unlocked.has(id) && !party.actors[id].recovering)
     .map(id => party.actors[id])];
 }
 
@@ -83,14 +113,14 @@ function startAttack(party, actor, kind, events) {
 // attackPressed alternates Marco's punch/kick; helperPressed cues both helpers.
 // Donkey strikes BEHIND its facing direction; Mario kicks forward.
 export function requestPartyAttacks(party, input, events = []) {
-  const marco = party.actors.marco;
-  if (input.attackPressed && startAttack(party, marco,
-    marco.nextKick ? 'kick' : 'punch', events)) marco.nextKick = !marco.nextKick;
+  if (input.attackPressed) requestActorAttack(party, party.actors[party.leader], events);
   if (!input.helperPressed) return;
-  for (const id of HELPER_IDS) {
-    if (party.unlocked.has(id)) {
-      startAttack(party, party.actors[id], id === 'donkey' ? 'backKick' : 'kick', events);
-    }
+  if (party.independent) {
+    party.manualAttack = true;
+    return;
+  }
+  for (const id of companionIds(party)) {
+    if (party.unlocked.has(id)) requestActorAttack(party, party.actors[id], events);
   }
 }
 
@@ -140,11 +170,71 @@ export function claimPartyHit(party, box, targetId) {
   return true;
 }
 
-export function resetPartyMotion(party, player, worldWidth = Infinity) {
+// context: {world, blocks, enemies}; required for independent lifecycle resets.
+export function resetPartyMotion(party, player, worldWidth = Infinity, context = null) {
+  party.companionTime = 0;
+  party.manualAttack = false;
+  party.planningTurn = 0;
   for (const actor of Object.values(party.actors)) {
     actor.attack = null;
     actor.cooldown = 0;
     actor.nextKick = false;
   }
   syncParty(party, player, worldWidth);
+  if (!party.independent) return;
+  companionIds(party).forEach((id, slot) => {
+    const actor = party.actors[id];
+    actor.ai = createCompanionAI(slot);
+    const anchor = { x: player.x - player.facing * (64 + slot * 52), y: player.y };
+    const position = context && findSafeLanding(anchor, context.world,
+      context.blocks || [], { maxDistance: 240,
+        avoid: (context.enemies || []).filter(enemy => !enemy.dead) });
+    resetActorBody(actor, position || player);
+    actor.facing = player.facing;
+    actor.recovering = !position;
+    actor.ai.recovering = !position;
+  });
+}
+
+// Call once per engine tick AFTER updateParty (attack timers), before combat.
+// Navigation commands are 60Hz; the current engine is 120Hz. Accumulate rather
+// than consuming a full navigation command on every half-length engine tick.
+export function updateCompanions(party, player, dt, context, events = []) {
+  if (!party.independent || !Number.isFinite(dt) || dt <= 0) return;
+  if (dt > 1 / 60 + .00001) throw new RangeError('Party requires fixed ticks <= 1/60 s');
+  party.companionTime += dt;
+  const step = 1 / 60;
+  const ids = companionIds(party);
+  while (party.companionTime + 1e-9 >= step) {
+    party.companionTime = Math.max(0, party.companionTime - step);
+    ids.forEach((id, slot) => {
+      const actor = party.actors[id];
+      const intent = decideCompanion(actor.ai, actor, {
+        ...context, leader: player, spec: ATTACKS[nextAttackKind(actor)],
+        manualAttack: party.manualAttack, allowPlanning: slot === party.planningTurn
+      }, step);
+      if (intent.recovery) {
+        resetActorBody(actor, intent.recovery);
+        actor.attack = null;
+        actor.cooldown = 0;
+        actor.nextKick = false;
+        actor.facing = player.facing;
+        actor.recovering = false;
+        events.push({ type: 'partyRecover', character: id });
+        return;
+      }
+      actor.recovering = actor.ai.recovering;
+      if (actor.recovering) {
+        actor.attack = null;
+        actor.vx = 0;
+        actor.vy = 0;
+        return;
+      }
+      stepActor(actor, intent, context.world, context.blocks || [], step);
+      if (!actor.attack && intent.facing) actor.facing = intent.facing;
+      if (intent.attackPressed) requestActorAttack(party, actor, events);
+    });
+    party.manualAttack = false;
+    party.planningTurn = (party.planningTurn + 1) % ids.length;
+  }
 }
