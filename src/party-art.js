@@ -109,7 +109,8 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
       line([[-10, 28], [-17, 25], [-19, 29]], '#716b80', 2);
       oval(-19, 30, 2, 3, '#303343');
       leg(-7, attack ? extension * 1.6 : stride * .5, '#787589', true);
-      leg(6, -stride * .5, '#a3a1ad', true);
+      // Plant the supporting leg during the kick instead of continuing its run cycle.
+      leg(6, attack ? 0 : -stride * .5, '#a3a1ad', true);
       oval(-1, 29, 12, 9, gradient('#b4b1bf', '#706e80', 21, 16));
       oval(8, 20, 6, 10, '#a3a0ae');
       oval(4, 7, 2.5, 7, '#9691a5');
