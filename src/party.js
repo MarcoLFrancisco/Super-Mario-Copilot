@@ -46,7 +46,7 @@ export function companionIds(party) {
 // Lifecycle recovery must subsequently supply the same context shape.
 export function initializeIndependentParty(party, player, context) {
   party.independent = true;
-  party.unlocked = new Set(companionIds(party));
+  // Independent movement does not grant recruitment: new runs start alone.
   resetPartyMotion(party, player, context.world.width, context);
 }
 
@@ -90,10 +90,14 @@ export function visibleParty(party) {
     .map(id => party.actors[id])];
 }
 
-// Accept the existing block pickup shape { kind }; duplicate rewards do nothing.
-export function unlockHelper(party, reward, events = []) {
-  const id = HELPER_IDS.find(key => CHARACTERS[key].reward === reward.kind);
+// Concrete helper rewards are assigned per run, excluding the selected leader.
+// Independent recruitment requires current geometry and only resets the recruit.
+export function unlockHelper(party, reward, events = [], player = null, context = null) {
+  const ids = companionIds(party);
+  const id = ids.find(key => reward.kind === `helper-${key}`);
   if (!id || party.unlocked.has(id)) return false;
+  if (party.independent && (!player || !context)) return false;
+  if (party.independent) resetCompanion(party, id, ids.indexOf(id), player, context);
   party.unlocked.add(id);
   events.push({ type: 'helperUnlocked', id, name: CHARACTERS[id].name });
   return true;
@@ -183,17 +187,24 @@ export function resetPartyMotion(party, player, worldWidth = Infinity, context =
   syncParty(party, player, worldWidth);
   if (!party.independent) return;
   companionIds(party).forEach((id, slot) => {
-    const actor = party.actors[id];
-    actor.ai = createCompanionAI(slot);
-    const anchor = { x: player.x - player.facing * (64 + slot * 52), y: player.y };
-    const position = context && findSafeLanding(anchor, context.world,
-      context.blocks || [], { maxDistance: 240,
-        avoid: (context.enemies || []).filter(enemy => !enemy.dead) });
-    resetActorBody(actor, position || player);
-    actor.facing = player.facing;
-    actor.recovering = !position;
-    actor.ai.recovering = !position;
+    if (party.unlocked.has(id)) resetCompanion(party, id, slot, player, context);
   });
+}
+
+function resetCompanion(party, id, slot, player, context) {
+  const actor = party.actors[id];
+  actor.attack = null;
+  actor.cooldown = 0;
+  actor.nextKick = false;
+  actor.ai = createCompanionAI(slot);
+  const anchor = { x: player.x - player.facing * (64 + slot * 52), y: player.y };
+  const position = context && findSafeLanding(anchor, context.world,
+    context.blocks || [], { maxDistance: 240,
+      avoid: (context.enemies || []).filter(enemy => !enemy.dead) });
+  resetActorBody(actor, position || player);
+  actor.facing = player.facing;
+  actor.recovering = !position;
+  actor.ai.recovering = !position;
 }
 
 // Call once per engine tick AFTER updateParty (attack timers), before combat.
@@ -208,6 +219,7 @@ export function updateCompanions(party, player, dt, context, events = []) {
   while (party.companionTime + 1e-9 >= step) {
     party.companionTime = Math.max(0, party.companionTime - step);
     ids.forEach((id, slot) => {
+      if (!party.unlocked.has(id)) return;
       const actor = party.actors[id];
       const intent = decideCompanion(actor.ai, actor, {
         ...context, leader: player, spec: ATTACKS[nextAttackKind(actor)],
