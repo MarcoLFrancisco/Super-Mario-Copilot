@@ -101,6 +101,17 @@ function respawn(state, events) {
 }
 
 function tick(state, input, events) {
+  // Keep the existing playing/paused lifecycle during the victory presentation,
+  // but bypass every physics, AI and combat update after the killing blow.
+  if (state.boss?.defeated) {
+    state.pendingJump = false; state.pendingBoost = false; state.pendingMelee = {};
+    state.boss.defeatTime = Math.min(1.8, state.boss.defeatTime + STEP);
+    if (state.boss.defeatTime >= 1.8) {
+      state.status = 'complete';
+      events.push({ type: 'complete', score: state.score, sparks: state.collected.size });
+    }
+    return;
+  }
   const p = state.player;
   const arena = state.stage === 'boss';
   const world = arena ? ARENA : LEVEL;
@@ -210,8 +221,9 @@ function tick(state, input, events) {
     if (state.boss.defeated) {
       const victory = bossEvents.find(event => event.type === 'bossDefeated');
       state.score += victory?.points ?? 0;
-      state.status = 'complete';
-      p.vx = 0; p.boostTime = 0;
+      // Results wait for the defeat presentation; scoring happens only here.
+      p.vx = 0; p.vy = 0; p.boostTime = 0;
+      state.pendingJump = false; state.pendingBoost = false; state.pendingMelee = {};
       // Freeze the team in place for victory; do not relocate companions.
       state.party.manualAttack = false;
       state.party.companionTime = 0;
@@ -219,7 +231,7 @@ function tick(state, input, events) {
         actor.attack = null; actor.vx = 0; actor.vy = 0; actor.boostTime = 0;
       }
       syncParty(state.party, p, world.width);
-      events.push({ type: 'complete', score: state.score, sparks: state.collected.size });
+      // The early defeated-boss branch emits completion after the animation.
     }
     return;
   }

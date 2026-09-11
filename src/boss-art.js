@@ -2,7 +2,8 @@ import { ARENA } from './encounters.js';
 
 // Arena coordinates; caller sets canvas scale. Background goes before solid
 // platforms; telegraphs and boss go afterward, before player/projectiles.
-// Decorative rings/arms are not hitboxes. The rectangular core is the target.
+// Crown, claws and ribbons are decorative. Corner brackets mark the unchanged
+// rectangular collision envelope around the sculpted reactor.
 function rect(c, x, y, w, h, color) {
   c.fillStyle = color; c.fillRect(x, y, w, h);
 }
@@ -75,7 +76,7 @@ export function drawBossWarnings(c, boss) {
     rect(c, 240, 106, 800, 35, '#35223eee');
     label(c, tips[boss.phase], 640, 129, 16, '#ffdb95');
   } else if (boss.mode === 'exposed') {
-    label(c, 'CORE EXPOSED — FIRE FROM THE RIGHT PLATFORM!', 640, 128, 16, '#98ffe1');
+    label(c, 'CORE EXPOSED — ATTACK WITH YOUR TEAM FROM THE RIGHT PLATFORM!', 640, 128, 16, '#98ffe1');
   }
   c.restore();
 }
@@ -116,34 +117,105 @@ function drawDialogueBubble(c, boss) {
 export function drawBoss(c, boss, reducedMotion = false) {
   const t = reducedMotion ? 0 : boss.age;
   const exposed = boss.mode === 'exposed';
+  const dissolve = boss.defeated
+    ? (reducedMotion ? 1 : Math.min(1, (boss.defeatTime || 0) / 1.8)) : 0;
   const color = boss.defeated ? '#89ffd7' : exposed ? '#90ffe6' : ['#b6a1ff', '#ffaccb', '#ffba87'][boss.phase];
   c.save(); c.translate(boss.x + boss.w / 2, boss.y + boss.h / 2);
   const glow = c.createRadialGradient(0, 0, 20, 0, 0, 170);
   glow.addColorStop(0, color + '55'); glow.addColorStop(1, color + '00');
   rect(c, -170, -170, 340, 340, glow);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // Bounded procedural effects: no image assets or growing particle arrays.
+  for (let i = 0; i < 4; i++) {
+    const side = i % 2 ? 1 : -1;
+    const sway = Math.sin(t * 1.6 + i) * 15;
+    c.beginPath(); c.moveTo(side * 38, 38);
+    c.bezierCurveTo(side * (115 + sway), 70, side * 12, 102,
+      side * (75 + sway), 125 + (i % 2) * 12);
+    c.strokeStyle = ['#64e8ff66', '#c896ff66', '#ff9bd866', '#87ffe366'][i];
+    c.lineWidth = 5 - i * .6; c.stroke();
+  }
+  for (let ring = 0; ring < 2; ring++) {
+    c.save(); c.rotate((ring ? -.5 : .5) + t * .13);
+    ellipse(c, 0, 0, 112, 45 + ring * 18, color + '66', false);
+    ellipse(c, 112, 0, 3, 3, '#ecfaff'); c.restore();
+  }
+  const metal = c.createLinearGradient(-65, -80, 65, 80);
+  metal.addColorStop(0, '#d1e6fb'); metal.addColorStop(.24, '#526b91');
+  metal.addColorStop(.55, '#15253f'); metal.addColorStop(.82, '#738bab');
+  metal.addColorStop(1, '#203451');
+  c.save(); c.globalAlpha *= 1 - dissolve * .8;
   for (const side of [-1, 1]) {
     const windup = boss.mode === 'warning' ? boss.windup : 0;
     const strike = reducedMotion ? (boss.mode === 'attack' ? 8 : 0) : boss.attackPulse * 55;
-    const elbow = 22 + Math.sin(t * 1.8) * 8 - windup * 48 + strike;
-    line(c, [[side * 55, -12], [side * 100, elbow], [side * 85, 99]], '#151f36', 15);
-    line(c, [[side * 55, -12], [side * 100, elbow], [side * 85, 99]], '#8392b8', 8);
-    ellipse(c, side * 100, elbow, 9, 9, '#bcc9e3');
-    ellipse(c, side * 100, elbow, 4, 4, color);
-    line(c, [[side * 85, 99], [side * 72, 113], [side * 82, 119]], color, 4);
+    const elbow = 18 + Math.sin(t * 1.8) * 7 - windup * 48 + strike;
+    c.save(); c.translate(side * dissolve * 30, dissolve * 15); c.scale(side, 1);
+    line(c, [[49, -14], [96, elbow], [91, 81 - windup * 18]], '#0a1429', 17);
+    line(c, [[49, -14], [96, elbow], [91, 81 - windup * 18]], '#657b9e', 10);
+    line(c, [[51, -17], [94, elbow - 3]], color, 2);
+    ellipse(c, 96, elbow, 10, 10, metal);
+    ellipse(c, 96, elbow, 4, 4, color);
+    c.translate(91, 81 - windup * 18);
+    ellipse(c, 0, 0, 11, 13, metal);
+    for (let finger = -1; finger <= 1; finger++) {
+      c.beginPath(); c.moveTo(finger * 7, 5);
+      c.quadraticCurveTo(finger * 18, 26, finger * 8 - 3, 34);
+      c.strokeStyle = '#c8d9ed'; c.lineWidth = 4; c.stroke();
+      ellipse(c, finger * 8 - 3, 34, 2, 2, color);
+    }
+    c.restore();
   }
-  for (let ring = 0; ring < 3; ring++) {
-    c.save(); c.rotate(ring * Math.PI / 3 + t * .18);
-    ellipse(c, 0, 0, 110, 42 + ring * 8, color + '88', false);
-    ellipse(c, 110, 0, 4, 4, '#ecfaff'); c.restore();
+  for (let i = -2; i <= 2; i++) {
+    c.save(); c.translate(i * 23, -67 - (2 - Math.abs(i)) * 8 - dissolve * 46);
+    c.rotate(i * .22 + (reducedMotion ? 0 : Math.sin(t + i) * .035));
+    c.beginPath(); c.moveTo(-9, 7); c.quadraticCurveTo(-13, -8, -5, -24);
+    c.lineTo(0, -37); c.lineTo(9, -12); c.quadraticCurveTo(13, 0, 9, 7);
+    c.closePath(); c.fillStyle = metal; c.fill();
+    c.strokeStyle = color; c.lineWidth = 1.5; c.stroke();
+    line(c, [[0, -25], [0, -3]], '#e0fbff', 2); c.restore();
   }
-  const metal = c.createLinearGradient(0, -80, 0, 80);
-  metal.addColorStop(0, '#b7c5df'); metal.addColorStop(.18, '#3d4c73'); metal.addColorStop(1, '#182641');
-  rect(c, -boss.w / 2, -boss.h / 2, boss.w, boss.h, metal);
-  c.strokeStyle = color; c.lineWidth = exposed ? 4 : 2;
-  c.strokeRect(-boss.w / 2, -boss.h / 2, boss.w, boss.h);
-  for (const x of [-61, 61]) for (const y of [-70, 70]) ellipse(c, x, y, 3, 3, '#d0dded');
-  rect(c, -54, -56, 108, 86, '#0b1932');
-  for (let i = 0; i < 5; i++) line(c, [[-45, -43 + i * 14], [45, -43 + i * 14]], '#87b6e51c');
+  c.restore();
+  const reactor = c.createRadialGradient(-20, -27, 3, 0, 0, 73);
+  reactor.addColorStop(0, '#f0ffff'); reactor.addColorStop(.22, color);
+  reactor.addColorStop(.55, exposed || boss.defeated ? '#287d88' : '#343c77');
+  reactor.addColorStop(1, '#09172d');
+  ellipse(c, 0, 0, 68, 73, reactor);
+  ellipse(c, 0, 0, 68, 73, color, false);
+  c.save(); c.globalAlpha *= .35;
+  ellipse(c, -18, -34, 29, 12, '#ffffff'); c.restore();
+  // Armor opens during vulnerability and separates when the core is patched.
+  for (const side of [-1, 1]) {
+    c.save(); c.scale(side, 1);
+    c.translate((exposed ? 9 : 0) + dissolve * 32, dissolve * 22);
+    c.globalAlpha *= 1 - dissolve * .9;
+    c.beginPath(); c.moveTo(12, -69);
+    c.bezierCurveTo(72, -87, 87, -24, 65, 40);
+    c.quadraticCurveTo(51, 75, 20, 79);
+    c.lineTo(34, 46); c.bezierCurveTo(58, 4, 48, -40, 12, -69);
+    c.closePath(); c.fillStyle = metal; c.fill();
+    c.strokeStyle = color; c.lineWidth = 1.5; c.stroke();
+    c.beginPath(); c.moveTo(33, -55); c.bezierCurveTo(69, -39, 71, 6, 48, 44);
+    c.strokeStyle = '#d7efff99'; c.lineWidth = 2; c.stroke();
+    for (let i = 0; i < 3; i++) line(c, [[53, i * 9], [63, i * 9 - 5]], color, 2);
+    c.restore();
+  }
+  ellipse(c, 0, -15, 49, 37, '#09162cdd');
+  if (!boss.defeated) for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const x = sx * boss.w / 2, y = sy * boss.h / 2;
+    line(c, [[x - sx * 11, y], [x, y], [x, y - sy * 11]],
+      exposed ? '#a8ffe9' : '#91a7c477', exposed ? 2 : 1);
+  }
+  if (boss.defeated && !reducedMotion) {
+    c.save(); c.globalAlpha *= 1 - dissolve;
+    ellipse(c, 0, 0, 72 + dissolve * 105, 76 + dissolve * 105, '#b5fff0', false);
+    for (let i = 0; i < 18; i++) {
+      const angle = i * Math.PI * 2 / 18;
+      const radius = 72 + dissolve * (65 + i % 3 * 17);
+      const x = Math.cos(angle) * radius, y = Math.sin(angle) * radius;
+      line(c, [[x, y], [x + Math.cos(angle) * 9, y + Math.sin(angle) * 9]], color, 2);
+    }
+    c.restore();
+  }
   const caption = boss.dialogue.current;
   const mood = boss.defeated ? 'defeated' : boss.recoil > 0 ? 'hurt'
     : exposed ? 'worried' : boss.mode === 'warning' || boss.phase === 2 ? 'angry'
@@ -181,7 +253,16 @@ export function drawBoss(c, boss, reducedMotion = false) {
   }
   label(c, boss.defeated ? 'VERIFIED' : exposed ? 'PATCH NOW' : 'SHIELDED', 0, 54, 12, color);
   if (!exposed && !boss.defeated) {
-    for (let x = -48; x < 50; x += 16) line(c, [[x, -51], [x, 25]], '#a5c6ff33');
+    c.save();
+    c.beginPath(); c.ellipse(0, 0, 66, 71, 0, 0, Math.PI * 2); c.clip();
+    for (let y = -70; y < 75; y += 16) {
+      for (let x = -80; x < 80; x += 24) {
+        const offset = (Math.floor(y / 16) % 2) * 12;
+        line(c, [[x + offset, y], [x + offset + 6, y - 4],
+          [x + offset + 18, y - 4], [x + offset + 24, y]], '#b6cdff26');
+      }
+    }
+    c.restore();
   }
   if (!boss.dialogue.current) {
     for (const [i, message] of ['FACT? NULL', 'TRUST: 0%', 'RETRY...'].entries()) {

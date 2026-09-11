@@ -207,6 +207,7 @@ export function hitBoss(boss, combat, events, party = null, solids = []) {
       helper: Boolean(shot.helper), damage });
     if (boss.health === 0) {
       boss.defeated = true; boss.mode = 'defeated'; boss.timer = 0;
+      boss.defeatTime = 0;
       boss.zones = []; combat.shots = []; combat.enemies = [];
       boss.vx = 0; boss.vy = 0; boss.windup = 0; boss.attackPulse = 0;
       events.push({ type: 'bossDefeated', name: ARENA.name, points: 3000 });

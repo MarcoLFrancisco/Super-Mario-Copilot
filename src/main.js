@@ -112,13 +112,16 @@ let fireUntil = 0;
 let melee = {};
 const mapping = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   Space: 'jump', KeyW: 'jump', ArrowUp: 'jump', ShiftLeft: 'boost', ShiftRight: 'boost', KeyF: 'fire', KeyJ: 'attack', KeyK: 'helper' };
+// Keep frame updates and pause available during defeat, but reject combat input.
 const playing = () => started && state.status === 'playing';
+const acceptingInput = () => playing() && !state.boss?.defeated;
 const announce = message => text('game-announcement', message);
 function clearInput() {
   melee = {};
   keys.clear(); pointers.clear(); jumpPressed = false; boostPressed = false; fireUntil = 0;
 }
 function press(action) {
+  if (!acceptingInput()) return;
   if (action === 'attack') melee.attackPressed = true;
   if (action === 'helper') melee.helperPressed = true;
   if (action === 'jump') jumpPressed = true;
@@ -139,10 +142,11 @@ function hud() {
   for (const app of Object.keys(PRODUCTIVITY)) {
     text(`count-${app}`, `${counts[app]} / ${PRODUCTIVITY_TOTALS[app]}`);
   }
-  el('fire-button').disabled = !playing() || !state.combat.blaster;
+  controls.forEach(button => { button.disabled = !acceptingInput(); });
+  el('fire-button').disabled = !acceptingInput() || !state.combat.blaster;
   const helpers = companionIds(state.party);
   const recruited = helpers.filter(id => state.party.unlocked.has(id));
-  el('helper-button').disabled = !playing()
+  el('helper-button').disabled = !acceptingInput()
     || !recruited.some(id => !state.party.actors[id].recovering);
   const names = helpers.map(id => {
     const status = !state.party.unlocked.has(id) ? 'find surprise box'
@@ -163,7 +167,9 @@ function hud() {
       warning: ['Token burst incoming: keep moving.', 'Leave the marked column; agents are incoming.', 'Energy waves incoming: jump or climb.'][boss.phase],
       attack: 'Dodge the attacks. The core is shielded.',
       exposed: 'Core exposed! Hold F or Fire from the right platform.',
-      defeated: 'Core patched. Review your final productivity results.'
+      defeated: state.status === 'complete'
+        ? 'Core patched. Review your final productivity results.'
+        : 'Core patched! The reactor is stabilizing; results follow shortly.'
     };
     text('boss-hint', tips[boss.mode] || 'Watch the arena warnings.');
   }
@@ -176,7 +182,7 @@ function panels() {
   el('complete-panel').hidden = !started || state.status !== 'complete';
   el('pause-button').disabled = !started || state.status === 'complete';
   text('pause-button', state.status === 'paused' ? 'Resume' : 'Pause');
-  controls.forEach(button => { button.disabled = !playing(); });
+  controls.forEach(button => { button.disabled = !acceptingInput(); });
   canvas.tabIndex = playing() ? 0 : -1;
   audio.setStatus(started ? state.status : 'idle');
 }
@@ -258,7 +264,7 @@ window.addEventListener('keydown', event => {
     return;
   }
   const action = mapping[event.code];
-  if (!action || !playing() || document.activeElement !== canvas || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (!action || !acceptingInput() || document.activeElement !== canvas || event.ctrlKey || event.metaKey || event.altKey) return;
   event.preventDefault();
   if (!keys.has(event.code) && !event.repeat) press(action);
   keys.set(event.code, action);
@@ -268,7 +274,7 @@ canvas.addEventListener('blur', () => { if (playing()) pause(true, false); });
 canvas.addEventListener('pointerdown', () => { if (playing()) canvas.focus({ preventScroll: true }); });
 controls.forEach(button => {
   button.addEventListener('pointerdown', event => {
-    if (!playing() || event.button !== 0) return;
+    if (!acceptingInput() || event.button !== 0) return;
     event.preventDefault();
     button.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, button.dataset.action);
@@ -328,7 +334,11 @@ function frame(now) {
       if (event.type === 'partyRecover') announce(`${CHARACTERS[event.character].name} regrouped with the team.`);
       if (event.type === 'blockReward') announce('Reward released beneath the block. Touch it to collect.');
       if (event.type === 'bossWarning' || event.type === 'bossPhase') announce(`${event.name}. Watch the arena warning.`);
-      if (event.type === 'bossExposed') announce('Core exposed! Fire from the right platform.');
+      if (event.type === 'bossExposed') announce('Core exposed! Attack with your team from the right platform.');
+      if (event.type === 'bossDefeated') {
+        clearInput();
+        announce('Core patched! Watch the reactor stabilize before your results appear.');
+      }
       if (event.type === 'complete') {
         clearInput();
         text('final-score', state.score.toLocaleString());
