@@ -3,7 +3,7 @@ import { ARENA } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
 import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat } from './combat.js';
 import { createBoss, updateBoss, hitBoss } from './boss.js';
-import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty } from './party.js';
+import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty, companionIds, unlockHelper } from './party.js';
 import { createPartyDialogue, updatePartyDialogue, sayParty, reactPartyDialogue, clearPartyCaption } from './party-dialogue.js';
 
 // Public API: createState(leader = 'marco'), setPaused(state, boolean), update(state,input,dt).
@@ -40,6 +40,11 @@ export function createState(leader = 'marco') {
     stage: 'world', blocks: createBlocks(), combat: createCombat(), boss: null,
     partyDialogue: createPartyDialogue(), partyStarted: false
   };
+  const recruits = companionIds(state.party);
+  for (const block of state.blocks.blocks) {
+    const slot = ['recruit-first', 'recruit-second'].indexOf(block.reward);
+    if (slot !== -1) block.reward = `helper-${recruits[slot]}`;
+  }
   initializeIndependentParty(state.party, player, partyContext(state));
   return state;
 }
@@ -168,7 +173,9 @@ function tick(state, input, events) {
     return;
   }
   for (const reward of collectBlockRewards(state.blocks, p)) {
-    grantPower(state.combat, reward, combatEvents);
+    if (!unlockHelper(state.party, reward, combatEvents, p, partyContext(state))) {
+      grantPower(state.combat, reward, combatEvents);
+    }
   }
   updateParty(state.party, p, STEP, world.width);
   requestPartyAttacks(state.party, state.pendingMelee, combatEvents);

@@ -82,12 +82,11 @@ for (const [index, offset, reward] of [
   }
 }
 
-// Former helper boxes now grant protection: the independent party starts
-// together instead of requiring recruitment. Keep stable IDs and geometry.
-// Their undersides remain within jump reach; existing blaster rewards stay intact.
+// Recruitment slots resolve to the two non-selected characters at run creation.
+// Keep stable box IDs and reachable geometry; existing blaster rewards stay intact.
 for (const [id, index, offset, reward] of [
-  ['helper-box-donkey', 0, 550, 'microsoft'],
-  ['helper-box-mario', 4, 280, 'microsoft']
+  ['helper-box-donkey', 0, 550, 'recruit-first'],
+  ['helper-box-mario', 4, 280, 'recruit-second']
 ]) {
   const p = surface(index);
   blocks.push({ id, x: p.x + offset, y: p.y - 142,
@@ -103,9 +102,10 @@ export const ENCOUNTERS = freeze({
   enemies,
   blocks,
   pickups: [protection('protection-inbox', 4, 320), protection('protection-teams', 8, 350)],
-  // Power-ups are never productivity collectibles. Keeping these separate
-  // prevents inflation of the five category counters.
-  rewardTypes: ['blaster', 'microsoft']
+  // Power-ups and recruits never increment productivity counters.
+  // Recruitment slots are resolved before blocks can release their pickups.
+  rewardTypes: ['blaster', 'microsoft', 'recruit-first', 'recruit-second',
+    'helper-marco', 'helper-donkey', 'helper-mario']
 });
 
 // Arena uses its own coordinate space. Enter it at the world beacon; do not
