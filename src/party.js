@@ -42,13 +42,16 @@ export function syncParty(party, player, worldWidth = Infinity) {
   const maxX = Math.max(0, worldWidth - P.playerWidth);
   for (const actor of Object.values(party.actors)) {
     const offset = CHARACTERS[actor.id].offset || 0;
-    actor.x = Math.max(0, Math.min(maxX, player.x + offset * facing));
+    const actorFacing = actor.attack ? actor.attack.facing : facing;
+    // Lock the helper's side as well as its direction for the whole swing.
+    // Turning Marco must not teleport an active strike across the party.
+    actor.x = Math.max(0, Math.min(maxX, player.x + offset * actorFacing));
     actor.y = player.y;
     actor.vx = player.vx;
     actor.vy = player.vy;
     actor.grounded = player.grounded;
     actor.boostTime = player.boostTime;
-    actor.facing = actor.attack ? actor.attack.facing : facing;
+    actor.facing = actorFacing;
   }
 }
 
