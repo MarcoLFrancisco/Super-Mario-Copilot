@@ -65,8 +65,8 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
     }
   }
   if (input.fire && combat.blaster && combat.cooldown === 0 && combat.health > 0) {
-    // Match Marco's visible direction, which stays locked during melee.
-    const facing = (party?.actors.marco.facing ?? player.facing) < 0 ? -1 : 1;
+    // Match the selected character's visible direction during melee.
+    const facing = (party?.actors[party.leader].facing ?? player.facing) < 0 ? -1 : 1;
     if (spawnShot(combat, { owner: 'player', kind: 'patch',
       x: player.x + P.playerWidth / 2 - 5, y: player.y + 22,
       vx: facing * C.projectileSpeed, vy: 0, damage: C.projectileDamage })) {
@@ -118,8 +118,12 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
         const contactLeft = Math.max(strike.x, enemy.x);
         const contactRight = Math.min(strike.x + strike.w, enemy.x + enemy.w);
         const target = (contactLeft + contactRight) / 2;
-        const left = Math.min(player.x + P.playerWidth / 2, strike.originX, target);
-        const right = Math.max(player.x + P.playerWidth / 2, strike.originX, target);
+        // Independent companions strike from their own physical position.
+        // Keep the leader-to-helper safeguard only for legacy attached helpers,
+        // which can otherwise be visually positioned through a solid brick.
+        const origin = party.independent ? strike.originX : player.x + P.playerWidth / 2;
+        const left = Math.min(origin, strike.originX, target);
+        const right = Math.max(origin, strike.originX, target);
         const corridor = { x: left, y: strike.y, w: Math.max(1, right - left), h: strike.h };
         if (solids.some(b => !b.broken && overlaps(corridor, b))) continue;
         if (claimPartyHit(party, strike, enemy.id)) hitEnemy(enemy, strike.damage, events);
