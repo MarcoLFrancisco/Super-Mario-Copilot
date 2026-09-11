@@ -3,6 +3,7 @@ import { ARENA, COMBAT } from './encounters.js';
 import { createState, setPaused, update } from './engine.js';
 import { render } from './art.js';
 import { createAudio } from './audio.js';
+import { CHARACTERS, companionIds } from './party.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -17,7 +18,7 @@ let state = createState();
 let started = false;
 let previous = 0;
 const audio = createAudio();
-const enabled = { music: false, effects: false };
+const enabled = { music: true, effects: true };
 const items = new Map(LEVEL.sparks.map(item => [item.id, item]));
 let audioBusy = false;
 const speech = window.speechSynthesis;
@@ -27,6 +28,11 @@ let utterance = null;
 let speechTimer;
 let captionBoss = null;
 let captionId = 0;
+let partyCaptionId = 0;
+function selectedCharacter() {
+  const id = document.querySelector('input[name="character"]:checked')?.value;
+  return Object.hasOwn(CHARACTERS, id) ? id : 'marco';
+}
 function cancelSpeech() {
   clearTimeout(speechTimer);
   if (utterance) {
@@ -67,6 +73,13 @@ function speakCaption(caption) {
   }
 }
 function syncDialogue() {
+  const team = started ? state.partyDialogue.current : null;
+  if (team && !state.boss?.dialogue.current && team.id !== partyCaptionId) {
+    partyCaptionId = team.id;
+    el('party-dialogue-panel').hidden = false;
+    text('party-caption', `${CHARACTERS[team.character].name}: ${team.text}`);
+  }
+  // Retain the latest team line for reading; reset it when a new run starts.
   const boss = started && state.stage === 'boss' ? state.boss : null;
   if (boss !== captionBoss) {
     cancelSpeech(); captionBoss = boss; captionId = 0;
@@ -127,10 +140,11 @@ function hud() {
     text(`count-${app}`, `${counts[app]} / ${PRODUCTIVITY_TOTALS[app]}`);
   }
   el('fire-button').disabled = !playing() || !state.combat.blaster;
-  const helpers = ['donkey', 'mario'].filter(id => state.party.unlocked.has(id))
-    .map(id => id === 'donkey' ? 'Donkey' : 'Mario');
-  el('helper-button').disabled = !playing() || helpers.length === 0;
-  text('party-status', `Leader: Marco · Helpers: ${helpers.join(' + ') || 'Find surprise boxes'}`);
+  const helpers = companionIds(state.party);
+  el('helper-button').disabled = !playing()
+    || helpers.every(id => state.party.actors[id].recovering);
+  const names = helpers.map(id => `${CHARACTERS[id].name}${state.party.actors[id].recovering ? ' (regrouping)' : ''}`);
+  text('party-status', `Leader: ${CHARACTERS[state.party.leader].name} · Companions: ${names.join(' + ')}`);
   el('boss-hud').hidden = !started || state.stage !== 'boss';
   if (state.boss) {
     const boss = state.boss;
@@ -152,6 +166,7 @@ function hud() {
 }
 function panels() {
   el('start-panel').hidden = started;
+  el('character-selection').disabled = started;
   el('pause-panel').hidden = !started || state.status !== 'paused';
   el('complete-panel').hidden = !started || state.status !== 'complete';
   el('pause-button').disabled = !started || state.status === 'complete';
@@ -164,10 +179,16 @@ function start() {
   cancelSpeech(); captionBoss = null; captionId = 0;
   text('boss-caption', ''); el('boss-dialogue-panel').hidden = true;
   audio.setStatus('idle'); audio.reset();
-  state = createState(); started = true; previous = 0;
-  if (enabled.music || enabled.effects) void audio.unlock();
+  state = createState(selectedCharacter()); started = true; previous = 0;
+  partyCaptionId = 0;
+  text('party-caption', ''); el('party-dialogue-panel').hidden = true;
+  if (enabled.music || enabled.effects) {
+    void audio.unlock().then(ok => {
+      if (!ok) text('audio-status', 'Audio unavailable or blocked. Gameplay continues; retry Music or Effects in Sound studio.');
+    });
+  }
   clearInput(); panels(); hud(); canvas.focus({ preventScroll: true });
-  announce('Marco’s adventure started. Tap J or Attack for kickboxing. Discover Donkey and Mario in surprise boxes, then tap K or Helpers. Find a blaster and reach the AI core.');
+  announce(`${CHARACTERS[state.party.leader].name} leads! Your companions follow and attack automatically. Tap J or Attack for your melee move; K or Helpers requests companion attacks.`);
 }
 function pause(value, focus = true) {
   if (!started || state.status === 'complete') return;
@@ -298,7 +319,7 @@ function frame(now) {
       if (event.type === 'powerup') announce(event.kind === 'microsoft'
         ? 'Microsoft protection active for 10 seconds. Falls still cause respawn.'
         : 'Debug Blaster equipped. Hold F or Fire to shoot.');
-      if (event.type === 'helperUnlocked') announce(`${event.name} joined Marco! Tap K or Helpers to attack.`);
+      if (event.type === 'partyRecover') announce(`${CHARACTERS[event.character].name} regrouped with the team.`);
       if (event.type === 'blockReward') announce('Reward released beneath the block. Touch it to collect.');
       if (event.type === 'bossWarning' || event.type === 'bossPhase') announce(`${event.name}. Watch the arena warning.`);
       if (event.type === 'bossExposed') announce('Core exposed! Fire from the right platform.');
@@ -311,7 +332,7 @@ function frame(now) {
         for (const app of Object.keys(PRODUCTIVITY)) {
           text(`final-${app}`, `${counts[app]} / ${PRODUCTIVITY_TOTALS[app]}`);
         }
-        text('completion-summary', `Marco patched the Hallucination Engine! You collected ${state.collected.size} of ${LEVEL.sparks.length} app items.`);
+        text('completion-summary', `${CHARACTERS[state.party.leader].name} and the team patched the Hallucination Engine! You collected ${state.collected.size} of ${LEVEL.sparks.length} app items.`);
         panels(); el('replay-button').focus({ preventScroll: true });
         announce('Level complete! Your results are ready.');
       }
@@ -322,6 +343,13 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 if (ctx) {
+  el('character-selection').addEventListener('change', () => {
+    if (started) return;
+    state = createState(selectedCharacter());
+    hud();
+    text('load-status', `${CHARACTERS[state.party.leader].name} selected. Both companions join automatically. Press Start when ready.`);
+  });
+  state = createState(selectedCharacter());
   panels(); hud();
   el('start-button').disabled = false;
   el('sound-button').disabled = false;
@@ -332,10 +360,11 @@ if (ctx) {
     ? 'Optional boss voice starts off. Captions work without speech. Enable voice separately; resume after changing controls.'
     : 'Browser speech is unavailable. Boss dialogue captions still work.');
   audioControls();
-  text('audio-status', 'Enable music and effects independently below, or use Enable all sound. Audio starts off and pauses with gameplay.');
+  text('audio-status', 'Music and effects are enabled by default and begin when you press Start. Mute before starting for silent play. Audio pauses with gameplay; boss voice remains opt-in.');
   canvas.setAttribute('aria-describedby', 'keyboard-help combat-help party-help party-status game-objective');
-  text('combat-controls-status', 'Combat ready. Tap J or Attack for kickboxing; K or Helpers commands unlocked companions. Hold F or Fire after collecting a blaster. The boss arena supplies one automatically.');
-  text('load-status', 'Marco is ready! Discover Donkey and Mario in surprise boxes, collect app items, and challenge the AI core. Audio is optional.');
+  text('character-selection-help', 'Choose who you control before Start. The other two follow and defend automatically. Restart and Explore again keep your choice; reload to choose another character.');
+  text('combat-controls-status', 'Tap J or Attack: Marco punches/kicks, Mario kicks forward, Donkey kicks backward. K or Helpers requests companion attacks. Hold F or Fire with a blaster; the arena supplies one.');
+  text('load-status', 'Choose Marco, Mario, or Donkey. The whole team starts together! Sound begins on Start unless muted.');
   requestAnimationFrame(frame);
 } else {
   text('load-status', 'Canvas graphics are unavailable. Please use a browser with Canvas 2D support.');
