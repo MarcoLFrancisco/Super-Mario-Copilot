@@ -229,6 +229,9 @@ function assignSupportTargets(party, player, context) {
   for (const retain of [true, false]) {
     for (const actor of actors) {
       if (slots === 0 || assignments.has(actor.id)) continue;
+      // A committed swing may retain its living target, but cannot act on a
+      // replacement until it ends. Leave that assignment for a ready teammate.
+      if (!retain && actor.attack) continue;
       const eligible = candidates(actor);
       const target = retain ? eligible.find(enemy => enemy.id === actor.ai.targetId)
         : eligible.sort((a, b) => distance(a, actor) - distance(b, actor))[0];
