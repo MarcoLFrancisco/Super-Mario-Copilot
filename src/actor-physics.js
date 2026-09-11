@@ -88,12 +88,13 @@ export function stepActor(actor, intent, world, blocks, dt) {
     for (const surface of landingSurfaces(world, solids)) {
       const floor = surface.y - P.playerHeight;
       if (overlap(actor.x, P.playerWidth, surface.x, surface.w)
-          && oldY <= floor + EPS && nextY >= floor) {
-        nextY = floor;
+          && oldY <= floor + EPS && nextY >= floor
+          && (!landing || surface.y < landing.y)) {
         landing = surface;
       }
     }
     if (landing) {
+      nextY = landing.y - P.playerHeight;
       actor.vy = 0;
       actor.grounded = true;
       actor.coyote = P.coyoteTime;

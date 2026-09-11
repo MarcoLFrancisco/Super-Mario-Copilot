@@ -131,6 +131,31 @@ export async function runTests({ test, assert }) {
     assert(last.defeated && events.filter(e => e.type === 'bossDefeated').length === 1, 'Single player victory');
   });
 
+  await test('Companions land on the first crossed floor regardless of surface order', () => {
+    const upper = { id: 'upper', x: 0, y: 300, w: 400, h: 4 };
+    const lower = { id: 'lower', x: 0, y: 310, w: 400, h: 4 };
+    const cases = [
+      { platforms: [upper, lower], blocks: [] },
+      { platforms: [lower, upper], blocks: [] },
+      { platforms: [upper], blocks: [lower] },
+      { platforms: [lower], blocks: [upper] }
+    ];
+    for (const { platforms, blocks } of cases) {
+      const world = { width: 400, hazards: [], platforms };
+      const actor = resetActorBody({ id: 'marco', facing: 1 },
+        { x: 100, y: upper.y - P.playerHeight - 2 });
+      actor.vy = P.maxFallSpeed;
+      const contact = stepActor(actor, { move: 0 }, world, blocks, 1 / 60);
+      assert(contact.landed && actor.grounded, 'Descending companion must land');
+      assert(actor.y === upper.y - P.playerHeight && actor.surfaceId === upper.id,
+        'Upper crossed floor must win over a later lower surface');
+      assert(actor.vy === 0, 'Landing must cancel downward velocity');
+      stepActor(actor, { move: 0 }, world, blocks, 1 / 60);
+      assert(actor.grounded && actor.surfaceId === upper.id,
+        'Companion must remain supported on the next tick');
+    }
+  });
+
   await test('Marco closes a near-target gap instead of idling outside punch range', () => {
     const world = { width: 800, hazards: [], platforms: [
       { id: 'floor', x: 0, y: 300, w: 800, h: 30 }
