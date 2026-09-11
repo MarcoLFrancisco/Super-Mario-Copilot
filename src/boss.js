@@ -2,6 +2,7 @@ import { PHYSICS as P } from './level.js';
 import { ARENA, ENEMY_TYPES } from './encounters.js';
 import { overlaps, makeEnemy, spawnShot, hurtPlayer } from './combat.js';
 import { createDialogue, updateDialogue, sayBoss } from './boss-dialogue.js';
+import { activePartyAttacks, claimPartyHit } from './party.js';
 
 // Arena-only state. On entry/respawn the engine creates a fresh boss and
 // arena combat, grants the blaster, and places Mario at ARENA.spawn.
@@ -12,9 +13,26 @@ export function createBoss() {
   return { ...ARENA.boss, maxHealth: ARENA.boss.health, phase: 0,
     mode: 'intro', timer: ARENA.boss.introDuration, age: 0,
     shotTimer: 0, grace: 0, cycle: 0, zones: [], defeated: false,
+    helperDamage: 0, helperWindowDamage: 0,
     vx: 0, vy: 0, lookX: -1, lookY: 0, windup: 0,
     recoil: 0, attackPulse: 0, dialogue: createDialogue() };
 }
+// Helpers may contribute one third of total health, at most two per exposure.
+// Keep the last point for the player; reset all counters with a fresh encounter.
+function supportAllowance(boss) {
+  return Math.max(0, Math.min(Math.floor(boss.maxHealth / 3) - boss.helperDamage,
+    2 - boss.helperWindowDamage, boss.health - 1));
+}
+
+export function bossSupportTarget(boss) {
+  if (boss.defeated || !['returning', 'exposed'].includes(boss.mode)
+      || supportAllowance(boss) <= 0) return null;
+  const platform = ARENA.platforms.find(p => p.id === 'arena-right');
+  return { id: 'boss-core', x: ARENA.boss.x, y: ARENA.boss.y,
+    w: boss.w, h: boss.h, exposed: boss.mode === 'exposed',
+    approachY: platform.y - P.playerHeight };
+}
+
 const playerBox = p => ({ x: p.x, y: p.y, w: P.playerWidth, h: P.playerHeight });
 const phaseFor = boss => Math.max(0, ARENA.phases.findIndex(p => boss.health > p.healthAbove));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -132,6 +150,7 @@ export function updateBoss(boss, combat, player, dt, events) {
     }
     if (boss.timer === 0) {
       boss.mode = 'returning';
+      boss.helperWindowDamage = 0;
       boss.zones = []; clearThreats(combat);
     }
   } else if (boss.mode === 'returning') {
@@ -154,18 +173,38 @@ export function updateBoss(boss, combat, player, dt, events) {
 // Shots move in updateCombat; consume overlapping survivors here. The full
 // visible core rectangle is hittable during exposure, including shots fired
 // from the right arena platform. Shielded shots are consumed without damage.
-export function hitBoss(boss, combat, events) {
+export function hitBoss(boss, combat, events, party = null, solids = []) {
   if (boss.defeated || combat.health <= 0) return;
-  for (const shot of combat.shots) {
+  // Player shots retain priority. Melee is evaluated against actual core bounds,
+  // never against the AI's predicted recovery target or decorative artwork.
+  const attacks = party ? activePartyAttacks(party).filter(strike => {
+    if (!overlaps(strike, boss)) return false;
+    const contactX = (Math.max(strike.x, boss.x)
+      + Math.min(strike.x + strike.w, boss.x + boss.w)) / 2;
+    const corridor = { x: Math.min(strike.originX, contactX), y: strike.y,
+      w: Math.max(1, Math.abs(contactX - strike.originX)), h: strike.h };
+    return !solids.some(block => !block.broken && overlaps(corridor, block));
+  }).map(strike => ({ ...strike, owner: 'player', life: 1, melee: true,
+    helper: strike.actorId !== party.leader })) : [];
+  for (const shot of [...combat.shots, ...attacks]) {
     if (shot.life <= 0 || shot.owner !== 'player' || !overlaps(shot, boss)) continue;
     shot.life = 0;
     if (boss.mode !== 'exposed' || boss.grace > 0) continue;
-    boss.health = Math.max(0, boss.health - shot.damage);
+    const damage = shot.helper ? Math.min(shot.damage, supportAllowance(boss)) : shot.damage;
+    if (damage <= 0) continue;
+    if (shot.melee && !claimPartyHit(party, shot, 'boss-core')) continue;
+    boss.health = Math.max(0, boss.health - damage);
+    if (shot.helper) {
+      boss.helperDamage += damage;
+      boss.helperWindowDamage += damage;
+    }
     boss.grace = ARENA.boss.damageGrace;
     boss.recoil = .28;
     // Keep the recovery target stationary; artwork still shows hit recoil.
     boss.vx = 0;
-    events.push({ type: 'bossHit', health: boss.health, maxHealth: boss.maxHealth });
+    events.push({ type: 'bossHit', health: boss.health, maxHealth: boss.maxHealth,
+      actorId: shot.actorId ?? party?.leader ?? 'player',
+      helper: Boolean(shot.helper), damage });
     if (boss.health === 0) {
       boss.defeated = true; boss.mode = 'defeated'; boss.timer = 0;
       boss.zones = []; combat.shots = []; combat.enemies = [];

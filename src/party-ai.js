@@ -83,13 +83,18 @@ export function decideCompanion(ai, actor, context, dt) {
   const candidates = alive.filter(e => distance(e, leader) < 330
     && distance(e, actor) < 300 && Math.abs(e.y - actor.y) < 150
     && (context.assignedTargetId === undefined || e.id === context.assignedTargetId));
-  const enemy = candidates.find(e => e.id === ai.targetId)
+  // The core has a separate support budget, independent of minion defeats.
+  // Stay near the leader; approach its stationary recovery position early.
+  const core = context.bossTarget;
+  const boss = core && distance(core, leader) < 600 && distance(core, actor) < 650
+    ? core : null;
+  const enemy = boss || candidates.find(e => e.id === ai.targetId)
     || candidates.sort((a, b) => distance(a, actor) - distance(b, actor))[0];
   const targetId = enemy?.id ?? null;
   if (ai.targetId !== targetId) ai.route = null;
   ai.targetId = targetId;
-  ai.mode = enemy ? 'defend' : 'follow';
-  if (enemy && spec) {
+  ai.mode = boss ? 'boss-support' : enemy ? 'defend' : 'follow';
+  if (enemy && spec && (!boss || boss.exposed)) {
     const attack = attackIntent(actor, enemy, spec, blocks);
     if (attack) { ai.route = null; return attack; }
   }
@@ -104,9 +109,9 @@ export function decideCompanion(ai, actor, context, dt) {
 
   let desired = anchor;
   if (enemy) {
-    const left = actor.x + P.playerWidth / 2 < enemy.x + enemy.w / 2;
+    const left = boss || actor.x + P.playerWidth / 2 < enemy.x + enemy.w / 2;
     desired = { x: left ? enemy.x - P.playerWidth - 12 : enemy.x + enemy.w + 12,
-      y: enemy.y + enemy.h - P.playerHeight };
+      y: boss ? boss.approachY : enemy.y + enemy.h - P.playerHeight };
   }
   const goal = findSafeLanding(desired, world, blocks,
     { maxDistance: enemy ? 160 : 260, avoid: alive });

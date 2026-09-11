@@ -122,7 +122,7 @@ export const ARENA = freeze({
     { id: 'arena-floor', x: 0, y: 630, w: VIEW.width, h: 50, app: 'copilot', kind: 'normal' },
     { id: 'arena-left', x: 200, y: 520, w: 180, h: 24, app: 'teams', kind: 'normal' },
     { id: 'arena-center', x: 480, y: 435, w: 190, h: 24, app: 'outlook', kind: 'normal' },
-    { id: 'arena-right', x: 770, y: 520, w: 180, h: 24, app: 'copilot', kind: 'normal' }
+    { id: 'arena-right', x: 770, y: 520, w: 260, h: 24, app: 'copilot', kind: 'normal' }
   ],
   boss: { x: 1030, y: 385, w: 140, h: 160, health: 24,
     damageGrace: .18, introDuration: 2, vulnerableDuration: 3.2 },
