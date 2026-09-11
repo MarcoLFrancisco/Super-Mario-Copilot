@@ -3,6 +3,7 @@ import { ARENA } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
 import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat } from './combat.js';
 import { createBoss, updateBoss, hitBoss } from './boss.js';
+import { createParty, unlockHelper, syncParty, resetPartyMotion } from './party.js';
 
 // Public API: createState(), setPaused(state, boolean), update(state,input,dt).
 // Input: held left/right/fire, one-frame jumpPressed/boostPressed booleans.
@@ -25,7 +26,7 @@ function makePlayer(spawn) {
 export function createState() {
   const player = makePlayer(LEVEL.spawn);
   return {
-    player, cameraX: cameraTarget(player), collected: new Set(),
+    player, party: createParty(player), cameraX: cameraTarget(player), collected: new Set(),
     checkpointIndex: 0, score: 0, combo: 1, bestCombo: 1,
     comboTimer: 0, deaths: 0, time: 0, status: 'playing',
     accumulator: 0, pendingJump: false, pendingBoost: false,
@@ -50,6 +51,7 @@ function enterArena(state) {
   state.combat = createCombat({ enemies: [], pickups: [] });
   state.combat.blaster = ARENA.grantBlaster;
   state.boss = createBoss();
+  resetPartyMotion(state.party, state.player, ARENA.width);
   state.pendingJump = false;
   state.pendingBoost = false;
 }
@@ -63,6 +65,7 @@ function respawn(state, events) {
     state.player = makePlayer(checkpoint.spawn);
     state.cameraX = cameraTarget(state.player);
     resetCombat(state.combat);
+    resetPartyMotion(state.party, state.player, LEVEL.width);
   }
   state.combo = 1;
   state.comboTimer = 0;
@@ -145,7 +148,9 @@ function tick(state, input, events) {
     return;
   }
   for (const reward of collectBlockRewards(state.blocks, p)) {
-    grantPower(state.combat, reward, combatEvents);
+    if (!unlockHelper(state.party, reward, combatEvents)) {
+      grantPower(state.combat, reward, combatEvents);
+    }
   }
   if (arena) updateBoss(state.boss, state.combat, p, STEP, combatEvents);
   updateCombat(state.combat, p, input, STEP, oldBottom, combatEvents, state.blocks.blocks);
@@ -166,6 +171,7 @@ function tick(state, input, events) {
     respawn(state, events);
     return;
   }
+  syncParty(state.party, p, world.width);
   if (arena) {
     const bossEvents = [];
     hitBoss(state.boss, state.combat, bossEvents);
@@ -175,6 +181,7 @@ function tick(state, input, events) {
       state.score += victory?.points ?? 0;
       state.status = 'complete';
       p.vx = 0; p.boostTime = 0;
+      resetPartyMotion(state.party, p, world.width);
       events.push({ type: 'complete', score: state.score, sparks: state.collected.size });
     }
     return;

@@ -104,7 +104,13 @@ export function drawPowerup(ctx, item, time = 0, reducedMotion = false) {
   const halo = ctx.createRadialGradient(item.w / 2, item.h / 2, 3, item.w / 2, item.h / 2, 27);
   halo.addColorStop(0, '#b3eaff77'); halo.addColorStop(1, '#b3eaff00');
   box(ctx, -15, -15, item.w + 30, item.h + 30, halo);
-  if (item.kind === 'microsoft') {
+  if (item.kind === 'helper-donkey' || item.kind === 'helper-mario') {
+    const donkey = item.kind === 'helper-donkey';
+    box(ctx, 0, 0, item.w, item.h, donkey ? '#655f79' : '#b93643');
+    box(ctx, 1, 1, item.w - 2, 3, donkey ? '#a9fff1' : '#ffd6b0');
+    text(ctx, donkey ? 'D' : 'M', item.w / 2, item.h - 6, 18, '#ffffff');
+    text(ctx, donkey ? 'Donkey' : 'Mario', item.w / 2, -8, 12, '#ffffff');
+  } else if (item.kind === 'microsoft') {
     const gap = 2, size = (Math.min(item.w, item.h) - gap) / 2;
     ['#f35325', '#81bc06', '#05a6f0', '#ffba08'].forEach((color, i) => {
       const x = (i % 2) * (size + gap), y = Math.floor(i / 2) * (size + gap);
