@@ -82,12 +82,12 @@ for (const [index, offset, reward] of [
   }
 }
 
-// Dedicated helper boxes preserve all existing blaster/protection rewards.
-// Their undersides are 64px above the standing player's head, within jump reach.
-// Positions avoid checkpoint spawns, existing clusters and upper platforms.
+// Former helper boxes now grant protection: the independent party starts
+// together instead of requiring recruitment. Keep stable IDs and geometry.
+// Their undersides remain within jump reach; existing blaster rewards stay intact.
 for (const [id, index, offset, reward] of [
-  ['helper-box-donkey', 0, 550, 'helper-donkey'],
-  ['helper-box-mario', 4, 280, 'helper-mario']
+  ['helper-box-donkey', 0, 550, 'microsoft'],
+  ['helper-box-mario', 4, 280, 'microsoft']
 ]) {
   const p = surface(index);
   blocks.push({ id, x: p.x + offset, y: p.y - 142,
@@ -103,9 +103,9 @@ export const ENCOUNTERS = freeze({
   enemies,
   blocks,
   pickups: [protection('protection-inbox', 4, 320), protection('protection-teams', 8, 350)],
-  // Power-ups and helper unlocks are never productivity collectibles. Keeping
-  // these separate prevents inflation of the five category counters.
-  rewardTypes: ['blaster', 'microsoft', 'helper-donkey', 'helper-mario']
+  // Power-ups are never productivity collectibles. Keeping these separate
+  // prevents inflation of the five category counters.
+  rewardTypes: ['blaster', 'microsoft']
 });
 
 // Arena uses its own coordinate space. Enter it at the world beacon; do not
