@@ -1,5 +1,7 @@
 import { LEVEL, VIEW, APPS, PHYSICS, zoneAt } from './level.js';
 import { drawParty } from './party-art.js';
+import { visibleParty } from './party.js';
+import { drawPartyBubble } from './party-bubbles.js';
 import { drawCollectible, drawPickup } from './collectibles.js';
 import { drawBackground, drawPlatform } from './scenery.js';
 import { ARENA } from './encounters.js';
@@ -81,7 +83,7 @@ function drawCombatScene(ctx, state, reducedMotion, visible) {
   if (combat.grace > 0 && combat.protection <= 0) ctx.globalAlpha = .65;
   drawParty(ctx, state.party, state.time, reducedMotion);
   if (combat.blaster) {
-    const facing = state.party.actors.marco.facing;
+    const facing = state.party.actors[state.party.leader].facing;
     const x = facing < 0 ? player.x - 6 : player.x + PHYSICS.playerWidth - 5;
     ctx.fillStyle = '#465e99'; ctx.fillRect(x, player.y + 25, 11, 6);
     ctx.fillStyle = '#9dffe5';
@@ -166,10 +168,30 @@ function renderUpgrade(ctx, state, reducedMotion) {
     }
     }
     drawCombatScene(ctx, state, reducedMotion, visible);
+    // A steady, text-labeled marker distinguishes the controlled actor from AI.
+    const leader = state.party.actors[state.party.leader];
+    if (leader.x + PHYSICS.playerWidth > camera && leader.x < camera + VIEW.width
+        && leader.y + PHYSICS.playerHeight > 0 && leader.y < VIEW.height) {
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      const markerX = Math.max(camera + 20, Math.min(camera + VIEW.width - 20,
+        leader.x + PHYSICS.playerWidth / 2));
+      const markerY = Math.max(18, Math.min(VIEW.height - 8,
+        leader.y + PHYSICS.playerHeight + 17));
+      label('YOU', markerX, markerY, 12);
+      ctx.restore();
+    }
     for (const effect of arena ? [] : effects.pickups) {
       if (visible(effect.item.x)) {
         drawPickup(ctx, effect.item, state.time - effect.startedAt, 0, reducedMotion);
       }
+    }
+    // Balloons use logical screen coordinates and restore the camera transform.
+    // Only present actors can speak; boss captions retain visual priority.
+    if (!state.boss?.dialogue.current) {
+      drawPartyBubble(ctx, state.partyDialogue.current, visibleParty(state.party), camera);
     }
   } finally {
     ctx.restore();
