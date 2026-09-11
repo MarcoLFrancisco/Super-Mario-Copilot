@@ -128,7 +128,9 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
     // A steady contact marker remains with reduced motion; decorative arcs do not.
     if (active) {
       const direction = spec.backward ? -1 : 1;
-      const tip = direction * (13 + spec.reach * 34 / P.playerWidth);
+      // Match the hitbox's outer edge relative to the actor's center,
+      // converting world pixels into this sprite's local coordinates.
+      const tip = direction * (P.playerWidth / 2 - 4 + spec.reach) * 34 / P.playerWidth;
       const y = (spec.top + spec.height / 2) * 46 / P.playerHeight;
       line([[tip - 3, y], [tip + 3, y]], '#e4fffc', 2);
       if (!reducedMotion) {
