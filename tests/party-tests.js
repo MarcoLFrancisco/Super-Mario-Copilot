@@ -166,6 +166,40 @@ export async function runTests({ test, assert }) {
     }
   });
 
+  await test('A finished target releases support to a ready teammate during an active swing', () => {
+    const world = { width: 800, hazards: [], platforms: [
+      { id: 'floor', x: 0, y: 300, w: 800, h: 30 }
+    ] };
+    const s = createState('mario');
+    const marco = s.party.actors.marco;
+    const donkey = s.party.actors.donkey;
+    for (const actor of [marco, donkey]) {
+      s.party.unlocked.add(actor.id);
+      resetActorBody(actor, { x: actor.id === 'marco' ? 200 : 350,
+        y: 300 - P.playerHeight });
+      Object.assign(actor, { facing: 1, recovering: false, ai: createCompanionAI() });
+    }
+    Object.assign(s.player, { x: 280, y: marco.y, vx: 0, vy: 0, facing: 1 });
+    const previous = { id: 'finished-target', dead: true,
+      x: marco.x + P.playerWidth + 8, y: marco.y, w: 30, h: P.playerHeight };
+    const next = { id: 'next-target', dead: false,
+      x: donkey.x + P.playerWidth + 8, y: donkey.y, w: 30, h: P.playerHeight };
+    marco.ai.targetId = previous.id;
+    requestActorAttack(s.party, marco);
+    const committedId = marco.attack.id;
+    const events = [];
+    updateCompanions(s.party, s.player, 1 / 60, {
+      world, blocks: [], enemies: [previous, next], supportSlots: 1
+    }, events);
+    assert(marco.attack?.id === committedId,
+      'The original swing must finish without cancellation or restart');
+    assert(donkey.ai.targetId === next.id && donkey.attack?.kind === 'backKick',
+      'Ready teammate must receive the next opponent instead of an occupied attacker');
+    const attacks = events.filter(event => event.type === 'melee');
+    assert(attacks.length === 1 && attacks[0].character === 'donkey',
+      'Only the ready teammate starts a new attack');
+  });
+
   await test('One helper swing cannot overspend defeat allowance or duplicate rewards', () => {
     const s = createState();
     const c = emptyCombat();
