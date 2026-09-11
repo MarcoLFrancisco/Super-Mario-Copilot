@@ -122,7 +122,8 @@ export async function runTests({ test, assert }) {
     const world = { width: 800, hazards: [], platforms: [
       { id: 'floor', x: 0, y: 300, w: 800, h: 30 }
     ] };
-    for (const committed of [false, true]) {
+    for (const scenario of ['cooldown', 'committed', 'committed-punch-band']) {
+      const committed = scenario !== 'cooldown';
       const s = createState('mario');
       const marco = s.party.actors.marco;
       const donkey = s.party.actors.donkey;
@@ -132,8 +133,12 @@ export async function runTests({ test, assert }) {
         Object.assign(actor, { facing: 1, recovering: false, ai: createCompanionAI() });
       }
       Object.assign(s.player, { x: 220, y: marco.y, vx: 0, vy: 0, facing: 1 });
+      const narrow = scenario === 'committed-punch-band';
       const enemy = { id: 'shared-target', dead: false,
-        x: marco.x + P.playerWidth + 8, y: marco.y, w: 30, h: P.playerHeight };
+        x: marco.x + P.playerWidth + 8, y: marco.y + (narrow ? 16 : 0),
+        w: 30, h: narrow ? 2 : P.playerHeight };
+      // This shallow target intersects punch and backKick, but not Marco's
+      // upcoming kick. A committed punch must still reserve it from Donkey.
       marco.ai.targetId = enemy.id;
       if (committed) requestActorAttack(s.party, marco);
       else marco.cooldown = .2;
@@ -143,7 +148,11 @@ export async function runTests({ test, assert }) {
       }, events);
       if (committed) {
         assert(marco.attack && !donkey.attack,
-          'An active swing must retain its assignment until it finishes');
+          'An active swing must retain its assignment using its own hitbox');
+        if (narrow) {
+          assert(marco.attack.kind === 'punch' && nextAttackKind(marco) === 'kick',
+            'Fixture must distinguish the committed punch from the upcoming kick');
+        }
         assert(!events.some(event => event.type === 'melee'),
           'The second helper must not duplicate a committed attack');
       } else {
