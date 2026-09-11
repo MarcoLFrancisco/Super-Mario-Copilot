@@ -118,6 +118,45 @@ export async function runTests({ test, assert }) {
     });
   }
 
+  await test('Ready teammates take cooldown-bound targets without stealing active swings', () => {
+    const world = { width: 800, hazards: [], platforms: [
+      { id: 'floor', x: 0, y: 300, w: 800, h: 30 }
+    ] };
+    for (const committed of [false, true]) {
+      const s = createState('mario');
+      const marco = s.party.actors.marco;
+      const donkey = s.party.actors.donkey;
+      for (const actor of [marco, donkey]) {
+        s.party.unlocked.add(actor.id);
+        resetActorBody(actor, { x: 300, y: 300 - P.playerHeight });
+        Object.assign(actor, { facing: 1, recovering: false, ai: createCompanionAI() });
+      }
+      Object.assign(s.player, { x: 220, y: marco.y, vx: 0, vy: 0, facing: 1 });
+      const enemy = { id: 'shared-target', dead: false,
+        x: marco.x + P.playerWidth + 8, y: marco.y, w: 30, h: P.playerHeight };
+      marco.ai.targetId = enemy.id;
+      if (committed) requestActorAttack(s.party, marco);
+      else marco.cooldown = .2;
+      const events = [];
+      updateCompanions(s.party, s.player, 1 / 60, {
+        world, blocks: [], enemies: [enemy], supportSlots: 1
+      }, events);
+      if (committed) {
+        assert(marco.attack && !donkey.attack,
+          'An active swing must retain its assignment until it finishes');
+        assert(!events.some(event => event.type === 'melee'),
+          'The second helper must not duplicate a committed attack');
+      } else {
+        assert(!marco.attack && marco.ai.targetId === null,
+          'Cooling-down companion must release its ordinary target');
+        assert(donkey.ai.targetId === enemy.id && donkey.attack?.kind === 'backKick',
+          'Ready teammate must take the target and attack automatically');
+        assert(events.filter(event => event.type === 'melee').length === 1,
+          'Exactly one helper starts an attack for the available slot');
+      }
+    }
+  });
+
   await test('One helper swing cannot overspend defeat allowance or duplicate rewards', () => {
     const s = createState();
     const c = emptyCombat();
