@@ -1,5 +1,5 @@
 import { LEVEL, VIEW, APPS, PHYSICS, zoneAt } from './level.js';
-import { drawCharacter } from './character.js';
+import { drawParty } from './party-art.js';
 import { drawCollectible, drawPickup } from './collectibles.js';
 import { drawBackground, drawPlatform } from './scenery.js';
 import { ARENA } from './encounters.js';
@@ -79,7 +79,7 @@ function drawCombatScene(ctx, state, reducedMotion, visible) {
   }
   // Steady translucency conveys damage grace without rapid flashing.
   if (combat.grace > 0 && combat.protection <= 0) ctx.globalAlpha = .65;
-  drawCharacter(ctx, player, state.time, reducedMotion);
+  drawParty(ctx, state.party, state.time, reducedMotion);
   if (combat.blaster) {
     const x = player.facing < 0 ? player.x - 6 : player.x + PHYSICS.playerWidth - 5;
     ctx.fillStyle = '#465e99'; ctx.fillRect(x, player.y + 25, 11, 6);
