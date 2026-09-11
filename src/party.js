@@ -223,7 +223,9 @@ function assignSupportTargets(party, player, context) {
   const candidates = actor => (context.enemies || []).filter(enemy => !enemy.dead
     && !claimed.has(enemy.id) && distance(enemy, player) < 330
     && distance(enemy, actor) < 300
-    && inMeleeBand(actor, enemy, ATTACKS[nextAttackKind(actor)]));
+    // Marco toggles his next move as soon as a swing starts. Reserve targets
+    // using that committed swing, not the different vertical band of his next.
+    && inMeleeBand(actor, enemy, ATTACKS[actor.attack?.kind ?? nextAttackKind(actor)]));
   for (const retain of [true, false]) {
     for (const actor of actors) {
       if (slots === 0 || assignments.has(actor.id)) continue;
