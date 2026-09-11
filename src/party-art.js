@@ -74,7 +74,8 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
     if (marco) {
       const skin = gradient('#ffdbb8', '#c98a66', 10, 20);
       const jeans = gradient('#5287cf', outfit.jeans, 31, 13);
-      leg(-5, stride * .55, '#21467f');
+      // Keep the supporting leg steady throughout the kickboxing pose.
+      leg(-5, attack?.kind === 'kick' ? 0 : stride * .55, '#21467f');
       leg(5, attack?.kind === 'kick' ? -1.48 * extension : -stride * .55, jeans);
       oval(-10, 27, 3, 6, outfit.shirt);
       oval(-10 - stride * 2, 32, 2.6, 3, skin);
