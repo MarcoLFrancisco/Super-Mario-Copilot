@@ -127,7 +127,9 @@ function tick(state, input, events) {
   p.y += p.vy * STEP;
   p.grounded = false;
   const contact = resolveBlockY(state.blocks, p, oldY, events);
-  if (p.vy >= 0 && !contact.ceiling) {
+  // A solid-brick landing already resolved position and grounding. Do not
+  // overwrite it with a nearby one-way platform from the same descent.
+  if (p.vy >= 0 && !contact.ceiling && !contact.landed) {
     const newBottom = p.y + P.playerHeight;
     let landing = null;
     for (const platform of world.platforms) {
