@@ -4,7 +4,11 @@ import { resolveBlockY } from '../src/blocks.js';
 import { visibleParty, requestActorAttack, activePartyAttacks, ATTACKS,
   resetPartyMotion } from '../src/party.js';
 import { createCombat, updateCombat, helperAllowance, resetCombat } from '../src/combat.js';
-import { createBoss, hitBoss } from '../src/boss.js';
+import { createBoss, hitBoss, bossSupportTarget } from '../src/boss.js';
+import { ARENA } from '../src/encounters.js';
+import { createCompanionAI, decideCompanion } from '../src/party-ai.js';
+import { resetActorBody, stepActor } from '../src/actor-physics.js';
+import { nextAttackKind, updateParty } from '../src/party.js';
 
 const emptyCombat = () => createCombat({ enemies: [], pickups: [] });
 const context = s => ({ world: LEVEL, blocks: s.blocks.blocks, enemies: [] });
@@ -125,6 +129,56 @@ export async function runTests({ test, assert }) {
     assert(last.health === 1 && !last.defeated, 'Helpers cannot finish alone');
     shot(c, last); hitBoss(last, c, events, s.party); hitBoss(last, c, events, s.party);
     assert(last.defeated && events.filter(e => e.type === 'bossDefeated').length === 1, 'Single player victory');
+  });
+
+  await test('Marco closes a near-target gap instead of idling outside punch range', () => {
+    const world = { width: 800, hazards: [], platforms: [
+      { id: 'floor', x: 0, y: 300, w: 800, h: 30 }
+    ] };
+    const enemy = { id: 'nearby-bug', x: 300, y: 254, w: 30, h: 46, dead: false };
+    const actor = resetActorBody({ id: 'marco', facing: 1, cooldown: 0, attack: null },
+      { x: enemy.x - P.playerWidth - 12 - 18, y: 300 - P.playerHeight });
+    const ai = createCompanionAI();
+    const leader = { x: 220, y: actor.y, facing: 1 };
+    let attacked = false;
+    for (let frame = 0; frame < 120; frame++) {
+      const intent = decideCompanion(ai, actor, { world, leader, blocks: [],
+        enemies: [enemy], spec: ATTACKS.punch, assignedTargetId: enemy.id }, 1 / 60);
+      assert(!intent.recovery, 'Approach must not rely on teleport recovery');
+      stepActor(actor, intent, world, [], 1 / 60);
+      if (intent.attackPressed) { attacked = true; break; }
+    }
+    assert(attacked, 'AI must close the gap and request a punch automatically');
+  });
+
+  await test('Marco automatically approaches and damages the exposed boss', () => {
+    const s = createState('mario');
+    const boss = createBoss();
+    boss.mode = 'exposed';
+    const combat = emptyCombat();
+    const target = bossSupportTarget(boss);
+    s.party.unlocked.add('marco');
+    const actor = s.party.actors.marco;
+    resetActorBody(actor, { x: target.x - P.playerWidth - 12 - 18, y: target.approachY });
+    Object.assign(actor, { facing: 1, recovering: false, ai: createCompanionAI() });
+    Object.assign(s.player, { x: 900, y: target.approachY, facing: 1 });
+    const events = [];
+    for (let frame = 0; frame < 120 && boss.helperDamage === 0; frame++) {
+      updateParty(s.party, s.player, 1 / 60, ARENA.width);
+      const intent = decideCompanion(actor.ai, actor, {
+        world: ARENA, leader: s.player, blocks: [], enemies: [],
+        spec: ATTACKS[nextAttackKind(actor)], assignedTargetId: null,
+        bossTarget: bossSupportTarget(boss)
+      }, 1 / 60);
+      assert(!intent.recovery, 'Boss approach must use movement, not recovery');
+      stepActor(actor, intent, ARENA, [], 1 / 60);
+      if (!actor.attack && intent.facing) actor.facing = intent.facing;
+      if (intent.attackPressed) requestActorAttack(s.party, actor, events);
+      hitBoss(boss, combat, events, s.party);
+    }
+    assert(boss.helperDamage === 1, 'Automatic Marco punch damages the exposed core');
+    assert(events.some(e => e.type === 'bossHit' && e.helper && e.actorId === 'marco'),
+      'Boss damage must be attributed to the recruited companion');
   });
 
   await test('Victory presentation freezes combat, pauses, and completes exactly once', () => {
