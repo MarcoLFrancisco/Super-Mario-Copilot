@@ -11,6 +11,7 @@ export function makeEnemy(definition) {
 }
 export function createCombat(definitions = ENCOUNTERS) {
   return { health: C.maxHealth, grace: 0, protection: 0, blaster: false,
+    contribution: { playerKills: 0, helperKills: 0, playerDamage: 0, helperDamage: 0 },
     cooldown: 0, enemies: definitions.enemies.map(makeEnemy), shots: [],
     pickups: definitions.pickups.map(p => ({ ...p, collected: false })) };
 }
@@ -41,13 +42,26 @@ export function spawnShot(combat, shot) {
   combat.shots.push({ w: 10, h: 8, life: C.projectileLifetime, damage: 1, ...shot });
   return true;
 }
-function hitEnemy(enemy, damage, events) {
-  if (enemy.dead) return;
-  enemy.health -= damage;
+// One opening helper defeat, then one more per two player defeats.
+// Combat owns this budget; simultaneous swings and manual requests cannot bypass it.
+export function helperAllowance(combat) {
+  return Math.max(0, 1 + Math.floor(combat.contribution.playerKills / 2)
+    - combat.contribution.helperKills);
+}
+
+function hitEnemy(combat, enemy, damage, events, actorId = 'player', helper = false) {
+  if (enemy.dead || (helper && helperAllowance(combat) === 0)) return;
+  const dealt = Math.min(enemy.health, Math.max(0, damage));
+  if (dealt === 0) return;
+  const contribution = combat.contribution;
+  contribution[helper ? 'helperDamage' : 'playerDamage'] += dealt;
+  enemy.health -= dealt;
   if (enemy.health <= 0) {
     enemy.dead = true;
-    events.push({ type: 'enemyDefeated', id: enemy.id, x: enemy.x, y: enemy.y, points: C.enemyScore });
-  } else events.push({ type: 'enemyHit', id: enemy.id });
+    contribution[helper ? 'helperKills' : 'playerKills']++;
+    events.push({ type: 'enemyDefeated', id: enemy.id, x: enemy.x, y: enemy.y,
+      points: C.enemyScore, actorId, helper });
+  } else events.push({ type: 'enemyHit', id: enemy.id, actorId, helper });
 }
 
 // Invoke once per fixed simulation step AFTER player movement/collisions.
@@ -104,7 +118,10 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
     if (solids.some(block => !block.broken && overlaps(shot, block))) { shot.life = 0; continue; }
     if (shot.owner === 'player') {
       const target = combat.enemies.find(e => !e.dead && overlaps(shot, e));
-      if (target) { hitEnemy(target, shot.damage, events); shot.life = 0; }
+      if (target) {
+        hitEnemy(combat, target, shot.damage, events, party?.leader ?? 'player');
+        shot.life = 0;
+      }
     } else if (overlaps(shot, body(player))) {
       hurtPlayer(combat, player, shot.x + shot.w / 2, events); shot.life = 0;
     }
@@ -126,7 +143,11 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
         const right = Math.max(origin, strike.originX, target);
         const corridor = { x: left, y: strike.y, w: Math.max(1, right - left), h: strike.h };
         if (solids.some(b => !b.broken && overlaps(corridor, b))) continue;
-        if (claimPartyHit(party, strike, enemy.id)) hitEnemy(enemy, strike.damage, events);
+        const helper = strike.actorId !== party.leader;
+        if (helper && helperAllowance(combat) === 0) continue;
+        if (claimPartyHit(party, strike, enemy.id)) {
+          hitEnemy(combat, enemy, strike.damage, events, strike.actorId, helper);
+        }
       }
     }
   }
@@ -137,9 +158,10 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
     const stomp = enemy.stompable && player.vy > 0 && horizontal
       && previousBottom <= enemy.y + 4 && box.y + box.h >= enemy.y && box.y < enemy.y + enemy.h;
     if (!stomp && !overlaps(box, enemy)) continue;
-    if (combat.protection > 0) hitEnemy(enemy, enemy.health, events);
-    else if (stomp) {
-      hitEnemy(enemy, enemy.health, events);
+    if (combat.protection > 0) {
+      hitEnemy(combat, enemy, enemy.health, events, party?.leader ?? 'player');
+    } else if (stomp) {
+      hitEnemy(combat, enemy, enemy.health, events, party?.leader ?? 'player');
       player.y = enemy.y - P.playerHeight; player.vy = -C.stompBounce;
       player.grounded = false; player.coyote = 0;
       events.push({ type: 'stomp' });

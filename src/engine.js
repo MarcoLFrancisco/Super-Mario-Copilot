@@ -1,7 +1,7 @@
 import { LEVEL, VIEW, PHYSICS as P } from './level.js';
 import { ARENA } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
-import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat } from './combat.js';
+import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat, helperAllowance } from './combat.js';
 import { createBoss, updateBoss, hitBoss } from './boss.js';
 import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty, companionIds, unlockHelper } from './party.js';
 import { createPartyDialogue, updatePartyDialogue, sayParty, reactPartyDialogue, clearPartyCaption } from './party-dialogue.js';
@@ -27,6 +27,7 @@ function makePlayer(spawn) {
 function partyContext(state) {
   return { world: state.stage === 'boss' ? ARENA : LEVEL,
     blocks: state.blocks.blocks, enemies: state.combat.enemies,
+    supportSlots: helperAllowance(state.combat),
     geometryVersion: `${state.stage}:${state.blocks.blocks.filter(b => b.broken).length}` };
 }
 

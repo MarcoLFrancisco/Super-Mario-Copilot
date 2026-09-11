@@ -207,6 +207,34 @@ function resetCompanion(party, id, slot, player, context) {
   actor.ai.recovering = !position;
 }
 
+// Allocate distinct nearby targets; preserve a valid claim before picking a new
+// one. All enemies remain in AI context for safe navigation and recovery.
+function assignSupportTargets(party, player, context) {
+  const assignments = new Map();
+  const claimed = new Set();
+  const actors = companionIds(party)
+    .filter(id => party.unlocked.has(id) && !party.actors[id].recovering)
+    .map(id => party.actors[id]);
+  let slots = Math.max(0, Math.floor(context.supportSlots ?? 0));
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const candidates = actor => (context.enemies || []).filter(enemy => !enemy.dead
+    && !claimed.has(enemy.id) && distance(enemy, player) < 330
+    && distance(enemy, actor) < 300 && Math.abs(enemy.y - actor.y) < 150);
+  for (const retain of [true, false]) {
+    for (const actor of actors) {
+      if (slots === 0 || assignments.has(actor.id)) continue;
+      const eligible = candidates(actor);
+      const target = retain ? eligible.find(enemy => enemy.id === actor.ai.targetId)
+        : eligible.sort((a, b) => distance(a, actor) - distance(b, actor))[0];
+      if (!target) continue;
+      assignments.set(actor.id, target.id);
+      claimed.add(target.id);
+      slots--;
+    }
+  }
+  return assignments;
+}
+
 // Call once per engine tick AFTER updateParty (attack timers), before combat.
 // Navigation commands are 60Hz; the current engine is 120Hz. Accumulate rather
 // than consuming a full navigation command on every half-length engine tick.
@@ -218,11 +246,13 @@ export function updateCompanions(party, player, dt, context, events = []) {
   const ids = companionIds(party);
   while (party.companionTime + 1e-9 >= step) {
     party.companionTime = Math.max(0, party.companionTime - step);
+    const assignments = assignSupportTargets(party, player, context);
     ids.forEach((id, slot) => {
       if (!party.unlocked.has(id)) return;
       const actor = party.actors[id];
       const intent = decideCompanion(actor.ai, actor, {
         ...context, leader: player, spec: ATTACKS[nextAttackKind(actor)],
+        assignedTargetId: assignments.get(id) ?? null,
         manualAttack: party.manualAttack, allowPlanning: slot === party.planningTurn
       }, step);
       if (intent.recovery) {
