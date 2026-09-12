@@ -97,6 +97,32 @@ export function musicStep(index) {
   return events;
 }
 
+const worldArrangements = freeze({
+  campus: { transpose: 2, lead: 'bell', offset: 0, percussion: .7 },
+  github: { transpose: -3, lead: 'lead', offset: 32, percussion: 1.1 },
+  cowork: { transpose: 5, lead: 'bell', offset: 64, percussion: .5 },
+  foundry: { transpose: -7, lead: 'lead', offset: 96, percussion: 1.25 },
+  agents: { transpose: 0, lead: 'lead', offset: 128, percussion: .9 },
+  teams: { transpose: -2, lead: 'bell', offset: 160, percussion: .75 },
+  orbit: { transpose: 7, lead: 'lead', offset: 192, percussion: 1.15 },
+  core: { transpose: -5, lead: 'lead', offset: 224, percussion: 1.05 }
+});
+
+export function worldMusicStep(index, theme = 'campus') {
+  if (!Number.isSafeInteger(index) || index < 0) return [];
+  const arrangement = worldArrangements[theme] ?? worldArrangements.campus;
+  const events = musicStep(index + arrangement.offset).map(event => ({ ...event,
+    midi: event.midi === null ? null : event.midi + arrangement.transpose,
+    voice: event.voice === 'lead' ? arrangement.lead : event.voice,
+    gain: event.gain * (['kick','snare','hat'].includes(event.voice) ? arrangement.percussion : .9)
+  }));
+  if (['github','agents','orbit','core'].includes(theme) && index % 8 === 2) {
+    events.push({ voice: 'bell', midi: 76 + arrangement.transpose + [0, 7, 12, 4][Math.floor(index / 8) % 4],
+      beats: .25, gain: .035, pan: .35 });
+  }
+  return events;
+}
+
 // Original boss arrangement: same clock and event schema as musicStep.
 // Sharing SCORE timing keeps note envelopes and the scheduler compatible.
 // Phase changes alter orchestration, not tempo or overall output gain.

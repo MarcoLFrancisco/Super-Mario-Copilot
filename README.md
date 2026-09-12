@@ -1,230 +1,171 @@
-# Mission Copilot
+# Copilot Cloud Quest
 
-A first playable milestone of **Microsoft AI: Mission Copilot**, an unofficial
-adventure starring original characters Bit and Sparq. Doctor Null has frozen the
-campus in an endless approval meeting. Restore access, repair the Setup Wizard,
-and take a flying saucer into the Orbit simulator.
+An eight-level Microsoft AI-themed campaign extending the original platform game.
+Choose **Marco, Mario, or Donkey**, recruit the other two, and keep your existing
+combat, blaster, checkpoints, and companions as you travel through the worlds.
+There are no replacement protagonists or separate Campus/Team Quest/Orbit modes.
 
-The latest upstream Cloud Quest campaign is preserved as **Team Quest**, a
-separate selectable mission in the same interface. Its combat, character
-selection, recruitment, independent companion AI, and Hallucination Engine
-encounter remain available without completing Campus first.
+The playfield uses the available page width, up to 1600 pixels, without a
+viewport-height width cap. A full-screen control is available. The original
+character art, attacks, recruitment, and independent companion AI are reused.
 
-This is a compact playable prototype, **not the full eight-world campaign** in
-the design brief. The AI agents are deterministic game mechanics, not live
-Copilot or Azure integrations. Compute is an in-game resource, not a cloud quota.
+## The Campaign
 
-## Playable Now
+| Level | World | Playable Theme | Boss |
+| --- | --- | --- | --- |
+| 1 | Copilot Campus | Optional suggestion bridge, pair construction, lab restoration, glass architecture and keyboard platforms | The Setup Wizard |
+| 2 | GitHub Copilot | Branching routes, delegated repair, load tests, bridge inspection, repository trees | The Merge Monster |
+| 3 | Cowork Central | Bounded plans, missing context, queued construction, approval, oversized bookshelves | The Scope Creep |
+| 4 | AI Foundry | Module choice, safe evaluation, staged deployment, rollback, conveyors and lifts | The Unstable Deployment |
+| 5 | Agent City | Dependent team assignments, signed evidence, scoped permissions, transit networks | The Infinite Planner |
+| 6 | Teams Tower | Shared objective, recovered decision, synchronized elevators, three audio systems | The Meeting Overlord |
+| 7 | Azure Orbit | Five brick-breaking waves, portals, power-ups, resource-limited team support, selected character in the saucer | The Orbital Firewall |
+| 8 | The Intelligence Core | Combined environments, multi-step repair, low gravity, command systems, final saucer phase | Doctor Null and the Legacy Monolith |
 
-- **Copilot Campus:** courtyard, keyboard gardens, innovation lab, optional upper
-	routes, patrolling enemies, corruption hazards, and four checkpoints.
-- **Assistance with a choice:** two dotted bridge proposals become solid only
-	after nearby approval. Both gaps also have an unassisted recovery route.
-- **Movement:** acceleration, variable-height jumps, coyote time, jump buffering,
-	and a story-unlocked Copilot Dash. Essential routes do not require the dash.
-- **The Setup Wizard:** telegraphed loading rings, three restart-switch strikes,
-	a fair boss checkpoint, and a locked exit until the repair is complete.
-- **Azure Orbit simulator:** five waves, armored blocks, paired portals, moving
-	barriers, telegraphed missiles, and a rotating Orbital Firewall encounter.
-- **A visible pilot:** Bit sits inside the saucer with his backpack connected to
-	the ship; Sparq is beside the controls. Shield contact position controls rebounds.
-- **Agent assignments:** Patch restores a recovery net, Query marks priority
-	targets, and Aegis intercepts missiles. Each has a compute cost and cooldown.
-- **Power-ups:** Wide Shield, Multiball, Magnetic Catch, Debug Laser, Recovery Net.
-- **Team Quest:** select Marco, Mario, or Donkey; recruit the other two through
-	surprise boxes, use melee and blaster combat, collect five app-item types, and
-	defeat the three-phase Hallucination Engine. Recent companion targeting,
-	attack-reservation, navigation, and contribution-limit fixes are preserved.
-- **Preferences:** remappable primary keys, independent music/effects controls,
-	reduced motion, high-contrast markers, subtitles, and zero-default Campus shake.
+Each platform world has its own route, four named chapter checkpoints, secret
+platforms, app collectibles, original combat encounters, mission terminals,
+boss objectives, artwork, dialogue, and musical arrangement. Main routes allow
+return visits without spending resources or relying on optional upgrades.
+
+Complete the required world tasks to enter its boss arena. Restore the arena's
+control systems, then attack during exposed windows. Finishing a level unlocks
+the next one and shows **Next: [world name]**. **Levels** opens the campaign map;
+unlocked worlds can be replayed. Azure Orbit is level seven, not a simulator.
+The final world transitions from the platform encounter into a saucer finale.
 
 ## Run Locally
 
-Use a current browser with JavaScript modules, import maps, Canvas 2D, and Pointer Events.
-Web Audio is optional. From the repository root on macOS/Linux:
+Use a current browser with JavaScript modules, import maps, Canvas 2D, and Pointer
+Events. From the repository root:
 
 ```sh
 python3 -m http.server 8000 --bind 127.0.0.1
 ```
 
-On Windows with the Python launcher:
+On Windows, use `py -3 -m http.server 8000 --bind 127.0.0.1`.
+Open **http://127.0.0.1:8000/** and select **Start level**. Choose another free
+port if 8000 is occupied. Stop the server with Ctrl+C. Opening the HTML directly
+is not supported because the game uses browser modules.
 
-```sh
-py -3 -m http.server 8000 --bind 127.0.0.1
-```
-
-Open **http://127.0.0.1:8000/** and select **Begin mission**. If port 8000 is already
-occupied, use another free port. Stop the server with Ctrl+C.
-
-No build, package installation, account, API key, or external service is required
-to play. Browser libraries are bundled locally with their licenses in
-[vendor/README.md](vendor/README.md). Do not open the HTML directly: browser
-module loading requires HTTP. After editing modules, use a hard reload if old
-artwork or behavior remains cached.
-
-## Publish Source Changes
-
-After changing JavaScript or CSS, run these commands before committing:
-
-```sh
-npm run build
-npm test
-```
-
-The dependency-free build updates the import map and CSS URL in
-[index.html](index.html) using a hash of the source assets. Commit that generated
-HTML together with the changed source. GitHub Pages still serves the project
-directly; no separate hosting service or package installation is needed.
-
-Every module, including transitive imports and local libraries, receives the
-same version token. This prevents a new page from reusing older cached modules
-or styles. The test suite rejects an outdated import map so a release cannot
-silently forget to refresh its asset version.
-
-If startup fails or exceeds 15 seconds, the page reports the error and offers
-**Retry loading** instead of remaining indefinitely on **Loading mission**.
-Retry reloads the page without clearing saved progress or preferences.
+No account, API key, package installation, or external game service is required.
+The local browser libraries and their licenses are described in
+[vendor/README.md](vendor/README.md). Optional boss speech may use an online
+voice provided by your browser or operating system.
 
 ## Controls
 
 | Action | Default Input |
 | --- | --- |
 | Move | A/D or Left/Right arrows |
-| Campus jump | Hold Space, W, or Up; release for a shorter jump |
-| Team Quest jump / boost | Space, W, or Up / Shift |
-| Approve a nearby bridge | E or the contextual Accept bridge button |
-| Copilot Dash | Shift, after completing Campus |
-| Pause/resume | Escape or the header Pause/Resume control |
-| Campus pointer controls | Hold the on-screen arrows and Jump button |
-| Orbit saucer | A/D, arrows, mouse movement over the canvas, or touch dragging |
-| Orbit launch/release | Space, Launch core, or a canvas tap |
-| Orbit agents | 1: Patch, 2: Query, 3: Aegis, or their buttons |
-| Team Quest melee | J or Attack; tap once per attack |
-| Team Quest blaster | Hold F or Fire after collecting a blaster |
-| Team Quest companions | K or Helpers; recruited companions also act automatically |
-| Preferences | Sliders icon in the header |
+| Jump | Hold Space, W, or Up for a full jump; release for a shorter jump |
+| Copilot boost | Shift; the original boost remains available |
+| Melee attack | J or Attack; tap once per attack |
+| Debug Blaster | Hold F or Fire after collecting a blaster |
+| Command recruited companions | K or Helpers; companions also act automatically |
+| Terminal interaction | E or the contextual button below the canvas |
+| Debug Pulse | Q after GitHub; reveals resource and task markers |
+| Focus Mode | Hold C after Teams to slow the game |
+| Pause/resume | Escape or the header control |
+| Saucer movement | A/D, arrows, mouse movement over the canvas, or touch dragging |
+| Saucer launch/release | Space, Launch core, or a canvas tap |
+| Saucer support | 1: repair net, 2: analyze targets, 3: defend shield |
 
-Primary keys can be remapped in Preferences; duplicate assignments are rejected.
-Arrow/W/right-Shift aliases remain available unless explicitly assigned to another
-action. Escape remains the pause key. Keyboard gameplay targets the focused canvas.
-Opening Preferences, changing window focus, or hiding the page pauses the game.
-Resume refocuses the canvas. Touch controls use pointer capture and clear held
-input on release/cancellation.
+Primary bindings can be changed in Preferences. Duplicate assignments are
+rejected. Arrow/W/right-Shift aliases remain unless assigned elsewhere. Touch
+controls use pointer capture and clear held input on release or cancellation.
 
-In Team Quest, choose a leader before starting. Ordinary platforms are one-way;
-reward bricks are solid. Hit recruitment boxes from below and collect the reward
-to unlock the other characters. The first box is on the launch platform and the
-second is on the first Outlook platform. The world beacon enters the AI Core
-arena, where a blaster is supplied. Only attack the core during exposed windows.
+Mission decisions open a contextual dialog and slow simulation while you choose.
+Opening Preferences or the level map, changing windows, or hiding the page pauses
+the game. Resume refocuses the canvas. Dialogue captions sit outside the playfield.
 
-## Recovery And Progress
+## Team And Recovery
 
-Campus falls and enemy contact return Bit to the last checkpoint without removing
-collected cells or approved bridges. Cells cannot be farmed through repeated
-deaths. An unfinished Wizard fight resets to full health on a retry. Completing
-Campus unlocks both Dash and the Orbit simulator, including Dash on later replays.
+Hit recruitment surprise boxes from below, then collect the released reward.
+The two recruitment slots belong to the non-selected original characters.
+Recruits, your selected leader, and earned blaster equipment carry into later
+levels. Companions retain the original independent navigation and combat rules.
 
-Team Quest retains its three-point health system, temporary protection, combat
-checkpoints, and recruited companions. World recovery retains collectibles,
-defeated enemies, used bricks, and recruits. The AI Core checkpoint restores
-health and the blaster for a fair retry. Switching missions pauses and retains
-the current run in memory; restarting that mission resets its own run.
+Falling or losing all three health points returns you to the current checkpoint.
+World retries retain collected items, used bricks, defeated enemies, completed
+tasks, and recruits. Boss retries restore health and the blaster and reset the
+arena task sequence. Repeating those tasks does not award their points again.
 
-Orbit begins with three recovery charges. Losing the last ball spends one charge
-and relatches a fresh core; losing one ball during multiball does not spend a
-charge. Recovery nets bounce a missed core without spending a charge. Once no
-charges remain, another last-ball loss ends the flight. Retry sector restarts the
-current wave with full resources; the Firewall wave also restores reserves on entry.
+Pair construction runs while you remain at its terminal. Delegated construction
+can run while you explore, but waits for missing dependencies or context. Wrong
+plans and failed evaluations leave the live route unchanged. Failed deployments
+must be explicitly rolled back. Model categories are fictional puzzle mechanics,
+not a representation of actual model availability or product guarantees.
 
-| Agent | Compute | Cooldown | Task |
-| --- | --- | --- | --- |
-| Patch | 30 | 9 seconds | Add one recovery net charge |
-| Query | 20 | 8 seconds | Highlight three priority targets |
-| Aegis | 25 | 10 seconds | Block missile damage for eight seconds |
+Orbit provides three recovery charges. Only losing the last ball spends a charge;
+losing one ball during multiball does not. A recovery net saves a missed ball
+without spending a charge. A failed flight can retry its current wave with fresh
+resources. The boss wave restores reserves on entry.
 
-Compute regenerates during active play and is replenished by brick hits. Agent
-tasks within their assigned role execute immediately, without another approval.
+| Support Action | Compute | Cooldown |
+| --- | --- | --- |
+| Repair net | 30 | 9 seconds |
+| Analyze targets | 20 | 8 seconds |
+| Defend shield | 25 | 10 seconds |
 
-Campus awards Explorer for at least ten secret cells, Debugger for repairing the
-Wizard, and Collaborator for approving both bridges. Badges are optional.
+Support uses deterministic in-game logic. It does not call live AI or Azure
+services. Compute regenerates during active play and through brick hits.
 
-Completion unlocks, best scores, and preferences are saved in local storage.
-Current-run checkpoints, collected cells, and Orbit waves are kept in memory
-only and are not restored after a reload. Blocked storage falls back to a playable
-session-only game. Sound starts off on a fresh profile and needs a user gesture.
-Campus and Orbit dialogue is text-only. Team Quest preserves its opt-in browser
-boss speech and now has a separate dialogue-volume slider in Preferences.
-Browser speech may use an online voice service. Mute sound also disables speech;
-pausing or switching missions cancels queued speech.
+The campaign save records unlocked/completed levels, selected leader, recruits,
+equipment, and best scores at progression events. A reload restarts the current
+level; exact live checkpoints, task queues, and wave state are not serialized.
+Older saves are left intact in their previous storage keys. Blocked storage falls
+back to session-only play. Preferences use their existing save key.
 
-## Verification
+## Build And Test
 
-Node 24 or newer is needed for development tests, not for browser gameplay:
+After changing JavaScript or CSS, run these before publishing:
 
 ```sh
+npm run build
 npm test
 ```
 
-This runs 42 checks through [tests/engine.test.mjs](tests/engine.test.mjs), using
-Node's built-in test runner with no installation step. The same suite can be run
-with `node --test tests/engine.test.mjs`.
+Node 24+ is needed for development tests, not for browser gameplay. No package
+installation is needed. The build refreshes the content-versioned import map
+and stylesheet URL in [index.html](index.html); commit that HTML with the source.
+The version check prevents mixed cached releases. Startup errors or a 15-second
+stall show a message and **Retry loading**, without deleting saves.
 
-The suite includes all 16 upstream checks in
-[tests/party-tests.js](tests/party-tests.js), including the most recent target
-reservation and attack-recovery regressions. During integration, that upstream
-suite exposed a missing default enemy direction: a stationary enemy could acquire
-a `NaN` position when its definition omitted `facing`. Enemy creation now defaults
-to facing right; the original regression and all other checks pass.
+The 53 passing tests cover original movement, all 16 companion regressions,
+every platform world's forward and return route connections, required world and
+boss tasks, safe plan/evaluation failures, queued dependencies, rollback,
+campaign continuity, saves, the final saucer transition, and Orbit physics.
+See [tests/campaign.test.mjs](tests/campaign.test.mjs) and
+[tests/engine.test.mjs](tests/engine.test.mjs).
 
-Checks cover jump behavior, edge grace, buffering, pause, approvals, retries,
-each required unassisted route connection, boss-switch reachability, progression,
-Planck collisions, rebound angles, multiball recovery, agent budgets, portals,
-missiles, power-ups, sector checkpoints, and game-over rules.
+Browser checks include the large desktop canvas, all eight world renderers,
+the original selected character in Orbit, a real saucer launch and repair action,
+Campus bridge approval, Cowork plan rejection/acceptance, Preferences focus,
+and the eight-level map at desktop and emulated 390x844 phone sizes. Tests that
+start later levels use temporary campaign-save fixtures, restored afterward.
 
-Browser smoke checks were performed on 2026-09-12 at desktop 1440x900 and emulated
-phone 390x844: startup, nonblank canvas/pilot pixels, horizontal overflow, keyboard
-bridge approval, remapped jumping, conflicting bindings, pointer controls,
-pause/resume focus, independent effects activation, subtitles, Orbit launch, and
-Patch assignment. Orbit checks used a temporary completed-Campus save fixture.
-
-Startup recovery was also checked with deliberately stale unversioned assets
-and a blocked entry-module request. The versioned graph ignored the stale assets,
-reported the blocked request, and recovered successfully through Retry.
-
-Real-device multitouch, Safari/Firefox, assistive-technology usability, soundtrack
-listening/balance, and uninterrupted human playthroughs still need validation.
-Per-connection reachability tests are not a full human difficulty assessment.
-
-## Next Milestones
-
-The remaining six campaign worlds, the fully restorable Reboot Campus hub,
-command wheel, ladders, collapsing/moving Campus platforms, advanced delegation
-and model-evaluation puzzles, Capability Map, cosmetics, daily challenges, and
-recorded character dialogue are not implemented. The full campaign's 12-18 minute level
-targets have not been met or validated by this compact milestone.
+This implementation still needs uninterrupted human campaign playthroughs,
+difficulty and duration tuning, real-device multitouch, broader browser and
+assistive-technology testing, and listening tests of the soundtrack. Route
+simulation is not a claim that the 12-18 minute targets are met. The separate
+restorable hub, cosmetics, daily challenges, freeform agent authoring, and
+recorded dialogue from the broader concept are not implemented.
 
 ## Code Map
 
-- [src/campus-engine.js](src/campus-engine.js) and
-	[src/campus-level.js](src/campus-level.js): Campus simulation and configuration.
-- [src/engine.js](src/engine.js) and [src/level.js](src/level.js): preserved
-	upstream Team Quest simulation, combat integration, and world geometry.
-- [src/orbit.js](src/orbit.js): Planck physics, waves, agents, and recovery rules.
-- [src/campus-art.js](src/campus-art.js), [src/bit.js](src/bit.js), and
-	[src/orbit-art.js](src/orbit-art.js): new mission artwork, isolated from the
-	upstream Team Quest renderers in [src/art.js](src/art.js) and
-	[src/party-art.js](src/party-art.js).
-- [src/party.js](src/party.js), [src/combat.js](src/combat.js), and
-	[src/boss.js](src/boss.js): Team Quest recruitment, combat, and final boss.
-- [src/main.js](src/main.js): mode selection, input, focus, preferences, and saves.
-- [src/audio.js](src/audio.js) and [src/music.js](src/music.js): synthesized audio.
-- [index.html](index.html) and [styles.css](styles.css): responsive, accessible UI.
+- [src/campaign.js](src/campaign.js): eight world definitions, progression, and saves.
+- [src/missions.js](src/missions.js): terminal interactions, dependencies, moving lifts, and objective gates.
+- [src/engine.js](src/engine.js): original fixed-step platform/combat engine, parameterized per world.
+- [src/world-art.js](src/world-art.js): themed architecture, platforms, terminals, and boss silhouettes.
+- [src/party.js](src/party.js) and [src/party-art.js](src/party-art.js): the original team and character artwork.
+- [src/orbit.js](src/orbit.js) and [src/orbit-art.js](src/orbit-art.js): saucer physics and the selected original pilot.
+- [src/main.js](src/main.js): campaign UI, input, decisions, preferences, and lifecycle.
+- [src/audio.js](src/audio.js) and [src/music.js](src/music.js): original synthesized audio and world arrangements.
 
-Nintendo, Microsoft, and GitHub names remain their owners' trademarks. This fan
-project is not affiliated with or endorsed by those companies. Bit and Sparq are
-original characters; Team Quest retains its procedural Mario fan artwork. No
-official sprites or soundtrack recordings are used. Preserve the included
-third-party library licenses when redistributing.
+Nintendo, Microsoft, and GitHub names remain their owners' trademarks. This
+unofficial fan project is not affiliated with or endorsed by those companies.
+Character and app illustrations are procedural fan artwork, not official assets.
+No official soundtrack recordings are used. Preserve all third-party licenses.
 
 <details>
 <summary>Archived Cloud Quest documentation and merge history</summary>

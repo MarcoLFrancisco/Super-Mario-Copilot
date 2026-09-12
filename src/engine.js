@@ -1,10 +1,11 @@
 import { LEVEL, VIEW, PHYSICS as P } from './level.js';
-import { ARENA } from './encounters.js';
+import { ARENA, ENCOUNTERS } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
 import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat, helperAllowance } from './combat.js';
 import { createBoss, updateBoss, hitBoss, bossSupportTarget } from './boss.js';
 import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty, companionIds, unlockHelper } from './party.js';
 import { createPartyDialogue, updatePartyDialogue, sayParty, reactPartyDialogue, clearPartyCaption } from './party-dialogue.js';
+import { createMissionProgress, updateMission, missionReady } from './missions.js';
 
 // Public API: createState(leader = 'marco'), setPaused(state, boolean), update(state,input,dt).
 // Input: held left/right/fire; one-frame jumpPressed/boostPressed/attackPressed/helperPressed.
@@ -17,7 +18,7 @@ const approach = (v, target, amount) => v < target
 const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x
   && a.y < b.y + b.h && a.y + a.h > b.y;
 const body = p => ({ x: p.x, y: p.y, w: P.playerWidth, h: P.playerHeight });
-const cameraTarget = p => clamp(p.x - VIEW.width * .35, 0, LEVEL.width - VIEW.width);
+const cameraTarget = (player, world = LEVEL) => clamp(player.x - VIEW.width * .35, 0, Math.max(0, world.width - VIEW.width));
 
 function makePlayer(spawn) {
   return { ...spawn, vx: 0, vy: 0, facing: 1, grounded: true,
@@ -25,21 +26,26 @@ function makePlayer(spawn) {
 }
 
 function partyContext(state) {
-  return { world: state.stage === 'boss' ? ARENA : LEVEL,
+  return { world: state.stage === 'boss' ? state.arena : state.geometry,
     blocks: state.blocks.blocks, enemies: state.combat.enemies,
     supportSlots: helperAllowance(state.combat),
     bossTarget: state.boss ? bossSupportTarget(state.boss) : null,
-    geometryVersion: `${state.stage}:${state.blocks.blocks.filter(b => b.broken).length}` };
+    geometryVersion: `${state.stage}:${state.blocks.blocks.filter(b => b.broken).length}:${state.missionProgress.geometryVersion}` };
 }
 
-export function createState(leader = 'marco') {
-  const player = makePlayer(LEVEL.spawn);
+export function createState(leader = 'marco', mission = {}) {
+  const world = mission.world ?? LEVEL;
+  const arena = mission.arena ?? ARENA;
+  const encounters = mission.encounters ?? ENCOUNTERS;
+  const player = makePlayer(world.spawn);
   const state = {
-    player, party: createParty(player, leader), cameraX: cameraTarget(player), collected: new Set(),
+    world, arena, mission, geometry: { ...world, platforms: world.platforms.map(platform => ({ ...platform })) },
+    missionProgress: createMissionProgress(),
+    player, party: createParty(player, leader), cameraX: cameraTarget(player, world), collected: new Set(),
     checkpointIndex: 0, score: 0, combo: 1, bestCombo: 1,
     comboTimer: 0, deaths: 0, time: 0, status: 'playing',
-    accumulator: 0, pendingJump: false, pendingBoost: false, pendingMelee: {},
-    stage: 'world', blocks: createBlocks(), combat: createCombat(), boss: null,
+    accumulator: 0, pendingJump: false, pendingBoost: false, pendingMelee: {}, pendingInteract: false, pendingChoice: null, pendingPulse: false,
+    stage: 'world', blocks: createBlocks(encounters.blocks), combat: createCombat(encounters), boss: null,
     partyDialogue: createPartyDialogue(), partyStarted: false
   };
   const recruits = companionIds(state.party);
@@ -58,21 +64,25 @@ export function setPaused(state, paused) {
   state.pendingJump = false;
   state.pendingBoost = false;
   state.player.jumpBuffer = 0;
+  state.pendingInteract = false; state.pendingChoice = null; state.pendingPulse = false;
   state.pendingMelee = {};
   state.party.manualAttack = false;
   state.party.companionTime = 0;
 }
 
 function enterArena(state) {
+  const arena = state.arena;
   state.pendingMelee = {};
   state.stage = 'boss';
-  state.player = makePlayer(ARENA.spawn);
+  state.player = makePlayer(arena.spawn);
   state.cameraX = 0;
   state.blocks = createBlocks([]);
   state.combat = createCombat({ enemies: [], pickups: [] });
-  state.combat.blaster = ARENA.grantBlaster;
-  state.boss = createBoss();
-  resetPartyMotion(state.party, state.player, ARENA.width, partyContext(state));
+  state.combat.blaster = arena.grantBlaster;
+  state.boss = createBoss(arena);
+  for (const station of arena.stations ?? []) delete state.missionProgress.jobs[station.id];
+  state.boss.objectivesLocked = !missionReady(state);
+  resetPartyMotion(state.party, state.player, arena.width, partyContext(state));
   clearPartyCaption(state.partyDialogue);
   state.pendingJump = false;
   state.pendingBoost = false;
@@ -80,14 +90,14 @@ function enterArena(state) {
 
 function respawn(state, events) {
   const checkpoint = state.stage === 'boss'
-    ? { name: ARENA.checkpointName, spawn: ARENA.spawn }
-    : LEVEL.checkpoints[state.checkpointIndex];
+    ? { name: state.arena.checkpointName, spawn: state.arena.spawn }
+    : state.world.checkpoints[state.checkpointIndex];
   if (state.stage === 'boss') enterArena(state);
   else {
     state.player = makePlayer(checkpoint.spawn);
-    state.cameraX = cameraTarget(state.player);
+    state.cameraX = cameraTarget(state.player, state.world);
     resetCombat(state.combat);
-    resetPartyMotion(state.party, state.player, LEVEL.width, partyContext(state));
+    resetPartyMotion(state.party, state.player, state.world.width, partyContext(state));
     clearPartyCaption(state.partyDialogue);
   }
   state.combo = 1;
@@ -114,9 +124,12 @@ function tick(state, input, events) {
   }
   const p = state.player;
   const arena = state.stage === 'boss';
-  const world = arena ? ARENA : LEVEL;
+  const world = arena ? state.arena : state.geometry;
   const combatEvents = [];
   state.time += STEP;
+  updateMission(state, { interactPressed: state.pendingInteract, choice: state.pendingChoice,
+    pulsePressed: state.pendingPulse }, STEP, events);
+  state.pendingInteract = false; state.pendingChoice = null; state.pendingPulse = false;
   updatePartyDialogue(state.partyDialogue, STEP);
   updateBlocks(state.blocks, STEP);
   state.comboTimer = Math.max(0, state.comboTimer - STEP);
@@ -156,7 +169,9 @@ function tick(state, input, events) {
   const oldBottom = p.y + P.playerHeight;
   p.x = clamp(p.x + p.vx * STEP, 0, world.width - P.playerWidth);
   resolveBlockX(state.blocks, p, oldX);
-  p.vy = Math.min(p.vy + P.gravity * STEP, P.maxFallSpeed);
+  const gravity = state.mission.id === 'core' && p.x > 6500 && !arena ? .72 : 1;
+  if (state.mission.id && input.jumpHeld === false && p.vy < -360) p.vy = -360;
+  p.vy = Math.min(p.vy + P.gravity * gravity * STEP, P.maxFallSpeed);
   p.y += p.vy * STEP;
   p.grounded = false;
   const contact = resolveBlockY(state.blocks, p, oldY, events);
@@ -197,7 +212,7 @@ function tick(state, input, events) {
   updateCompanions(state.party, p, STEP, partyContext(state), combatEvents);
   updateCombat(state.combat, p, input, STEP, oldBottom, combatEvents, state.blocks.blocks, state.party);
   if (!arena) {
-    const hazard = LEVEL.hazards.find(h => overlaps(body(p), h));
+    const hazard = world.hazards.find(h => overlaps(body(p), h));
     if (hazard) hurtPlayer(state.combat, p, hazard.x + hazard.w / 2, combatEvents);
   }
   // World enemies remain defeated across respawns. Arena summons award no
@@ -236,14 +251,14 @@ function tick(state, input, events) {
     return;
   }
   const box = body(p);
-  for (let i = state.checkpointIndex + 1; i < LEVEL.checkpoints.length; i++) {
-    const c = LEVEL.checkpoints[i];
+  for (let i = state.checkpointIndex + 1; i < world.checkpoints.length; i++) {
+    const c = world.checkpoints[i];
     if (overlaps(box, { x: c.x - 28, y: c.y - 110, w: 56, h: 110 })) {
       state.checkpointIndex = i;
       events.push({ type: 'checkpoint', name: c.name });
     }
   }
-  for (const spark of LEVEL.sparks) {
+  for (const spark of world.sparks) {
     if (state.collected.has(spark.id)) continue;
     const dx = spark.x - clamp(spark.x, box.x, box.x + box.w);
     const dy = spark.y - clamp(spark.y, box.y, box.y + box.h);
@@ -257,10 +272,10 @@ function tick(state, input, events) {
     state.score += points;
     events.push({ type: 'spark', id: spark.id, points, combo: state.combo });
   }
-  state.cameraX += (cameraTarget(p) - state.cameraX) * (1 - Math.exp(-8 * STEP));
-  if (overlaps(box, LEVEL.goal)) {
+  state.cameraX += (cameraTarget(p, world) - state.cameraX) * (1 - Math.exp(-8 * STEP));
+  if (overlaps(box, world.goal) && missionReady(state)) {
     enterArena(state);
-    events.push({ type: 'bossEnter', name: ARENA.name });
+    events.push({ type: 'bossEnter', name: state.arena.name });
   }
 }
 
@@ -269,6 +284,9 @@ export function update(state, input = {}, dt = 0) {
   if (state.status !== 'playing') return events;
   state.pendingJump ||= Boolean(input.jumpPressed);
   state.pendingBoost ||= Boolean(input.boostPressed);
+  state.pendingInteract ||= Boolean(input.interactPressed);
+  state.pendingChoice ??= input.choice ?? null;
+  state.pendingPulse ||= Boolean(input.pulsePressed);
   state.pendingMelee.attackPressed ||= Boolean(input.attackPressed);
   state.pendingMelee.helperPressed ||= Boolean(input.helperPressed);
   // Bound catch-up after stalls; small fixed steps keep collisions consistent.

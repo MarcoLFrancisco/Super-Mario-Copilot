@@ -3,47 +3,44 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#eff3ed">
-  <meta name="description" content="An unofficial Microsoft AI-inspired adventure. Restore Copilot Campus with Bit and Sparq, then take a flying saucer into Azure Orbit.">
-  <title>Mission Copilot</title>
+  <meta name="theme-color" content="#0c151e">
+  <meta name="description" content="An eight-level Microsoft AI-themed platform adventure with Marco, Mario, and Donkey. Explore the campus, repository forest, workspace, factory, city, tower, orbit, and Intelligence Core.">
+  <title>Copilot Cloud Quest</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles.css?v=27fc566037090528">
+  <link rel="stylesheet" href="./styles.css?v=3d2dabf1d88d1631">
   <script type="importmap">
 {
   "imports": {
-    "./src/actor-physics.js": "./src/actor-physics.js?v=27fc566037090528",
-    "./src/art.js": "./src/art.js?v=27fc566037090528",
-    "./src/audio.js": "./src/audio.js?v=27fc566037090528",
-    "./src/bit.js": "./src/bit.js?v=27fc566037090528",
-    "./src/blocks.js": "./src/blocks.js?v=27fc566037090528",
-    "./src/boss-art.js": "./src/boss-art.js?v=27fc566037090528",
-    "./src/boss-dialogue.js": "./src/boss-dialogue.js?v=27fc566037090528",
-    "./src/boss.js": "./src/boss.js?v=27fc566037090528",
-    "./src/campus-art.js": "./src/campus-art.js?v=27fc566037090528",
-    "./src/campus-collectibles.js": "./src/campus-collectibles.js?v=27fc566037090528",
-    "./src/campus-engine.js": "./src/campus-engine.js?v=27fc566037090528",
-    "./src/campus-level.js": "./src/campus-level.js?v=27fc566037090528",
-    "./src/campus-scenery.js": "./src/campus-scenery.js?v=27fc566037090528",
-    "./src/character.js": "./src/character.js?v=27fc566037090528",
-    "./src/collectibles.js": "./src/collectibles.js?v=27fc566037090528",
-    "./src/combat.js": "./src/combat.js?v=27fc566037090528",
-    "./src/encounters.js": "./src/encounters.js?v=27fc566037090528",
-    "./src/enemy-art.js": "./src/enemy-art.js?v=27fc566037090528",
-    "./src/engine.js": "./src/engine.js?v=27fc566037090528",
-    "./src/level.js": "./src/level.js?v=27fc566037090528",
-    "./src/main.js": "./src/main.js?v=27fc566037090528",
-    "./src/music.js": "./src/music.js?v=27fc566037090528",
-    "./src/orbit-art.js": "./src/orbit-art.js?v=27fc566037090528",
-    "./src/orbit.js": "./src/orbit.js?v=27fc566037090528",
-    "./src/party-ai.js": "./src/party-ai.js?v=27fc566037090528",
-    "./src/party-art.js": "./src/party-art.js?v=27fc566037090528",
-    "./src/party-bubbles.js": "./src/party-bubbles.js?v=27fc566037090528",
-    "./src/party-dialogue.js": "./src/party-dialogue.js?v=27fc566037090528",
-    "./src/party-navigation.js": "./src/party-navigation.js?v=27fc566037090528",
-    "./src/party.js": "./src/party.js?v=27fc566037090528",
-    "./src/scenery.js": "./src/scenery.js?v=27fc566037090528",
-    "./vendor/lucide.min.js": "./vendor/lucide.min.js?v=27fc566037090528",
-    "./vendor/planck.mjs": "./vendor/planck.mjs?v=27fc566037090528"
+    "./src/actor-physics.js": "./src/actor-physics.js?v=3d2dabf1d88d1631",
+    "./src/art.js": "./src/art.js?v=3d2dabf1d88d1631",
+    "./src/audio.js": "./src/audio.js?v=3d2dabf1d88d1631",
+    "./src/blocks.js": "./src/blocks.js?v=3d2dabf1d88d1631",
+    "./src/boss-art.js": "./src/boss-art.js?v=3d2dabf1d88d1631",
+    "./src/boss-dialogue.js": "./src/boss-dialogue.js?v=3d2dabf1d88d1631",
+    "./src/boss.js": "./src/boss.js?v=3d2dabf1d88d1631",
+    "./src/campaign.js": "./src/campaign.js?v=3d2dabf1d88d1631",
+    "./src/character.js": "./src/character.js?v=3d2dabf1d88d1631",
+    "./src/collectibles.js": "./src/collectibles.js?v=3d2dabf1d88d1631",
+    "./src/combat.js": "./src/combat.js?v=3d2dabf1d88d1631",
+    "./src/encounters.js": "./src/encounters.js?v=3d2dabf1d88d1631",
+    "./src/enemy-art.js": "./src/enemy-art.js?v=3d2dabf1d88d1631",
+    "./src/engine.js": "./src/engine.js?v=3d2dabf1d88d1631",
+    "./src/level.js": "./src/level.js?v=3d2dabf1d88d1631",
+    "./src/main.js": "./src/main.js?v=3d2dabf1d88d1631",
+    "./src/missions.js": "./src/missions.js?v=3d2dabf1d88d1631",
+    "./src/music.js": "./src/music.js?v=3d2dabf1d88d1631",
+    "./src/orbit-art.js": "./src/orbit-art.js?v=3d2dabf1d88d1631",
+    "./src/orbit.js": "./src/orbit.js?v=3d2dabf1d88d1631",
+    "./src/party-ai.js": "./src/party-ai.js?v=3d2dabf1d88d1631",
+    "./src/party-art.js": "./src/party-art.js?v=3d2dabf1d88d1631",
+    "./src/party-bubbles.js": "./src/party-bubbles.js?v=3d2dabf1d88d1631",
+    "./src/party-dialogue.js": "./src/party-dialogue.js?v=3d2dabf1d88d1631",
+    "./src/party-navigation.js": "./src/party-navigation.js?v=3d2dabf1d88d1631",
+    "./src/party.js": "./src/party.js?v=3d2dabf1d88d1631",
+    "./src/scenery.js": "./src/scenery.js?v=3d2dabf1d88d1631",
+    "./src/world-art.js": "./src/world-art.js?v=3d2dabf1d88d1631",
+    "./vendor/lucide.min.js": "./vendor/lucide.min.js?v=3d2dabf1d88d1631",
+    "./vendor/planck.mjs": "./vendor/planck.mjs?v=3d2dabf1d88d1631"
   }
 }
   </script>
@@ -89,23 +86,20 @@
     <header class="masthead">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true"><i data-lucide="circuit-board"></i></span>
-        <div><p class="eyebrow">Microsoft AI / An unofficial adventure</p><h1>Mission <span>Copilot</span></h1></div>
+        <div><p class="eyebrow">Microsoft AI / An unofficial adventure</p><h1>Copilot <span>Cloud Quest</span></h1></div>
       </div>
       <div class="header-actions">
-        <span class="build-label">BIT + SPARQ <span class="status-dot"></span></span>
+        <span id="build-label" class="build-label">MARCO / LEVEL 1 OF 8</span>
         <button id="sound-button" class="icon-button" type="button" aria-label="Enable sound" aria-pressed="false" data-tooltip="Enable sound" disabled><span id="sound-icon"><i data-lucide="volume-x"></i></span></button>
         <button id="pause-button" class="icon-button" type="button" aria-label="Pause" data-tooltip="Pause" aria-controls="pause-panel" disabled><span id="pause-icon"><i data-lucide="pause"></i></span></button>
         <button id="settings-button" class="icon-button" type="button" aria-label="Preferences" data-tooltip="Preferences" aria-haspopup="dialog"><i data-lucide="sliders-horizontal"></i></button>
+        <button id="fullscreen-button" class="icon-button" type="button" aria-label="Full screen" data-tooltip="Full screen"><i data-lucide="maximize"></i></button>
       </div>
     </header>
-    <section class="game-shell" id="mission-panel" role="tabpanel" aria-labelledby="campus-tab">
+    <section class="game-shell" id="mission-panel" aria-labelledby="level-title">
       <header class="level-header">
         <div class="mission-heading"><span id="mission-number" class="mission-number">01</span><div><p class="eyebrow" id="world-label">Restore the connection</p><h2 id="level-title">Copilot Campus</h2></div></div>
-        <nav class="mission-tabs" role="tablist" aria-label="Missions">
-          <button id="campus-tab" role="tab" aria-selected="true" aria-controls="mission-panel" type="button"><i data-lucide="trees" aria-hidden="true"></i>Campus</button>
-          <button id="quest-tab" role="tab" aria-selected="false" aria-controls="mission-panel" tabindex="-1" type="button"><i data-lucide="users" aria-hidden="true"></i>Team Quest</button>
-          <button id="orbit-tab" role="tab" aria-selected="false" aria-controls="mission-panel" tabindex="-1" type="button" disabled title="Restore Campus to unlock Orbit"><i data-lucide="orbit" aria-hidden="true"></i>Orbit<span id="orbit-lock"><i data-lucide="lock-keyhole" aria-hidden="true"></i></span></button>
-        </nav>
+        <div class="campaign-heading"><span id="chapter-name">Campus Courtyard</span><button id="levels-button" type="button" aria-haspopup="dialog"><i data-lucide="map" aria-hidden="true"></i>Levels <span id="level-counter">1 / 8</span></button></div>
       </header>
       <dl class="hud" aria-label="Mission statistics">
         <div><dt>Score</dt><dd id="score-value">0</dd></div>
@@ -117,10 +111,10 @@
       <div class="game-viewport" id="game-viewport">
         <canvas id="game-canvas" width="1280" height="720" tabindex="-1" aria-label="Copilot Campus platform game" aria-describedby="game-objective keyboard-help">Canvas graphics are required to play.</canvas>
         <section class="game-overlay" id="start-panel" aria-labelledby="start-title">
-          <p class="eyebrow" id="start-eyebrow">Mission 01 / Reboot Campus</p>
-          <h2 id="start-title">A little help.<br>A giant leap.</h2>
-          <p id="game-objective">Doctor Null has locked the campus in an endless approval meeting. Bit and Sparq have other plans.</p>
-          <label id="character-choice" class="character-choice" hidden>Leader<select id="character-select"><option value="marco">Marco</option><option value="mario">Mario</option><option value="donkey">Donkey</option></select></label>
+          <p class="eyebrow" id="start-eyebrow">Level 01 / Assistance, on your terms</p>
+          <h2 id="start-title">Copilot Campus</h2>
+          <p id="game-objective">Doctor Null has locked the campus in an endless approval meeting. Restore the connections and restart his onboarding machinery.</p>
+          <label id="character-choice" class="character-choice">Leader<select id="character-select"><option value="marco">Marco</option><option value="mario">Mario</option><option value="donkey">Donkey</option></select></label>
           <button id="start-button" class="primary-button" type="button" disabled><i data-lucide="play" aria-hidden="true"></i><span id="start-label">Begin mission</span></button>
           <p id="load-status" role="status">Loading mission...</p>
         </section>
@@ -131,34 +125,36 @@
         <section class="game-overlay" id="complete-panel" aria-labelledby="complete-title" hidden>
           <p class="eyebrow" id="result-eyebrow">Control restored</p><h2 id="complete-title">Campus, back online.</h2>
           <p id="completion-summary"></p>
-          <p id="final-productivity" class="productivity-counts" hidden></p>
           <dl class="results"><div><dt>Score</dt><dd id="final-score">0</dd></div><div><dt id="final-items-label">Cells</dt><dd id="final-sparks">0</dd></div><div><dt id="final-combo-label">Best combo</dt><dd id="final-combo">x1</dd></div></dl>
           <div id="mission-badges" class="badges" aria-label="Mission badges"><span id="badge-explorer"><i data-lucide="compass" aria-hidden="true"></i>Explorer</span><span id="badge-debugger"><i data-lucide="scan-line" aria-hidden="true"></i>Debugger</span><span id="badge-collaborator"><i data-lucide="handshake" aria-hidden="true"></i>Collaborator</span></div>
-          <div class="overlay-actions"><button id="orbit-unlock-button" class="primary-button" type="button"><i data-lucide="orbit" aria-hidden="true"></i>Enter Orbit</button><button id="campus-return-button" type="button" hidden><i data-lucide="arrow-left" aria-hidden="true"></i>Back to Campus</button><button id="replay-button" type="button"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span id="replay-label">Replay mission</span></button></div>
+          <div class="overlay-actions"><button id="next-level-button" class="primary-button" type="button"><i data-lucide="arrow-right" aria-hidden="true"></i><span id="next-level-label">Next level</span></button><button id="results-map-button" type="button"><i data-lucide="map" aria-hidden="true"></i>Level map</button><button id="replay-button" type="button"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span id="replay-label">Replay level</span></button></div>
         </section>
       </div>
       <div class="mission-strip" id="game-controls"><div class="objective"><span class="status-dot"></span><span id="mission-objective">Restore campus access</span><span id="boss-health" hidden></span></div><button id="interact-button" type="button" data-action="interact" disabled><span id="interact-icon"><i data-lucide="check" aria-hidden="true"></i></span><span id="interact-label">Accept bridge</span></button></div>
-      <section id="quest-readout" class="quest-readout" aria-label="Team Quest status" hidden>
+      <ul id="task-ribbon" class="task-ribbon" aria-label="Mission tasks"></ul>
+      <section id="quest-readout" class="quest-readout" aria-label="Team status">
         <dl class="quest-stats"><div><dt>Health</dt><dd id="health-value">3 / 3</dd></div><div><dt>Weapon</dt><dd id="weapon-value">Not equipped</dd></div><div><dt>Protection</dt><dd id="protection-value">Inactive</dd></div></dl>
         <p id="party-status"></p><p id="productivity-counts" class="productivity-counts"></p>
-        <div id="quest-boss-status" class="quest-boss-status" hidden><label for="quest-boss-health">Hallucination Engine</label><progress id="quest-boss-health" max="24" value="24"></progress><span id="quest-boss-value">24 / 24</span></div>
+        <div id="quest-boss-status" class="quest-boss-status" hidden><label id="boss-name" for="quest-boss-health">Boss</label><progress id="quest-boss-health" max="24" value="24"></progress><span id="quest-boss-value">24 / 24</span></div>
       </section>
-      <div id="combat-controls" class="combat-controls" role="group" aria-label="Team Quest combat" hidden><button id="attack-button" type="button" data-action="attack"><i data-lucide="swords" aria-hidden="true"></i>Attack</button><button id="fire-button" type="button" data-action="fire"><i data-lucide="crosshair" aria-hidden="true"></i>Fire</button><button id="helper-button" type="button" data-action="helper"><i data-lucide="users" aria-hidden="true"></i>Helpers</button></div>
+      <div id="combat-controls" class="combat-controls" role="group" aria-label="Combat controls"><button id="attack-button" type="button" data-action="attack"><i data-lucide="swords" aria-hidden="true"></i>Attack</button><button id="fire-button" type="button" data-action="fire"><i data-lucide="crosshair" aria-hidden="true"></i>Fire</button><button id="helper-button" type="button" data-action="helper"><i data-lucide="users" aria-hidden="true"></i>Helpers</button><button id="pulse-button" type="button" data-action="pulse" title="Debug Pulse, unlocked after GitHub"><i data-lucide="scan-line" aria-hidden="true"></i>Debug Pulse</button><button id="focus-button" type="button" data-action="focus" title="Hold for Focus Mode, unlocked after Teams"><i data-lucide="focus" aria-hidden="true"></i>Focus</button></div>
       <div class="touch-controls" id="touch-controls" role="group" aria-label="Game controls"><div class="direction-controls"><button type="button" class="icon-button" data-action="left" aria-label="Move left" disabled><i data-lucide="arrow-left"></i></button><button type="button" class="icon-button" data-action="right" aria-label="Move right" disabled><i data-lucide="arrow-right"></i></button></div><div class="action-controls"><button id="boost-button" type="button" class="icon-button" data-action="boost" aria-label="Copilot Dash" disabled><i data-lucide="zap"></i></button><button id="jump-button" type="button" class="icon-button" data-action="jump" aria-label="Jump" disabled><i data-lucide="arrow-up"></i></button></div></div>
-      <div id="agent-controls" class="agent-controls" role="group" aria-label="Agent assignments" hidden><button id="agent-patch" type="button" data-action="patch"><i data-lucide="wrench" aria-hidden="true"></i><span>Patch<small id="patch-status">Ready</small></span></button><button id="agent-query" type="button" data-action="query"><i data-lucide="search" aria-hidden="true"></i><span>Query<small id="query-status">Ready</small></span></button><button id="agent-aegis" type="button" data-action="aegis"><i data-lucide="shield" aria-hidden="true"></i><span>Aegis<small id="aegis-status">Ready</small></span></button></div>
-      <div class="dialogue-strip" id="dialogue-strip"><span id="speaker" class="speaker">SPARQ</span><p id="subtitle">The campus is quiet. A little too quiet.</p></div>
+      <div id="agent-controls" class="agent-controls" role="group" aria-label="Team assignments" hidden><button id="agent-patch" type="button" data-action="patch"><i data-lucide="wrench" aria-hidden="true"></i><span>Repair net<small id="patch-status">Ready</small></span></button><button id="agent-query" type="button" data-action="query"><i data-lucide="search" aria-hidden="true"></i><span>Analyze targets<small id="query-status">Ready</small></span></button><button id="agent-aegis" type="button" data-action="aegis"><i data-lucide="shield" aria-hidden="true"></i><span>Defend shield<small id="aegis-status">Ready</small></span></button></div>
+      <div class="dialogue-strip" id="dialogue-strip"><span id="speaker" class="speaker">MISSION</span><p id="subtitle">Campus access is offline.</p></div>
       <p id="keyboard-help" class="sr-only">Arrow keys or A and D move. Hold Space to jump higher. E accepts a nearby bridge. Shift dashes after unlocking it. Escape pauses. Controls can be remapped in Preferences.</p>
       <p id="game-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
     </section>
-    <footer class="site-footer"><p>Unofficial fan project. Bit and Sparq are original characters. Team Quest retains fan-made Mario artwork. Nintendo, Microsoft, and GitHub names belong to their owners; no affiliation or endorsement.</p><p id="storage-status">Local progress</p></footer>
+    <footer class="site-footer"><p>Unofficial fan project with custom character artwork. Nintendo, Microsoft, and GitHub names belong to their owners; no affiliation or endorsement.</p><p id="storage-status">Local progress</p></footer>
   </main>
   <dialog id="settings-dialog" aria-labelledby="settings-title">
     <div class="settings-header"><div><p class="eyebrow">Make yourself at home</p><h2 id="settings-title">Preferences</h2></div><button id="close-settings" class="icon-button" type="button" aria-label="Close preferences" data-tooltip="Close"><i data-lucide="x"></i></button></div>
     <fieldset id="audio-settings"><legend>Audio</legend><div class="audio-row"><label class="toggle"><input type="checkbox" id="music-enabled">Music</label><input id="music-volume" aria-label="Music volume" type="range" min="0" max="100" step="5" value="45"><output id="music-output" for="music-volume">45%</output></div><div class="audio-row"><label class="toggle"><input type="checkbox" id="effects-enabled">Effects</label><input id="effects-volume" aria-label="Effects volume" type="range" min="0" max="100" step="5" value="65"><output id="effects-output" for="effects-volume">65%</output></div><p id="audio-status" class="setting-status" role="status">Sound is off.</p></fieldset>
     <fieldset><legend>Accessibility</legend><div class="access-options"><label class="toggle"><input type="checkbox" id="reduced-motion">Reduced motion</label><label class="toggle"><input type="checkbox" id="high-contrast">High-contrast markers</label><label class="toggle"><input type="checkbox" id="subtitles" checked>Subtitles</label></div><div class="audio-row"><label for="shake-volume">Screen shake</label><input id="shake-volume" type="range" min="0" max="100" step="10" value="0"><output id="shake-output" for="shake-volume">0%</output></div></fieldset>
-    <fieldset><legend>Team Quest dialogue</legend><div class="audio-row"><label class="toggle" title="Browser speech may use an online voice service"><input type="checkbox" id="boss-voice-enabled">Boss voice</label><input id="dialogue-volume" aria-label="Dialogue volume" type="range" min="0" max="100" step="5" value="65"><output id="dialogue-output" for="dialogue-volume">65%</output></div></fieldset>
+    <fieldset><legend>Dialogue</legend><div class="audio-row"><label class="toggle" title="Browser speech may use an online voice service"><input type="checkbox" id="boss-voice-enabled">Boss voice</label><input id="dialogue-volume" aria-label="Dialogue volume" type="range" min="0" max="100" step="5" value="65"><output id="dialogue-output" for="dialogue-volume">65%</output></div></fieldset>
     <fieldset><legend>Controls</legend><div id="binding-grid" class="binding-grid"></div><p id="binding-status" class="setting-status" role="status"></p><button id="reset-bindings" type="button"><i data-lucide="rotate-ccw" aria-hidden="true"></i>Reset bindings</button></fieldset>
   </dialog>
-  <noscript><p class="noscript-message">Enable JavaScript to play Mission Copilot.</p></noscript>
+  <dialog id="level-dialog" aria-labelledby="levels-title"><div class="settings-header"><div><p class="eyebrow">Campaign</p><h2 id="levels-title">World map</h2></div><button id="close-levels" class="icon-button" type="button" aria-label="Close level map"><i data-lucide="x"></i></button></div><div id="level-list" class="level-list"></div></dialog>
+  <dialog id="task-dialog" aria-labelledby="task-title"><form id="task-form"><p class="eyebrow">Mission decision</p><h2 id="task-title"></h2><p id="task-context"></p><fieldset id="task-choices" class="task-choices"></fieldset><div class="overlay-actions"><button id="task-confirm" type="submit" class="primary-button"><i data-lucide="check" aria-hidden="true"></i>Confirm</button><button id="task-cancel" type="button">Cancel</button></div></form></dialog>
+  <noscript><p class="noscript-message">Enable JavaScript to play Copilot Cloud Quest.</p></noscript>
 </body>
 </html>

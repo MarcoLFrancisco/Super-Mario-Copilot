@@ -1,4 +1,4 @@
-import { SCORE, VOICES, JINGLES, musicStep, bossMusicStep, midiFrequency } from './music.js';
+import { SCORE, VOICES, JINGLES, musicStep, worldMusicStep, bossMusicStep, midiFrequency } from './music.js';
 
 // Call unlock() from a user gesture; failure returns false, never blocks play.
 // setStatus: playing/paused/complete/idle. Set complete before its event.
@@ -7,6 +7,7 @@ export function createAudio() {
   let ctx, buses, noise, timer;
   let status = 'idle', disposed = false, step = 0, next = 0;
   let stage = 'world', bossPhase = 0;
+  let theme = null;
   const lastEffects = new Map();
   const volumes = { music: 0, effects: 0 };
   const active = new Set();
@@ -63,7 +64,8 @@ export function createAudio() {
     const now = ctx.currentTime;
     if (next < now) next = now + .02;
     while (next < now + .12) {
-      const notes = stage === 'boss' ? bossMusicStep(step, bossPhase) : musicStep(step);
+      const notes = stage === 'boss' ? bossMusicStep(step, bossPhase)
+        : theme ? worldMusicStep(step, theme) : musicStep(step);
       notes.forEach(event => note(event, next, 'music'));
       step = (step + 1) % SCORE.loopSteps;
       next += SCORE.secondsPerStep;
@@ -129,6 +131,11 @@ export function createAudio() {
   function reset() {
     stop(); step = 0; stage = 'world'; bossPhase = 0;
     lastEffects.clear();
+    clearInterval(timer); timer = undefined; sync();
+  }
+  function setTheme(value) {
+    if (theme === value) return;
+    theme = value; stop('music'); step = 0;
     clearInterval(timer); timer = undefined; sync();
   }
   function effect(event, app = 'copilot') {
@@ -203,5 +210,5 @@ export function createAudio() {
       try { await ctx.close(); } catch { /* Closing is best effort. */ }
     }
   }
-  return { unlock, setVolume, setStatus, setStage, reset, effect, dispose };
+  return { unlock, setVolume, setStatus, setStage, setTheme, reset, effect, dispose };
 }

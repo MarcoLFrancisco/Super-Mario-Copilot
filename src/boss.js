@@ -9,13 +9,13 @@ import { activePartyAttacks, claimPartyHit } from './party.js';
 // Fixed-step order: player physics -> updateBoss -> updateCombat -> hitBoss.
 // Engine handles zero player health BEFORE hitBoss so death wins a tie.
 // Only bossDefeated completes the game; never complete at the world beacon.
-export function createBoss() {
-  return { ...ARENA.boss, maxHealth: ARENA.boss.health, phase: 0,
-    mode: 'intro', timer: ARENA.boss.introDuration, age: 0,
+export function createBoss(arena = ARENA) {
+  return { ...arena.boss, arena, maxHealth: arena.boss.health, phase: 0,
+    mode: 'intro', timer: arena.boss.introDuration, age: 0,
     shotTimer: 0, grace: 0, cycle: 0, zones: [], defeated: false,
     helperDamage: 0, helperWindowDamage: 0,
     vx: 0, vy: 0, lookX: -1, lookY: 0, windup: 0,
-    recoil: 0, attackPulse: 0, dialogue: createDialogue() };
+    recoil: 0, attackPulse: 0, dialogue: createDialogue(arena.dialogue) };
 }
 // Helpers may contribute one third of total health, at most two per exposure.
 // Keep the last point for the player; reset all counters with a fresh encounter.
@@ -25,42 +25,44 @@ function supportAllowance(boss) {
 }
 
 export function bossSupportTarget(boss) {
-  if (boss.defeated || !['returning', 'exposed'].includes(boss.mode)
+  if (boss.defeated || boss.objectivesLocked || !['returning', 'exposed'].includes(boss.mode)
       || supportAllowance(boss) <= 0) return null;
-  const platform = ARENA.platforms.find(p => p.id === 'arena-right');
-  return { id: 'boss-core', x: ARENA.boss.x, y: ARENA.boss.y,
+  const arena = boss.arena ?? ARENA;
+  const platform = arena.platforms.find(p => p.id === 'arena-right');
+  return { id: 'boss-core', x: arena.boss.x, y: arena.boss.y,
     w: boss.w, h: boss.h, exposed: boss.mode === 'exposed',
     approachY: platform.y - P.playerHeight };
 }
 
 const playerBox = p => ({ x: p.x, y: p.y, w: P.playerWidth, h: P.playerHeight });
-const phaseFor = boss => Math.max(0, ARENA.phases.findIndex(p => boss.health > p.healthAbove));
+const phaseFor = boss => Math.max(0, (boss.arena ?? ARENA).phases.findIndex(phase => boss.health > phase.healthAbove));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 function moveCore(boss, player, dt) {
+  const arena = boss.arena ?? ARENA;
   const exposed = boss.mode === 'exposed';
   const returning = boss.mode === 'returning';
   // Fly above the platforms; descend only beside the right platform.
   // Return along a safe overhead corridor rather than sweeping through Mario.
-  const homeX = ARENA.boss.x;
+  const homeX = arena.boss.x;
   const aboveHome = Math.abs(boss.x - homeX) < 18;
   const overhead = boss.y <= 205;
   const targetX = exposed || returning ? (overhead || aboveHome ? homeX : boss.x)
     : (overhead ? 600 + Math.cos(boss.age * .65) * 430 : boss.x);
-  const targetY = exposed || (returning && aboveHome) ? ARENA.boss.y
+  const targetY = exposed || (returning && aboveHome) ? arena.boss.y
     : 155 + Math.sin(boss.age * .9) * 25;
   boss.vx += ((targetX - boss.x) * 18 - boss.vx * 9) * dt;
   boss.vy += ((targetY - boss.y) * 18 - boss.vy * 9) * dt;
   boss.vx = clamp(boss.vx, -360, 360);
   boss.vy = clamp(boss.vy, -230, 230);
   const x = boss.x + boss.vx * dt, y = boss.y + boss.vy * dt;
-  boss.x = clamp(x, 120, ARENA.width - boss.w - 100);
-  boss.y = clamp(y, 120, ARENA.boss.y);
+  boss.x = clamp(x, 120, arena.width - boss.w - 100);
+  boss.y = clamp(y, 120, arena.boss.y);
   if (boss.x !== x) boss.vx = 0;
   if (boss.y !== y) boss.vy = 0;
   boss.lookX = clamp((player.x + P.playerWidth / 2 - boss.x - boss.w / 2) / 300, -1, 1);
   boss.lookY = clamp((player.y + P.playerHeight / 2 - boss.y - boss.h / 2) / 180, -1, 1);
   boss.windup = boss.mode === 'warning'
-    ? clamp(1 - boss.timer / Math.max(1.6, ARENA.phases[boss.phase].warningTime), 0, 1) : 0;
+    ? clamp(1 - boss.timer / Math.max(1.6, arena.phases[boss.phase].warningTime), 0, 1) : 0;
   boss.recoil = Math.max(0, boss.recoil - dt);
   boss.attackPulse = Math.max(0, boss.attackPulse - dt);
 }
@@ -69,12 +71,13 @@ function clearThreats(combat) {
   combat.enemies = [];
 }
 function warn(boss, player, events) {
+  const arena = boss.arena ?? ARENA;
   boss.phase = phaseFor(boss);
-  const phase = ARENA.phases[boss.phase];
+  const phase = arena.phases[boss.phase];
   boss.mode = 'warning'; boss.timer = Math.max(1.6, phase.warningTime);
   boss.cycle += 1; boss.zones = [];
   if (phase.attack === 'agents') {
-    const x = Math.max(0, Math.min(ARENA.width - 100, player.x - 32));
+    const x = Math.max(0, Math.min(arena.width - 100, player.x - 32));
     // Full-height beam: move out of its marked column before activation.
     boss.zones.push({ x, y: 0, w: 100, h: 630, active: false });
   }
@@ -82,19 +85,21 @@ function warn(boss, player, events) {
   sayBoss(boss.dialogue, phase.attack, events);
 }
 function summon(boss, combat) {
+  const arena = boss.arena ?? ARENA;
   combat.enemies = combat.enemies.filter(enemy => !enemy.dead);
-  const count = Math.min(2, ARENA.phases[boss.phase].summonCount,
-    ARENA.maxMinions - combat.enemies.length);
+  const count = Math.min(2, arena.phases[boss.phase].summonCount,
+    arena.maxMinions - combat.enemies.length);
   for (let i = 0; i < count; i++) {
-    const x = ARENA.summonPoints[i];
+    const x = arena.summonPoints[i];
     const type = ENEMY_TYPES.robot;
     combat.enemies.push(makeEnemy({ id: `agent-${boss.cycle}-${i}`, kind: 'robot',
       x, y: 630 - type.h, minX: Math.max(30, x - 95),
-      maxX: Math.min(ARENA.width - type.w - 30, x + 95), facing: i % 2 ? -1 : 1 }));
+      maxX: Math.min(arena.width - type.w - 30, x + 95), facing: i % 2 ? -1 : 1 }));
   }
 }
 function attack(boss, combat, player) {
-  const phase = ARENA.phases[boss.phase];
+  const arena = boss.arena ?? ARENA;
+  const phase = arena.phases[boss.phase];
   if (combat.shots.filter(s => s.owner === 'enemy' && s.life > 0).length >= 2) return;
   if (phase.attack === 'tokens') {
     const x = boss.x + boss.w / 2 - 7, y = boss.y + boss.h;
@@ -109,9 +114,9 @@ function attack(boss, combat, player) {
       w: 14, h: 14, life: 3.5 });
   } else if (phase.attack === 'waves') {
     // Always enter from the right edge, never materialize beneath Mario.
-    if (player.x > ARENA.width - 240) return;
+    if (player.x > arena.width - 240) return;
     spawnShot(combat, { owner: 'enemy', kind: 'wave',
-      x: ARENA.width - 34, y: 604, w: 32, h: 26,
+      x: arena.width - 34, y: 604, w: 32, h: 26,
       vx: -Math.min(180, phase.waveSpeed), vy: 0, life: 7 });
   }
   boss.attackPulse = .3;
@@ -119,12 +124,13 @@ function attack(boss, combat, player) {
 export function updateBoss(boss, combat, player, dt, events) {
   if (boss.defeated || combat.health <= 0 || !Number.isFinite(dt) || dt <= 0) return;
   const step = Math.min(dt, 1 / 60);
+  const arena = boss.arena ?? ARENA;
   updateDialogue(boss.dialogue, step);
   if (boss.age === 0) sayBoss(boss.dialogue, 'entrance', events);
   boss.age += step; boss.timer = Math.max(0, boss.timer - step);
   boss.grace = Math.max(0, boss.grace - step);
   moveCore(boss, player, step);
-  const phase = ARENA.phases[boss.phase];
+  const phase = arena.phases[boss.phase];
   if (boss.mode === 'intro') {
     if (boss.timer === 0) warn(boss, player, events);
   } else if (boss.mode === 'warning') {
@@ -155,10 +161,10 @@ export function updateBoss(boss, combat, player, dt, events) {
     }
   } else if (boss.mode === 'returning') {
     // Recovery time starts after arrival, not while the core is out of reach.
-    if (Math.abs(boss.x - ARENA.boss.x) < 8 && Math.abs(boss.y - ARENA.boss.y) < 8) {
-      boss.x = ARENA.boss.x; boss.y = ARENA.boss.y;
+    if (Math.abs(boss.x - arena.boss.x) < 8 && Math.abs(boss.y - arena.boss.y) < 8) {
+      boss.x = arena.boss.x; boss.y = arena.boss.y;
       boss.vx = 0; boss.vy = 0;
-      boss.mode = 'exposed'; boss.timer = Math.max(5, ARENA.boss.vulnerableDuration);
+      boss.mode = 'exposed'; boss.timer = Math.max(5, arena.boss.vulnerableDuration);
       events.push({ type: 'bossExposed', duration: boss.timer });
       sayBoss(boss.dialogue, 'exposed', events);
     }
@@ -175,6 +181,7 @@ export function updateBoss(boss, combat, player, dt, events) {
 // from the right arena platform. Shielded shots are consumed without damage.
 export function hitBoss(boss, combat, events, party = null, solids = []) {
   if (boss.defeated || combat.health <= 0) return;
+  const arena = boss.arena ?? ARENA;
   // Player shots retain priority. Melee is evaluated against actual core bounds,
   // never against the AI's predicted recovery target or decorative artwork.
   const attacks = party ? activePartyAttacks(party).filter(strike => {
@@ -189,7 +196,7 @@ export function hitBoss(boss, combat, events, party = null, solids = []) {
   for (const shot of [...combat.shots, ...attacks]) {
     if (shot.life <= 0 || shot.owner !== 'player' || !overlaps(shot, boss)) continue;
     shot.life = 0;
-    if (boss.mode !== 'exposed' || boss.grace > 0) continue;
+    if (boss.objectivesLocked || boss.mode !== 'exposed' || boss.grace > 0) continue;
     const damage = shot.helper ? Math.min(shot.damage, supportAllowance(boss)) : shot.damage;
     if (damage <= 0) continue;
     if (shot.melee && !claimPartyHit(party, shot, 'boss-core')) continue;
@@ -198,7 +205,7 @@ export function hitBoss(boss, combat, events, party = null, solids = []) {
       boss.helperDamage += damage;
       boss.helperWindowDamage += damage;
     }
-    boss.grace = ARENA.boss.damageGrace;
+    boss.grace = arena.boss.damageGrace;
     boss.recoil = .28;
     // Keep the recovery target stationary; artwork still shows hit recoil.
     boss.vx = 0;
@@ -210,15 +217,15 @@ export function hitBoss(boss, combat, events, party = null, solids = []) {
       boss.defeatTime = 0;
       boss.zones = []; combat.shots = []; combat.enemies = [];
       boss.vx = 0; boss.vy = 0; boss.windup = 0; boss.attackPulse = 0;
-      events.push({ type: 'bossDefeated', name: ARENA.name, points: 3000 });
+      events.push({ type: 'bossDefeated', name: arena.name, points: 3000 });
       sayBoss(boss.dialogue, 'defeat', events);
       return;
     }
     const nextPhase = phaseFor(boss);
     if (nextPhase !== boss.phase) {
-      boss.phase = nextPhase; boss.mode = 'intro'; boss.timer = ARENA.boss.introDuration;
+      boss.phase = nextPhase; boss.mode = 'intro'; boss.timer = arena.boss.introDuration;
       boss.zones = []; clearThreats(combat);
-      events.push({ type: 'bossPhase', phase: nextPhase, name: ARENA.phases[nextPhase].name });
+      events.push({ type: 'bossPhase', phase: nextPhase, name: arena.phases[nextPhase].name });
       sayBoss(boss.dialogue, nextPhase === 1 ? 'phase1' : 'phase2', events);
       break;
     }

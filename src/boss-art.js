@@ -72,11 +72,12 @@ export function drawBossWarnings(c, boss) {
     label(c, zone.active ? 'DANGER' : 'MOVE!', zone.x + zone.w / 2, 135, 13, '#ffe1a7');
   }
   if (boss.mode === 'warning') {
-    const tips = ['TOKEN BURST — KEEP MOVING', 'AGENTS INCOMING — AVOID THE MARKED COLUMN', 'ENERGY WAVES — JUMP OR CLIMB'];
+    const tips = { tokens: 'PROJECTILE BURST INCOMING', agents: 'MARKED COLUMN ACTIVATING', waves: 'FLOOR WAVES INCOMING' };
+    const attack = (boss.arena ?? ARENA).phases[boss.phase].attack;
     rect(c, 240, 106, 800, 35, '#35223eee');
-    label(c, tips[boss.phase], 640, 129, 16, '#ffdb95');
+    label(c, tips[attack], 640, 129, 16, '#ffdb95');
   } else if (boss.mode === 'exposed') {
-    label(c, 'CORE EXPOSED — ATTACK WITH YOUR TEAM FROM THE RIGHT PLATFORM!', 640, 128, 16, '#98ffe1');
+    label(c, boss.objectivesLocked ? 'CONTROL SYSTEMS STILL LOCKED' : 'CORE EXPOSED', 640, 128, 16, '#98ffe1');
   }
   c.restore();
 }

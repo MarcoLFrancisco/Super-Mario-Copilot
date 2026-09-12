@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assetManifest } from '../scripts/build-assets.mjs';
-import { createState, setPaused, update, interactionAt, platformsFor } from '../src/campus-engine.js';
-import { LEVEL, PHYSICS } from '../src/campus-level.js';
+import { createState as createOriginalState, setPaused, update } from '../src/engine.js';
+import { CAMPAIGN } from '../src/campaign.js';
+import { interactionFor } from '../src/missions.js';
 import { createOrbit, updateOrbit, setOrbitPaused, reboundVelocity, ballPosition } from '../src/orbit.js';
 import { runTests as runPartyTests } from './party-tests.js';
 
 const step = 1 / 120;
+const LEVEL = CAMPAIGN[0].world;
+const createState = () => createOriginalState('marco', CAMPAIGN[0]);
 
 function jumpHeight(held) {
   const state = createState();
@@ -31,7 +34,7 @@ test('holding jump rises higher than tapping without changing the full jump', ()
 
 test('jumping shortly after leaving an edge uses coyote time', () => {
   const state = createState();
-  state.player.x = 641;
+  state.player.x = LEVEL.mainRoute[0].w + 1;
   for (let frame = 0; frame < 8; frame += 1) update(state, {}, step);
   assert.equal(state.player.grounded, false);
   const events = update(state, { jumpPressed: true, jumpHeld: true }, step);
@@ -41,7 +44,7 @@ test('jumping shortly after leaving an edge uses coyote time', () => {
 
 test('an expired edge grace period cannot be used as an air jump', () => {
   const state = createState();
-  state.player.x = 641;
+  state.player.x = LEVEL.mainRoute[0].w + 1;
   for (let frame = 0; frame < 20; frame += 1) update(state, {}, step);
   const events = update(state, { jumpPressed: true, jumpHeld: true }, step);
   assert.equal(events.some(event => event.type === 'jump'), false);
@@ -72,90 +75,35 @@ test('pausing discards pending actions and freezes simulation', () => {
 
 test('a suggested bridge is non-solid until explicitly accepted nearby', () => {
   const state = createState();
-  const suggestion = LEVEL.suggestions[0];
-  assert.equal(platformsFor(state).includes(suggestion.platform), false);
+  const suggestion = LEVEL.stations[0];
+  assert.equal(state.geometry.platforms.some(platform => platform.id === suggestion.bridge.id), false);
   update(state, { interactPressed: true }, step);
-  assert.equal(state.acceptedSuggestions.size, 0);
+  assert.equal(state.missionProgress.jobs[suggestion.id], undefined);
   state.player.x = suggestion.x;
-  assert.equal(interactionAt(state), suggestion);
+  assert.equal(interactionFor(state), suggestion);
   const events = update(state, { interactPressed: true }, step);
-  assert.equal(events.some(event => event.type === 'suggestion'), true);
-  assert.equal(platformsFor(state).includes(suggestion.platform), true);
+  assert.equal(events.some(event => event.type === 'missionTask'), true);
+  assert.equal(state.geometry.platforms.some(platform => platform.id === suggestion.bridge.id), true);
   const score = state.score;
   update(state, { interactPressed: true }, step);
   assert.equal(state.score, score);
 });
 
-test('bridge approval survives a fall while the boss resets fairly', () => {
+test('bridge approval survives a fall with original character and health restored', () => {
   const state = createState();
-  state.acceptedSuggestions.add(LEVEL.suggestions[0].id);
+  const suggestion = LEVEL.stations[0];
+  state.player.x = suggestion.x;
+  update(state, { interactPressed: true }, step);
   state.checkpointIndex = 3;
-  state.boss.health = 1;
-  state.boss.phase = 'attack';
+  state.combat.health = 1;
   state.player.y = LEVEL.deathY + 10;
   update(state, {}, step);
   assert.equal(state.deaths, 1);
   assert.equal(state.player.x, LEVEL.checkpoints[3].spawn.x);
-  assert.equal(state.boss.health, LEVEL.boss.health);
-  assert.equal(state.boss.phase, 'idle');
-  assert.equal(state.boss.pulses.length, 0);
-  assert.equal(state.acceptedSuggestions.size, 1);
-});
-
-test('the exit remains locked until the Setup Wizard is repaired', () => {
-  const state = createState();
-  Object.assign(state.player, { x: LEVEL.goal.x, y: LEVEL.goal.y + 60 });
-  update(state, {}, step);
-  assert.equal(state.status, 'playing');
-  state.boss.health = 0;
-  state.boss.phase = 'defeated';
-  const events = update(state, {}, step);
-  assert.equal(state.status, 'complete');
-  assert.equal(events.some(event => event.type === 'complete'), true);
-});
-
-test('the boss telegraphs before attacking and exposes a restart switch afterward', () => {
-  const state = createState();
-  state.player.x = LEVEL.boss.arenaX;
-  update(state, {}, step);
-  assert.equal(state.boss.phase, 'telegraph');
-  assert.equal(state.boss.pulses.length, 0);
-  for (let frame = 0; frame < 170; frame += 1) update(state, {}, step);
-  assert.equal(state.boss.phase, 'attack');
-  assert.ok(state.boss.pulses.length > 0);
-  state.player.x = LEVEL.boss.x + 300;
-  for (let frame = 0; frame < 255; frame += 1) update(state, {}, step);
-  assert.equal(state.boss.phase, 'exposed');
-});
-
-test('only a downward strike on the exposed switch damages the boss and unlocks dash', () => {
-  const state = createState();
-  const prepareStrike = phase => {
-    state.boss.phase = phase;
-    state.boss.timer = 4;
-    Object.assign(state.player, { x: LEVEL.boss.switch.x,
-      y: LEVEL.boss.switch.y - PHYSICS.playerHeight - 1,
-      vy: 250, grounded: false, coyote: 0 });
-  };
-  prepareStrike('telegraph');
-  update(state, {}, step);
-  assert.equal(state.boss.health, 3);
-  assert.equal(state.abilities.dash, false);
-  for (let strike = 0; strike < 3; strike += 1) {
-    prepareStrike('exposed');
-    update(state, {}, step);
-  }
-  assert.equal(state.boss.health, 0);
-  assert.equal(state.boss.phase, 'defeated');
-  assert.equal(state.abilities.dash, true);
-  assert.equal(update(state, { boostPressed: true }, step).some(event => event.type === 'boost'), true);
-});
-
-test('dash is story-gated but a replay can retain its unlock', () => {
-  const locked = createState();
-  assert.equal(update(locked, { boostPressed: true }, step).some(event => event.type === 'boost'), false);
-  const replay = createState({ dashUnlocked: true });
-  assert.equal(update(replay, { boostPressed: true }, step).some(event => event.type === 'boost'), true);
+  assert.equal(state.combat.health, 3);
+  assert.equal(state.party.leader, 'marco');
+  assert.equal(state.missionProgress.jobs[suggestion.id].status, 'complete');
+  assert.equal(state.geometry.platforms.some(platform => platform.id === suggestion.bridge.id), true);
 });
 
 test('Orbit rebounds follow shield contact position without horizontal trajectories', () => {
@@ -265,43 +213,6 @@ test('Orbit restores boss resources, completes all waves, and freezes while paus
   state.bricks.forEach(brick => { brick.hp = 0; });
   updateOrbit(state, {}, step);
   assert.equal(state.status, 'complete');
-});
-
-test('every required Campus connection is reachable without approvals or dash', () => {
-  const connections = Array.from({ length: 11 }, (_, index) => [index, index + 1]);
-  connections.push([11, 22], [22, 23], [23, 24]);
-  for (const [sourceIndex, targetIndex] of connections) {
-    const source = LEVEL.platforms[sourceIndex];
-    const target = LEVEL.platforms[targetIndex];
-    let reachable = false;
-    for (let launchX = source.x + 12; launchX <= source.x + source.w - PHYSICS.playerWidth; launchX += 12) {
-      if (launchX + 360 < target.x) continue;
-      const state = createState();
-      Object.assign(state.player, { x: launchX, y: source.y - PHYSICS.playerHeight, vx: PHYSICS.speed });
-      for (let frame = 0; frame < 150; frame += 1) {
-        update(state, { right: true, jumpHeld: true, jumpPressed: frame === 0 }, step);
-        if (state.deaths > 0) break;
-        if (state.player.grounded && frame > 0) {
-          reachable = Math.abs(state.player.y + PHYSICS.playerHeight - target.y) < .01
-            && state.player.x + PHYSICS.playerWidth > target.x && state.player.x < target.x + target.w;
-          break;
-        }
-      }
-      if (reachable) break;
-    }
-    assert.ok(reachable, `${source.id} must connect to ${target.id}`);
-  }
-});
-
-test('the Wizard restart switch can be reached by jumping from its final platform', () => {
-  const state = createState();
-  state.boss.phase = 'exposed'; state.boss.timer = 8;
-  Object.assign(state.player, { x: LEVEL.boss.switch.x, y: 405 - PHYSICS.playerHeight });
-  for (let frame = 0; frame < 100; frame += 1) {
-    update(state, { jumpPressed: frame === 0, jumpHeld: true }, step);
-  }
-  assert.equal(state.boss.health, 2);
-  assert.equal(state.deaths, 0);
 });
 
 test('Orbit retries rebuild the selected sector with a fair recovery reserve', () => {

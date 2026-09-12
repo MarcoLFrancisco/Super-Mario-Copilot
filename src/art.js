@@ -7,6 +7,8 @@ import { drawBackground, drawPlatform } from './scenery.js';
 import { ARENA } from './encounters.js';
 import { drawEnemy, drawProjectile, drawPowerup } from './enemy-art.js';
 import { drawArena, drawBossWarnings, drawBoss } from './boss-art.js';
+import { drawWorldBackground, drawWorldPlatform, drawMissionObjects, drawCampaignBoss } from './world-art.js';
+import { missionReady } from './missions.js';
 
 function drawCombatScene(ctx, state, reducedMotion, visible) {
   const { combat, blocks, player } = state;
@@ -50,7 +52,8 @@ function drawCombatScene(ctx, state, reducedMotion, visible) {
   }
   if (state.stage === 'boss') {
     drawBossWarnings(ctx, state.boss);
-    drawBoss(ctx, state.boss, reducedMotion);
+    if (state.mission.id) drawCampaignBoss(ctx, state.boss, state.mission, reducedMotion);
+    else drawBoss(ctx, state.boss, reducedMotion);
   }
   for (const enemy of combat.enemies) {
     if (visible(enemy.x, enemy.w)) drawEnemy(ctx, enemy, reducedMotion);
@@ -94,13 +97,18 @@ function drawCombatScene(ctx, state, reducedMotion, visible) {
 
 // Transient visuals stay outside simulation state and reset with each run.
 const visuals = new WeakMap();
-function renderUpgrade(ctx, state, reducedMotion) {
+function renderUpgrade(ctx, state, reducedMotion, options) {
+  const world = state.world ?? LEVEL;
+  const campaign = Boolean(state.mission?.id);
   let effects = visuals.get(state);
   if (!effects) {
-    effects = { seen: new Set(state.collected), pickups: [] };
+    effects = { seen: new Set(state.collected), pickups: [], health: state.combat.health,
+      deaths: state.deaths, impactAt: -1 };
     visuals.set(state, effects);
   }
-  for (const item of LEVEL.sparks) {
+  if (state.combat.health < effects.health || state.deaths > effects.deaths) effects.impactAt = state.time;
+  effects.health = state.combat.health; effects.deaths = state.deaths;
+  for (const item of world.sparks) {
     if (state.collected.has(item.id) && !effects.seen.has(item.id)) {
       effects.seen.add(item.id);
       effects.pickups.push({ item, startedAt: state.time });
@@ -121,19 +129,26 @@ function renderUpgrade(ctx, state, reducedMotion) {
   ctx.save();
   try {
     ctx.setTransform(ctx.canvas.width / VIEW.width, 0, 0, ctx.canvas.height / VIEW.height, 0, 0);
-    if (arena) drawArena(ctx, state.time, reducedMotion);
+    if (!reducedMotion && state.time - effects.impactAt < .2) {
+      ctx.translate(Math.sin(state.time * 110) * (options.shake ?? 0) * 4, 0);
+    }
+    if (campaign) drawWorldBackground(ctx, state.mission, camera, state.time, reducedMotion, arena);
+    else if (arena) drawArena(ctx, state.time, reducedMotion);
     else drawBackground(ctx, camera, zoneAt(state.player.x), state.time, reducedMotion);
     ctx.translate(-camera, 0);
-    for (const platform of arena ? ARENA.platforms : LEVEL.platforms) {
-      if (visible(platform.x, platform.w)) drawPlatform(ctx, platform, state.time, reducedMotion);
+    for (const platform of arena ? (state.arena ?? ARENA).platforms : (state.geometry ?? world).platforms) {
+      if (!visible(platform.x, platform.w)) continue;
+      if (campaign) drawWorldPlatform(ctx, platform, state.mission, state.time, reducedMotion, options.highContrast);
+      else drawPlatform(ctx, platform, state.time, reducedMotion);
     }
+    if (campaign) drawMissionObjects(ctx, state, visible);
     if (!arena) {
-    for (const item of LEVEL.sparks) {
+    for (const item of world.sparks) {
       if (visible(item.x) && !state.collected.has(item.id)) {
         drawCollectible(ctx, item, state.time, reducedMotion);
       }
     }
-    for (const hazard of LEVEL.hazards) {
+    for (const hazard of world.hazards) {
       if (!visible(hazard.x, hazard.w)) continue;
       rect(hazard.x, hazard.y, hazard.w, hazard.h, '#641c49');
       rect(hazard.x, hazard.y, hazard.w, 3, '#ff9eb9');
@@ -142,7 +157,7 @@ function renderUpgrade(ctx, state, reducedMotion) {
       }
       label('!', hazard.x + hazard.w / 2 - 3, hazard.y + 22, 15);
     }
-    LEVEL.checkpoints.forEach((checkpoint, index) => {
+    world.checkpoints.forEach((checkpoint, index) => {
       if (!visible(checkpoint.x)) return;
       const active = index <= state.checkpointIndex;
       rect(checkpoint.x - 3, checkpoint.y - 91, 6, 91, '#345375');
@@ -151,10 +166,10 @@ function renderUpgrade(ctx, state, reducedMotion) {
       label(active ? '✓' : 'C', checkpoint.x + 13, checkpoint.y - 71, 16);
       rect(checkpoint.x - 10, checkpoint.y - 5, 20, 5, '#e4f7ff');
     });
-    for (const sign of LEVEL.signs) {
+    for (const sign of world.signs) {
       if (visible(sign.x, 350)) label(sign.text, sign.x, sign.y);
     }
-    const goal = LEVEL.goal;
+    const goal = world.goal;
     if (visible(goal.x, goal.w)) {
       rect(goal.x, goal.y, 7, goal.h, '#566bad');
       rect(goal.x + goal.w - 7, goal.y, 7, goal.h, '#566bad');
@@ -164,7 +179,7 @@ function renderUpgrade(ctx, state, reducedMotion) {
       rect(goal.x, goal.y + goal.h - 9, goal.w, 9, '#ecf7ff');
       drawCollectible(ctx, { x: goal.x + goal.w / 2, y: goal.y + 48,
         radius: 23, app: 'copilot', secret: false }, state.time, reducedMotion);
-      label('AI CORE', goal.x + 9, goal.y - 15, 12);
+      label(campaign && !missionReady(state) ? 'TASKS PENDING' : 'BOSS GATE', goal.x + 9, goal.y - 15, 12);
     }
     }
     drawCombatScene(ctx, state, reducedMotion, visible);
@@ -190,7 +205,7 @@ function renderUpgrade(ctx, state, reducedMotion) {
     }
     // Balloons use logical screen coordinates and restore the camera transform.
     // Only present actors can speak; boss captions retain visual priority.
-    if (!state.boss?.dialogue.current) {
+    if (!campaign && !state.boss?.dialogue.current) {
       drawPartyBubble(ctx, state.partyDialogue.current, visibleParty(state.party), camera);
     }
   } finally {
@@ -201,8 +216,8 @@ function renderUpgrade(ctx, state, reducedMotion) {
 // Renderer contract: player {x,y,vx,facing,boostTime}, cameraX,
 // collected Set of spark IDs, checkpointIndex, time (seconds), status.
 // Rendering never changes simulation state. Coordinates remain 1280 × 720.
-export function render(ctx, state, reducedMotion = false) {
-  return renderUpgrade(ctx, state, reducedMotion);
+export function render(ctx, state, reducedMotion = false, options = {}) {
+  return renderUpgrade(ctx, state, reducedMotion, options);
 }
 
 // Legacy renderer retained temporarily; it is not called by the application.

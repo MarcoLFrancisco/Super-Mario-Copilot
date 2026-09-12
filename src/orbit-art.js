@@ -1,5 +1,5 @@
 import { ORBIT, ballPosition, reboundVelocity } from './orbit.js';
-import { drawCharacter, drawSparq } from './bit.js';
+import { drawPartyActor } from './party-art.js';
 
 const colors = ['#e5ba55', '#df897a', '#67c9b6', '#79b9d5'];
 
@@ -29,8 +29,8 @@ function drawSaucer(ctx, state, reducedMotion) {
   ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#b7ebed22'; ctx.strokeStyle = '#bfe8e1'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.ellipse(paddle.x, hullY - 2, 39, 48, 0, Math.PI, Math.PI * 2); ctx.fill(); ctx.stroke();
-  drawCharacter(ctx, { x: paddle.x - 17, y: paddle.y - 10, vx: 0, vy: 0,
-    facing: 1, grounded: true, boostTime: 0 }, state.time, true);
+  drawPartyActor(ctx, { id: state.pilot ?? 'marco', x: paddle.x - 17, y: paddle.y - 10, vx: 0, vy: 0,
+    facing: 1, grounded: true, boostTime: 0, attack: null }, state.time, true);
   ctx.strokeStyle = '#6cd5c0'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(paddle.x - 17, hullY - 18); ctx.lineTo(paddle.x - 29, hullY - 6); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(paddle.x + 11, hullY - 15); ctx.lineTo(paddle.x + 16, hullY - 6); ctx.stroke();
@@ -50,7 +50,7 @@ function drawSaucer(ctx, state, reducedMotion) {
       ctx.lineTo(paddle.x + side * 32, hullY + 29 + Math.sin(state.time * 15) * 3); ctx.stroke();
     }
   }
-  drawSparq(ctx, paddle.x + 27, hullY - 22, state.time, reducedMotion);
+  rectangle(ctx, paddle.x + 25, hullY - 28, 12, 10, '#99e6d6', 2);
   ctx.restore();
 }
 
@@ -88,7 +88,7 @@ export function renderOrbit(ctx, state, reducedMotion = false, options = {}) {
       rectangle(ctx, brick.x - brick.hp * 4 + health * 8, brick.y - 2, 5, 4, '#254d51', 1);
     }
     if (brick.kind === 'core') {
-      ctx.textAlign = 'center'; label(ctx, armorRemaining ? 'FIREWALL' : 'RESTORE', brick.x, brick.y + 21, 10, '#204748');
+      ctx.textAlign = 'center'; label(ctx, armorRemaining ? state.finale ? 'MONOLITH' : 'FIREWALL' : 'RESTORE', brick.x, brick.y + 21, 10, '#204748');
       ctx.textAlign = 'left';
     }
   }

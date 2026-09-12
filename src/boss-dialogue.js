@@ -57,8 +57,8 @@ const MOOD = Object.freeze({
   exposed: 'worried', hit: 'hurt', phase1: 'angry', phase2: 'angry', defeat: 'defeated'
 });
 
-export function createDialogue() {
-  return { current: null, cooldown: 0, sequence: 0,
+export function createDialogue(overrides = {}) {
+  return { lines: { ...BOSS_LINES, ...overrides }, current: null, cooldown: 0, sequence: 0,
     next: Object.fromEntries(Object.keys(BOSS_LINES).map(key => [key, 0])),
     usedOnce: [] };
 }
@@ -83,7 +83,7 @@ export function sayBoss(dialogue, key, events = []) {
   const current = dialogue.current;
   if (current && priority <= current.priority) return null;
   if (dialogue.cooldown > 0 && priority < 2) return null;
-  const choices = BOSS_LINES[key];
+  const choices = (dialogue.lines ?? BOSS_LINES)[key];
   const index = dialogue.next[key] % choices.length;
   const text = choices[index];
   const duration = Math.max(2.6, Math.min(4.5, 1.4 + text.length * .055));
