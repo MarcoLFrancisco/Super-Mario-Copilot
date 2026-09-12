@@ -8,7 +8,8 @@ import { CHARACTERS, companionIds } from './party.js';
 import { COMBAT } from './encounters.js';
 import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, retryLevel,
   saveCampaign, pauseCampaign, chapterAt } from './campaign.js';
-import { interactionFor, missionStations, stationStatus, missionReady, missionObjective } from './missions.js';
+import { interactionFor, missionStations, stationStatus, missionReady, missionObjective, interact } from './missions.js';
+import { workView } from './work-tasks.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -74,7 +75,6 @@ let orbitPointer = null;
 let lastStation = null;
 let missionMessageUntil = 0;
 let pulsePressed = false;
-let selectedChoice = null;
 let taskStation = null;
 let taskSignature = '';
 let attackPressed = false;
@@ -91,7 +91,8 @@ const keys = new Map();
 const pointers = new Map();
 const orbitMode = () => state.mode === 'orbit';
 const currentMission = () => CAMPAIGN[campaign.levelIndex];
-const playing = () => started && state.status === 'playing' && !el('settings-dialog').open && !el('level-dialog').open;
+const openDialog = () => ['task-dialog','settings-dialog','level-dialog'].map(el).find(dialog => dialog.open);
+const playing = () => started && state.status === 'playing' && !openDialog();
 const finished = () => state.status === 'complete' || state.status === 'failed';
 const announce = message => text('game-announcement', message);
 function say(message, speaker = 'MISSION') {
@@ -143,7 +144,7 @@ function clearInput() {
   keys.clear(); pointers.clear(); jumpPressed = false; boostPressed = false;
   interactPressed = false; agentPressed = null; orbitPointer = null;
   attackPressed = false; helperPressed = false; fireUntil = 0;
-  pulsePressed = false; selectedChoice = null;
+  pulsePressed = false;
 }
 function press(action) {
   if (!orbitMode() && state.boss?.defeated || el('task-dialog').open) return;
@@ -156,8 +157,8 @@ function press(action) {
     if (orbitMode()) jumpPressed = true;
     else {
       const station = interactionFor(state);
-      if (station?.choices && stationStatus(state, station) !== 'Rollback required') openTask(station);
-      else interactPressed = true;
+      if (station?.workflow) openTask(station);
+      else { say(missionObjective(state).summary); missionMessageUntil = state.time + 6; }
     }
   }
   if (action === 'pulse' && campaign.unlocked >= 2) pulsePressed = true;
@@ -175,6 +176,27 @@ function resize() {
     canvas.width = width * density; canvas.height = VIEW.height * density;
   }
   canvas.style.aspectRatio = `${width} / ${VIEW.height}`;
+}
+
+function playfieldBounds() {
+  const bounds = canvas.getBoundingClientRect();
+  const scale = Math.min(bounds.width / VIEW.width, bounds.height / VIEW.height);
+  return { scale, left: bounds.left + (bounds.width - VIEW.width * scale) / 2,
+    top: bounds.top + (bounds.height - VIEW.height * scale) / 2 };
+}
+
+function positionWorkstation(station) {
+  const button = el('interact-button');
+  const stage = el('game-viewport').getBoundingClientRect();
+  const bounds = playfieldBounds();
+  const x = orbitMode() ? state.paddle.x : station.x - (state.stage === 'boss' ? 0 : state.cameraX);
+  const y = orbitMode() ? state.paddle.y - 85 : station.y - 150;
+  const halfWidth = button.offsetWidth / 2;
+  const left = Math.max(halfWidth + 12, Math.min(stage.width - halfWidth - 12, bounds.left - stage.left + x * bounds.scale));
+  const hudBottom = el('game-controls').getBoundingClientRect().bottom - stage.top;
+  const minimum = Math.min(stage.height - 56, hudBottom + button.offsetHeight + 6);
+  const top = Math.max(minimum, Math.min(stage.height - 56, bounds.top - stage.top + y * bounds.scale));
+  button.style.left = `${left}px`; button.style.top = `${top}px`;
 }
 function hud() {
   const orbit = orbitMode();
@@ -196,19 +218,19 @@ function hud() {
   text('boost-label', orbit ? 'Compute' : 'Copilot boost');
   text('boost-value', orbit ? `${Math.floor(state.compute)} / 100`
     : state.player.boostCooldown > 0 ? `${state.player.boostCooldown.toFixed(1)}s` : 'Ready');
-  const localStatus = !request ? '' : status.startsWith('Blocked:')
-    ? `${request.label ?? request.title} blocked. ` : status === 'Ready' ? '' : `${request.title}: ${status}. `;
   text('mission-objective', orbit ? state.phase === 'ready' ? 'Core latched' : state.finale
     ? 'Restore the Monolith command interface' : mission.boss
     : state.stage === 'boss' && !state.boss.objectivesLocked
       ? `${state.arena.phases[state.boss.phase].name}: ${state.boss.mode}`
-      : `${localStatus}${objective.summary}`);
+      : objective.summary);
   text('chapter-name', orbit ? state.finale ? 'Final command' : ORBIT.waves[state.wave]
     : state.stage === 'boss' ? mission.boss : chapterAt(mission, state.player.x).name);
-  el('interact-button').disabled = !active || (orbit ? state.phase !== 'ready'
-    : !request || status === 'Complete' || Boolean(state.missionProgress.jobs[request.id]) && !['idle','rollback'].includes(state.missionProgress.jobs[request.id].status));
-  text('interact-label', orbit ? 'Launch core' : status === 'Rollback required' ? 'Roll back'
-    : request?.label ?? 'Interact');
+  el('interact-button').hidden = !active || (orbit ? state.phase !== 'ready' : !request);
+  el('game-viewport').classList.toggle('has-workstation', !el('interact-button').hidden);
+  el('interact-button').disabled = !active;
+  text('interact-label', orbit ? 'Launch core' : status === 'Complete' ? 'View saved result'
+    : status === 'Draft ready for review' ? 'Review AI draft' : `Open ${request?.workflow?.product ?? 'workspace'}`);
+  if (!el('interact-button').hidden) positionWorkstation(request);
   controls.forEach(button => { if (!['interact','patch','query','aegis'].includes(button.dataset.action)) button.disabled = !active; });
   if (!orbit) {
     const helpers = companionIds(state.party);
@@ -254,9 +276,9 @@ function hud() {
       item.append(name, detail); return item;
     }));
   }
-  if (request && request.id !== lastStation && active && status === 'Ready') {
+  if (request && request.id !== lastStation && active) {
     lastStation = request.id;
-    say(request.message ?? `${request.title} is available.`);
+    say(request.workflow?.goal ?? `${request.title} is available.`);
     missionMessageUntil = state.time + 4;
   }
 }
@@ -264,14 +286,14 @@ function panels() {
   const mission = currentMission();
   const orbit = orbitMode();
   el('start-panel').hidden = started;
-  el('pause-panel').hidden = !started || state.status !== 'paused';
+  el('pause-panel').hidden = !started || state.status !== 'paused' || Boolean(openDialog());
   el('complete-panel').hidden = !started || !finished();
   el('pause-button').disabled = !started || finished();
   const pauseLabel = state.status === 'paused' ? 'Resume' : 'Pause';
   el('pause-button').setAttribute('aria-label', pauseLabel); el('pause-button').dataset.tooltip = pauseLabel;
   icon('pause-icon', state.status === 'paused' ? 'play' : 'pause');
   canvas.tabIndex = playing() ? 0 : -1;
-  audio.setStatus(started ? state.status === 'failed' ? 'paused' : state.status : 'idle');
+  audio.setStatus(started ? openDialog() || state.status === 'failed' ? 'paused' : state.status : 'idle');
   audio.setStage(orbit ? 'world' : state.stage, state.boss?.phase ?? 0);
   audio.setTheme(orbit ? 'orbit' : mission.theme);
   document.body.classList.toggle('is-orbit', orbit);
@@ -293,13 +315,28 @@ function panels() {
   text('start-title', mission.title);
   text('game-objective', mission.intro);
   text('start-label', 'Start level');
-  icon('interact-icon', orbit ? 'play' : 'check');
+  icon('interact-icon', orbit ? 'play' : 'folder-open');
   canvas.setAttribute('aria-label', `${mission.title}, level ${mission.number}, ${CHARACTERS[campaign.leader].name}`);
   const bindings = Object.fromEntries(Object.entries(preferences.bindings).map(([action, code]) => [action, keyLabel(code)]));
   text('keyboard-help', orbit
     ? `${bindings.left} and ${bindings.right} move the saucer. Mouse or touch dragging also moves it. ${bindings.jump} launches. ${bindings.patch}, ${bindings.query}, ${bindings.aegis} activate repair, analysis, defense. Escape pauses.`
     : `${bindings.left} and ${bindings.right} move. Hold ${bindings.jump} for a full jump. ${bindings.boost} boosts. ${bindings.attack} attacks, ${bindings.fire} fires, ${bindings.helper} commands your recruited team. ${bindings.interact} interacts with terminals. ${bindings.pulse} activates Debug Pulse. Escape pauses.`);
   hud();
+}
+
+function syncPanels() {
+  const dialog = openDialog();
+  el('panel-backdrop').hidden = !dialog;
+  el('game-ui').inert = Boolean(dialog);
+  canvas.inert = Boolean(dialog);
+  el('game-viewport').classList.toggle('panel-open', Boolean(dialog));
+  panels();
+}
+
+function showPanel(id, focusId) {
+  el(id).show();
+  syncPanels();
+  el(focusId).focus({ preventScroll: true });
 }
 function persistCampaign() { writeStorage(campaignKey, saveCampaign(campaign)); }
 function activateRun() {
@@ -352,18 +389,67 @@ function showResults() {
   (won && !campaign.finished ? el('next-level-button') : el('replay-button')).focus({ preventScroll: true });
   announce(won ? `${mission.title} complete.` : 'Flight ended. Retry the current wave.');
 }
-function openTask(station) {
-  if (!playing()) return;
-  clearInput(); taskStation = station;
+
+function renderTable(id, material) {
+  const container = el(id);
+  const title = document.createElement('h3'); title.textContent = material.title;
+  const table = document.createElement('table');
+  const head = document.createElement('thead'); const row = document.createElement('tr');
+  for (const column of material.columns) {
+    const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = column; row.append(cell);
+  }
+  head.append(row); table.append(head);
+  const body = document.createElement('tbody');
+  for (const values of material.rows) {
+    const row = document.createElement('tr');
+    for (const value of values) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }
+    body.append(row);
+  }
+  table.append(body); container.replaceChildren(title, table);
+}
+
+function renderWorkstation(feedback = '') {
+  const station = taskStation;
+  const job = state.missionProgress.jobs[station.id] ?? {};
+  const view = workView(station, job);
+  const complete = view.phase === 'complete';
   text('task-title', station.title);
-  text('task-context', station.message ?? currentMission().subtitle);
-  const choices = station.choices.map(([value, name], index) => {
-    const label = document.createElement('label');
-    const input = document.createElement('input'); input.type = 'radio'; input.name = 'task-choice'; input.value = value; input.checked = index === 0;
-    label.append(input, document.createTextNode(name)); return label;
+  text('task-product', view.task.product);
+  text('task-goal', view.task.goal);
+  text('task-context', view.task.context);
+  icon('task-product-icon', view.task.icon);
+  text('work-phase', complete ? '3 / 3 - Saved' : view.phase === 'request' ? '1 / 3 - Request' : '2 / 3 - Review');
+  text('work-step-title', complete ? 'Deliverable saved' : view.current.title);
+  text('work-step-prompt', complete ? `${view.output.title} is saved. This workstation is complete.` : view.current.prompt);
+  renderTable('work-sources', view.task.sources);
+  el('work-output').hidden = view.phase === 'request';
+  if (view.phase !== 'request') renderTable('work-output', view.output);
+  el('task-dialog').dataset.phase = view.phase;
+  const controls = (view.current?.fields ?? []).map(item => {
+    const label = document.createElement('label'); label.textContent = item.label;
+    const select = document.createElement('select'); select.name = item.id; select.required = true;
+    const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose an option';
+    select.append(placeholder);
+    for (const [value, name] of item.options) {
+      const option = document.createElement('option'); option.value = value; option.textContent = name; select.append(option);
+    }
+    label.append(select); return label;
   });
-  el('task-choices').replaceChildren(...choices);
-  el('task-dialog').showModal(); el('task-confirm').focus();
+  el('task-choices').replaceChildren(...controls);
+  text('task-feedback', feedback || job.feedback || '');
+  el('task-feedback').hidden = !el('task-feedback').textContent;
+  el('task-confirm').hidden = complete;
+  text('task-confirm-label', view.current?.command ?? 'Saved');
+  text('task-close-label', complete ? 'Return to level' : 'Continue later');
+  el('task-done').hidden = !complete;
+  el('task-cancel').hidden = complete;
+}
+
+function openTask(station) {
+  if (!playing() || !station.workflow) return;
+  cancelSpeech(); clearInput(); taskStation = station;
+  renderWorkstation();
+  showPanel('task-dialog', 'task-title');
 }
 function openMap() {
   if (playing()) pause(true, false);
@@ -385,7 +471,7 @@ function openMap() {
     return button;
   });
   el('level-list').replaceChildren(...rows);
-  el('level-dialog').showModal(); el('close-levels').focus();
+  showPanel('level-dialog', 'close-levels');
 }
 function savePreferences() { writeStorage('mission-copilot-preferences-v1', preferences); }
 function audioControls() {
@@ -450,7 +536,7 @@ el('reset-bindings').addEventListener('click', () => {
 });
 el('settings-button').addEventListener('click', () => {
   if (playing()) pause(true, false);
-  clearInput(); el('settings-dialog').showModal(); el('close-settings').focus();
+  clearInput(); showPanel('settings-dialog', 'close-settings');
 });
 el('close-settings').addEventListener('click', () => el('settings-dialog').close());
 el('fullscreen-button').addEventListener('click', async () => {
@@ -466,7 +552,7 @@ document.addEventListener('fullscreenchange', () => {
   resize();
 });
 el('settings-dialog').addEventListener('close', () => {
-  panels(); (started && state.status === 'paused' ? el('resume-button') : el('settings-button')).focus({ preventScroll: true });
+  syncPanels(); (started && state.status === 'paused' ? el('resume-button') : el('settings-button')).focus({ preventScroll: true });
 });
 for (const [id, name] of [['reduced-motion', 'reducedMotion'], ['high-contrast', 'highContrast'], ['subtitles', 'subtitles']]) {
   el(id).checked = preferences[name];
@@ -507,18 +593,38 @@ el('levels-button').addEventListener('click', openMap);
 el('results-map-button').addEventListener('click', openMap);
 el('close-levels').addEventListener('click', () => el('level-dialog').close());
 el('level-dialog').addEventListener('close', () => {
+  syncPanels();
   if (state.status === 'paused') el('resume-button').focus({ preventScroll: true });
 });
-el('task-cancel').addEventListener('click', () => el('task-dialog').close());
+for (const id of ['task-cancel','task-done','close-workspace']) el(id).addEventListener('click', () => el('task-dialog').close());
 el('task-form').addEventListener('submit', event => {
   event.preventDefault();
-  if (!taskStation || orbitMode() || interactionFor(state)?.id !== taskStation.id) return;
-  const choice = new FormData(el('task-form')).get('task-choice');
-  el('task-dialog').close();
-  selectedChoice = typeof choice === 'string' ? choice : null;
+  if (!taskStation || orbitMode()) return;
+  if (interactionFor(state)?.id !== taskStation.id) {
+    text('task-feedback', 'This workstation is no longer in range. Return to the marked terminal.');
+    el('task-feedback').hidden = false; el('task-feedback').focus(); return;
+  }
+  const job = state.missionProgress.jobs[taskStation.id] ?? {};
+  const phase = workView(taskStation, job).phase;
+  const answers = Object.fromEntries(new FormData(el('task-form')));
+  const events = [];
+  const accepted = interact(state, { phase, answers }, events);
+  processEvents(events);
+  if (accepted) {
+    renderWorkstation();
+    el('work-phase').focus({ preventScroll: true });
+    el('work-scroll').scrollTop = 0;
+    if (el('task-dialog').dataset.phase === 'complete') el('work-output').scrollIntoView({ block: 'start' });
+  } else {
+    text('task-feedback', events.at(-1)?.text ?? 'Review the required fields.');
+    el('task-feedback').hidden = false;
+    el('task-feedback').focus();
+  }
+  hud();
 });
 el('task-dialog').addEventListener('close', () => {
-  taskStation = null; keys.clear(); pointers.clear(); canvas.focus({ preventScroll: true });
+  taskStation = null; clearInput(); previous = 0; syncPanels();
+  (state.status === 'paused' ? el('resume-button') : canvas).focus({ preventScroll: true });
 });
 el('character-select').addEventListener('change', () => {
   if (started) return;
@@ -533,7 +639,21 @@ el('pause-button').addEventListener('click', event => {
   pointerPauseIntent = null; pause(value);
 });
 window.addEventListener('keydown', event => {
-  if (el('settings-dialog').open || el('level-dialog').open || el('task-dialog').open) return;
+  const dialog = openDialog();
+  if (dialog) {
+    if (event.code === 'Escape') { event.preventDefault(); dialog.close(); }
+    if (event.code === 'Tab') {
+      const focusable = [...dialog.querySelectorAll('button,select,input,[tabindex="0"]')]
+        .filter(node => !node.disabled && node.getClientRects().length);
+      const first = focusable[0]; const last = focusable.at(-1);
+      if (first && event.shiftKey && (document.activeElement === first || !focusable.includes(document.activeElement))) {
+        event.preventDefault(); last.focus();
+      } else if (last && !event.shiftKey && (document.activeElement === last || !focusable.includes(document.activeElement))) {
+        event.preventDefault(); first.focus();
+      }
+    }
+    return;
+  }
   if (event.code === 'Escape' && started && !finished()) {
     event.preventDefault(); if (!event.repeat) pause(state.status !== 'paused'); return;
   }
@@ -548,7 +668,7 @@ canvas.addEventListener('blur', event => {
   if (playing() && !el('task-dialog').open && !event.relatedTarget?.closest('[data-action]')) pause(true, false);
 });
 function pointSaucer(event) {
-  const bounds = canvas.getBoundingClientRect(); orbitPointer = (event.clientX - bounds.left) / bounds.width * state.width;
+  const bounds = playfieldBounds(); orbitPointer = (event.clientX - bounds.left) / bounds.scale;
 }
 canvas.addEventListener('pointerdown', event => {
   if (!playing() || event.button !== 0) return;
@@ -556,6 +676,15 @@ canvas.addEventListener('pointerdown', event => {
   if (orbitMode()) {
     canvas.setPointerCapture(event.pointerId); pointSaucer(event);
     if (state.phase === 'ready') jumpPressed = true;
+  } else {
+    const bounds = playfieldBounds();
+    const x = (event.clientX - bounds.left) / bounds.scale + (state.stage === 'boss' ? 0 : state.cameraX);
+    const y = (event.clientY - bounds.top) / bounds.scale;
+    const station = missionStations(state).find(item => Math.abs(item.x - x) < 70 && y > item.y - 130 && y < item.y + 20);
+    if (station) {
+      if (interactionFor(state)?.id === station.id) openTask(station);
+      else { say(`${station.title}: workstation out of reach. ${missionObjective(state).summary}`); missionMessageUntil = state.time + 6; }
+    }
   }
 });
 canvas.addEventListener('pointermove', event => {
@@ -564,6 +693,7 @@ canvas.addEventListener('pointermove', event => {
 controls.forEach(button => {
   button.addEventListener('pointerdown', event => {
     if (!playing() || button.disabled || event.button !== 0) return;
+    if (button.dataset.action === 'interact') { event.preventDefault(); return; }
     event.preventDefault(); button.setPointerCapture(event.pointerId);
     pointers.set(event.pointerId, button.dataset.action); press(button.dataset.action);
   });
@@ -571,7 +701,7 @@ controls.forEach(button => {
     button.addEventListener(name, event => { pointers.delete(event.pointerId); });
   }
   button.addEventListener('click', event => {
-    if (event.detail === 0 && playing() && !button.disabled) press(button.dataset.action);
+    if ((event.detail === 0 || button.dataset.action === 'interact') && playing() && !button.disabled) press(button.dataset.action);
   });
 });
 window.addEventListener('blur', () => {
@@ -594,11 +724,11 @@ function processEvents(events) {
     if (event.type === 'missionTask') persistCampaign();
     if (event.type === 'checkpoint') { say(`${event.name} checkpoint online.`); persistCampaign(); }
     if (event.type === 'respawn') { clearInput(); say(`Back at ${event.name}. Your team and completed tasks are safe.`); }
-    if (event.type === 'bossEnter') { clearInput(); taskSignature = ''; say(`${currentMission().boss}. Control systems must be restored before attacking.`); missionMessageUntil = state.time + 5; }
+    if (event.type === 'bossEnter') { clearInput(); taskSignature = ''; say(`${currentMission().boss}. The reviewed deliverables await your final handoff at the marked desk.`); missionMessageUntil = state.time + 5; }
     if (event.type === 'damage') announce(`${event.health} health remaining.`);
     if (event.type === 'helperUnlocked') { say(`${event.name} has joined the team.`, 'TEAM'); persistCampaign(); }
     if (event.type === 'partyRecover') announce(`${CHARACTERS[event.character].name} regrouped.`);
-    if (event.type === 'bossExposed') announce(state.boss.objectivesLocked ? 'Restore the control systems first.' : 'Core exposed.');
+    if (event.type === 'bossExposed') announce(state.boss.objectivesLocked ? 'Save the reviewed handoff first.' : 'Core exposed.');
     if (event.type === 'bossDefeated') { clearInput(); say(`${currentMission().boss} is stabilizing.`); }
     if (event.type === 'agent') say({ patch: 'Recovery net restored.', query: 'Priority targets marked.', aegis: 'Missile defense active.' }[event.name], 'TEAM');
     if (event.type === 'recovery') say('Recovery charge used. The core is back on your shield.');
@@ -617,13 +747,13 @@ function frame(now) {
     const held = new Set([...keys.values(), ...pointers.values()]);
     const input = { left: held.has('left'), right: held.has('right'), jumpHeld: held.has('jump'),
       jumpPressed, boostPressed, interactPressed, agentPressed, pointerX: orbitPointer,
-      fire: held.has('fire') || now < fireUntil, attackPressed, helperPressed, pulsePressed, choice: selectedChoice };
-    const slow = el('task-dialog').open ? .12 : held.has('focus') && campaign.unlocked >= 6 ? .5 : 1;
+      fire: held.has('fire') || now < fireUntil, attackPressed, helperPressed, pulsePressed };
+    const slow = held.has('focus') && campaign.unlocked >= 6 ? .5 : 1;
     const events = updateCampaign(campaign, input, dt * slow);
     state = campaign.run;
     audio.setStage(orbitMode() ? 'world' : state.stage, state.boss?.phase ?? 0);
     jumpPressed = false; boostPressed = false; interactPressed = false; agentPressed = null;
-    attackPressed = false; helperPressed = false; pulsePressed = false; selectedChoice = null; processEvents(events);
+    attackPressed = false; helperPressed = false; pulsePressed = false; processEvents(events);
   }
   const reduced = preferences.reducedMotion || motion.matches;
   syncQuestDialogue();

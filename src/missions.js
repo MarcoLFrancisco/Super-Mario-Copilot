@@ -1,4 +1,5 @@
 import { PHYSICS } from './level.js';
+import { submitWork } from './work-tasks.js';
 
 export function createMissionProgress() {
   return { jobs: {}, resources: new Set(), rewardedTasks: new Set(), module: 'speed', pulse: 0, pulseCooldown: 0, focused: 0,
@@ -48,7 +49,8 @@ export function missionObjective(state) {
   const resource = next?.resource && !state.missionProgress.resources.has(next.resource)
     ? state.world.resources?.find(item => item.key === next.resource) : null;
   const target = resource ? { ...resource, title: resource.label } : next;
-  const heading = `${completed} / ${required.length} required tasks complete.`;
+  const heading = required.some(station => station.workflow)
+    ? `${completed} / ${required.length} deliverables saved.` : `${completed} / ${required.length} required tasks complete.`;
   if (!target) return { completed, total: required.length, target: null,
     summary: `${heading} ${state.stage === 'boss' ? 'Control systems restored.' : 'Boss gate open.'}` };
   const horizontal = target.x - state.player.x - PHYSICS.playerWidth / 2;
@@ -71,6 +73,7 @@ function dependencyLabels(state, missing) {
 export function stationStatus(state, station) {
   const job = progressFor(state, station);
   if (job.status === 'complete') return 'Complete';
+  if (station.workflow) return job.status === 'review' ? 'Draft ready for review' : 'Ready';
   if (job.status === 'rollback') return 'Rollback required';
   const missing = dependenciesFor(state, station);
   if (missing.length) return `Blocked: ${dependencyLabels(state, missing).join(', ')}`;
@@ -112,9 +115,21 @@ function complete(state, station, events) {
 
 export function interact(state, choice, events) {
   const station = interactionFor(state);
-  if (!station) return false;
+  if (!station) {
+    message(state, 'No workstation in range. Follow the next objective marker.', events);
+    return false;
+  }
   const job = state.missionProgress.jobs[station.id] ??= { status: 'idle', remaining: station.duration ?? 0 };
-  if (job.status === 'complete' || job.status === 'working' || job.status === 'queued') return false;
+  if (station.workflow) {
+    const outcome = submitWork(station, job, choice);
+    if (outcome.complete) complete(state, station, events);
+    message(state, outcome.message, events);
+    return outcome.accepted;
+  }
+  if (job.status === 'complete' || job.status === 'working' || job.status === 'queued') {
+    message(state, `${station.title}: ${stationStatus(state, station)}.`, events);
+    return false;
+  }
   if (job.status === 'rollback') {
     complete(state, station, events);
     message(state, 'Previous version restored. The deployment is contained; the corrected result can proceed.', events);

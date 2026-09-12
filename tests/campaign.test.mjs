@@ -7,6 +7,7 @@ import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel,
 import { createBoss } from '../src/boss.js';
 import { worldMusicStep } from '../src/music.js';
 import { interact, updateMission, missionReady, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
+import { WORK_TASKS, submitWork, workView } from '../src/work-tasks.js';
 
 test('the original engine accepts a mission without changing the selected character', () => {
   const world = { ...LEVEL, width: 2000, spawn: { x: 180, y: 564 }, sparks: [], hazards: [],
@@ -49,106 +50,131 @@ function atStation(state, key) {
   return station;
 }
 
-test('blocked terminals name the missing task and its chapter before and after interaction', () => {
-  const state = createState('marco', CAMPAIGN[0]);
-  const tower = atStation(state, 'tower');
-  assert.equal(stationStatus(state, tower), 'Blocked: Innovation Lab');
-  const events = [];
-  assert.equal(interact(state, null, events), false);
-  assert.equal(events.at(-1).text, 'Open tower blocked: Innovation Lab incomplete.');
-  assert.equal(state.missionProgress.jobs[tower.id].status, 'idle');
-  const lab = atStation(state, 'restore');
-  assert.equal(stationStatus(state, lab), 'Blocked: Lab power link (Keyboard Gardens)');
-  assert.equal(interact(state, null, events), false);
-  assert.match(events.at(-1).text, /Lab power link \(Keyboard Gardens\)/);
-  assert.equal(state.score, 0);
+function finishWork(state, key, events = []) {
+  const station = atStation(state, key);
+  for (const phase of ['request', 'review']) {
+    const answers = Object.fromEntries(station.workflow[phase].fields.map(item => [item.id, item.answer]));
+    assert.equal(interact(state, { phase, answers }, events), true);
+  }
+  return station;
+}
+
+test('the workbook task uses Work IQ context, checks discounts, and produces a corrected workbook artifact', () => {
+  const station = { workflow: WORK_TASKS.campus.find(task => task.key === 'workbook') };
+  const job = {};
+  assert.equal(submitWork(station, job, { phase: 'review', answers: {} }).accepted, false);
+  assert.equal(submitWork(station, job, { phase: 'request', answers: { scope: 'approved', formula: 'net' } }).accepted, true);
+  assert.equal(workView(station, job).phase, 'review');
+  assert.equal(submitWork(station, job, { phase: 'review', answers: { total: 'gross' } }).accepted, false);
+  assert.equal(job.artifact, undefined);
+  const result = submitWork(station, job, { phase: 'review', answers: { total: 'sum' } });
+  assert.equal(result.complete, true);
+  assert.equal(job.artifact.title, 'Regional-sales.xlsx');
+  assert.deepEqual(job.artifact.rows.at(-1), ['Grand total', '1360']);
 });
 
-test('pair construction reports remaining time, nearby waiting, and unambiguous completion', () => {
-  const state = createState('marco', CAMPAIGN[0]);
-  const station = atStation(state, 'pair');
-  assert.equal(stationLabel(state, station), 'Lab power link (Keyboard Gardens)');
-  const events = [];
-  interact(state, null, events);
-  assert.equal(stationStatus(state, station), 'Building together: 2.5s remaining');
-  updateMission(state, {}, .5, events);
-  assert.equal(stationStatus(state, station), 'Building together: 2.0s remaining');
-  state.player.x = 0;
-  updateMission(state, {}, 1, events);
-  assert.equal(stationStatus(state, station), 'Waiting for you: 2.0s remaining');
-  atStation(state, 'pair');
-  updateMission(state, {}, 2, events);
-  assert.equal(stationStatus(state, station), 'Complete');
-  assert.ok(events.some(event => event.type === 'missionMessage' && event.text === 'Lab power link complete.'));
+test('Cowork inbox review requires the urgent invoice and retains unsent drafts', () => {
+  const station = { workflow: WORK_TASKS.cowork[0] };
+  const job = {};
+  submitWork(station, job, { phase: 'request', answers: { scope: 'drafts' } });
+  const rejected = submitWork(station, job, { phase: 'review', answers: { invoice: 'today', sending: 'send' } });
+  assert.equal(rejected.accepted, false);
+  assert.match(rejected.message, /not sending/);
+  assert.equal(submitWork(station, job, { phase: 'review', answers: { invoice: 'today', sending: 'hold' } }).complete, true);
+  assert.deepEqual(job.artifact.rows.at(-1), ['Drafts', '2 prepared; 0 sent; 0 deleted']);
 });
 
-test('the end gate identifies the next required task and its direction without counting the optional bridge', () => {
+test('all workplace examples provide evidence, actionable feedback, and a reviewable deliverable', () => {
+  for (const tasks of Object.values(WORK_TASKS)) for (const task of tasks) {
+    const job = {};
+    assert.ok(task.product && task.goal && task.sources.rows.length && task.result.rows.length);
+    for (const phase of ['request','review']) {
+      const step = task[phase];
+      assert.ok(step.fields.length > 0);
+      for (const item of step.fields) assert.ok(item.options.some(([key]) => key === item.answer) && item.hint);
+      const result = submitWork({ workflow: task }, job, { phase,
+        answers: Object.fromEntries(step.fields.map(item => [item.id, item.answer])) });
+      assert.equal(result.accepted, true, `${task.key}: ${phase}`);
+      if (phase === 'review') assert.equal(result.complete, true);
+    }
+  }
+});
+
+test('each workstation can be completed independently without an unrelated prerequisite switch', () => {
+  for (const mission of CAMPAIGN.filter(item => item.type === 'platform')) {
+    for (const station of mission.world.stations) {
+      const state = createState('marco', mission);
+      assert.equal(stationStatus(state, station), 'Ready');
+      assert.equal(station.requires, undefined);
+      assert.equal(station.duration, undefined);
+      finishWork(state, station.key);
+      assert.equal(stationStatus(state, station), 'Complete');
+      assert.equal(state.missionProgress.jobs[station.id].artifact.title, station.workflow.result.title);
+    }
+  }
+});
+
+test('level-two draft, repeated submission, completion, and out-of-range inputs provide immediate feedback', () => {
+  const state = createState('marco', CAMPAIGN[1]);
+  const station = atStation(state, 'fix');
+  const events = [];
+  const request = { phase: 'request', answers: { scope: 'counter' } };
+  assert.equal(interact(state, request, events), true);
+  assert.equal(stationStatus(state, station), 'Draft ready for review');
+  assert.equal(interact(state, request, events), false);
+  assert.match(events.at(-1).text, /Current step: Review before keeping/);
+  assert.equal(interact(state, { phase: 'review', answers: { tests: 'all' } }, events), true);
+  const score = state.score;
+  assert.equal(interact(state, null, events), false);
+  assert.match(events.at(-1).text, /Issue-42.patch is already saved/);
+  assert.equal(state.score, score);
+  state.player.x = -500;
+  assert.equal(interact(state, null, events), false);
+  assert.match(events.at(-1).text, /No workstation in range/);
+});
+
+test('drafts do not count as saved deliverables or open the end gate', () => {
   const state = createState('marco', CAMPAIGN[0]);
-  atStation(state, 'suggestion'); interact(state, null, []);
   state.player.x = state.world.goal.x;
   let objective = missionObjective(state);
-  assert.equal(objective.summary, '0 / 3 required tasks complete. Next: Lab power link (Keyboard Gardens), left.');
-  const pair = atStation(state, 'pair'); interact(state, null, []);
-  updateMission(state, {}, pair.duration, []);
+  assert.equal(objective.summary, '0 / 3 deliverables saved. Next: Write the launch brief (Campus Courtyard), left.');
+  atStation(state, 'brief');
+  interact(state, { phase: 'request', answers: { context: 'latest' } }, []);
+  assert.equal(missionObjective(state).completed, 0);
+  assert.equal(missionReady(state), false);
+  interact(state, { phase: 'review', answers: { date: 'target' } }, []);
   state.player.x = state.world.goal.x;
   objective = missionObjective(state);
   assert.equal(objective.completed, 1);
-  assert.equal(objective.target.key, 'restore');
+  assert.equal(objective.target.key, 'workbook');
   assert.equal(objective.direction, 'left');
-  atStation(state, 'restore'); interact(state, null, []);
-  state.player.x = state.world.goal.x;
-  assert.equal(missionObjective(state).summary, '2 / 3 required tasks complete. Next: Tower uplink (Tower Ascent), left.');
-  atStation(state, 'tower'); interact(state, null, []);
-  assert.equal(missionObjective(state).summary, '3 / 3 required tasks complete. Boss gate open.');
-  assert.equal(missionReady(state), true);
+  finishWork(state, 'workbook'); finishWork(state, 'deck');
+  assert.equal(missionObjective(state).summary, '3 / 3 deliverables saved. Boss gate open.');
 });
 
-test('guidance targets a missing context record before the waiting construction terminal', () => {
-  const state = createState('marco', CAMPAIGN[2]);
-  atStation(state, 'plan'); interact(state, 'bounded', []);
-  atStation(state, 'build'); interact(state, null, []);
-  const objective = missionObjective(state);
-  assert.equal(objective.target.title, 'Roof access record');
-  assert.equal(objective.direction, 'right');
-  assert.match(objective.summary, /Roof access record \(Context Archives\)/);
+test('the source, draft, and saved artifact remain distinct while a task is reviewed', () => {
+  const state = createState('marco', CAMPAIGN[0]);
+  const station = atStation(state, 'workbook');
+  const source = JSON.stringify(station.workflow);
+  interact(state, { phase: 'request', answers: { scope: 'approved', formula: 'net' } }, []);
+  state.player.x = 0;
+  updateMission(state, {}, 20, []);
+  assert.equal(stationStatus(state, station), 'Draft ready for review');
+  atStation(state, 'workbook');
+  interact(state, { phase: 'review', answers: { total: 'sum' } }, []);
+  state.missionProgress.jobs[station.id].artifact.rows[0][1] = 'local-copy';
+  assert.equal(JSON.stringify(station.workflow), source);
+  assert.match(stationLabel(state, station), /Create the sales workbook/);
 });
 
-test('pair work waits nearby, delegated work resumes only when context arrives', () => {
-  const campus = createState('marco', CAMPAIGN[0]);
-  const station = atStation(campus, 'pair'); interact(campus, null, []);
-  campus.player.x = 0;
-  for (let tick = 0; tick < 40; tick += 1) updateMission(campus, {}, .1, []);
-  assert.equal(campus.missionProgress.jobs[station.id].remaining, station.duration);
-  atStation(campus, 'pair');
-  for (let tick = 0; tick < 30; tick += 1) updateMission(campus, {}, .1, []);
-  assert.equal(campus.missionProgress.jobs[station.id].status, 'complete');
-  const cowork = createState('marco', CAMPAIGN[2]);
-  atStation(cowork, 'plan'); assert.equal(interact(cowork, 'expand', []), false);
-  interact(cowork, 'bounded', []);
-  const build = atStation(cowork, 'build'); interact(cowork, null, []);
-  for (let tick = 0; tick < 60; tick += 1) updateMission(cowork, {}, .1, []);
-  assert.equal(cowork.missionProgress.jobs[build.id].status, 'queued');
-  cowork.missionProgress.resources.add('context');
-  for (let tick = 0; tick < 60; tick += 1) updateMission(cowork, {}, .1, []);
-  assert.equal(cowork.missionProgress.jobs[build.id].status, 'complete');
-});
-
-test('evaluation failures are safe and deployment requires an explicit rollback', () => {
+test('a bad rollout is not approved merely because the AI draft recommends scaling', () => {
   const state = createState('marco', CAMPAIGN[3]);
-  atStation(state, 'module'); interact(state, 'speed', []);
-  const evaluation = atStation(state, 'evaluate');
-  assert.equal(interact(state, 'speed', []), false);
-  assert.notEqual(state.missionProgress.jobs[evaluation.id].status, 'complete');
-  interact(state, 'reasoning', []);
-  const trial = atStation(state, 'trial'); interact(state, null, []);
-  for (let tick = 0; tick < 40; tick += 1) updateMission(state, {}, .1, []);
-  assert.equal(state.missionProgress.jobs[trial.id].status, 'rollback');
-  const final = atStation(state, 'deploy');
-  assert.equal(interact(state, null, []), false);
-  atStation(state, 'trial'); interact(state, null, []);
-  atStation(state, 'deploy'); interact(state, null, []);
-  assert.equal(state.missionProgress.jobs[final.id].status, 'complete');
-  assert.equal(missionReady(state), true);
+  const station = atStation(state, 'rollout');
+  interact(state, { phase: 'request', answers: { gate: 'inspect' } }, []);
+  assert.equal(interact(state, { phase: 'review', answers: { recovery: 'continue' } }, []), false);
+  assert.equal(state.missionProgress.jobs[station.id].artifact, undefined);
+  assert.equal(interact(state, { phase: 'review', answers: { recovery: 'rollback' } }, []), true);
+  assert.deepEqual(state.missionProgress.jobs[station.id].artifact.rows[0], ['v1','100%','Known-good service restored']);
 });
 
 test('campaign progression carries the original leader, recruits, and equipment through all eight levels', () => {
@@ -220,13 +246,13 @@ test('arena task retries restore progress fairly without farming score', () => {
   state.player.x = state.world.goal.x; state.player.y = state.world.goal.y + state.world.goal.h - PHYSICS.playerHeight;
   update(state, {}, 1 / 60);
   assert.equal(state.stage, 'boss');
-  const station = atStation(state, 'restart'); interact(state, null, []);
+  const station = finishWork(state, 'handoff');
   const score = state.score;
   state.player.y = 900;
   update(state, {}, 1 / 60);
   assert.equal(state.missionProgress.jobs[station.id], undefined);
   assert.equal(state.boss.health, state.boss.maxHealth);
-  atStation(state, 'restart'); interact(state, null, []);
+  finishWork(state, 'handoff');
   assert.equal(state.score, score);
 });
 
@@ -267,19 +293,15 @@ test('world objectives and boss control sequences complete through their real in
     const state = createState('marco', mission);
     for (const resource of mission.world.resources) state.missionProgress.resources.add(resource.key);
     for (const station of state.world.stations) {
-      atStation(state, station.key);
-      assert.equal(interact(state, station.answer ?? station.choices?.[0][0], []), true, `${mission.id}: ${station.key}`);
-      for (let tick = 0; tick < 120; tick += 1) updateMission(state, {}, .1, []);
-      if (state.missionProgress.jobs[station.id].status === 'rollback') interact(state, null, []);
+      finishWork(state, station.key);
       assert.equal(state.missionProgress.jobs[station.id].status, 'complete');
     }
     assert.equal(missionReady(state), true);
     state.stage = 'boss'; state.boss = createBoss(state.arena);
     for (const station of state.arena.stations) {
-      atStation(state, station.key);
-      assert.equal(interact(state, station.answer ?? station.choices?.[0][0], []), true, `${mission.id} boss: ${station.key}`);
-      for (let tick = 0; tick < 100; tick += 1) updateMission(state, {}, .1, []);
+      finishWork(state, station.key);
     }
+    updateMission(state, {}, .1, []);
     assert.equal(missionReady(state), true);
     assert.equal(state.boss.objectivesLocked, false);
   }

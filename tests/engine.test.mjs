@@ -73,27 +73,29 @@ test('pausing discards pending actions and freezes simulation', () => {
   assert.equal(update(state, {}, step).some(event => event.type === 'jump'), false);
 });
 
-test('a suggested bridge is non-solid until explicitly accepted nearby', () => {
+test('workstation submissions require proximity and a reviewed deliverable', () => {
   const state = createState();
-  const suggestion = LEVEL.stations[0];
-  assert.equal(state.geometry.platforms.some(platform => platform.id === suggestion.bridge.id), false);
+  const station = LEVEL.stations[0];
   update(state, { interactPressed: true }, step);
-  assert.equal(state.missionProgress.jobs[suggestion.id], undefined);
-  state.player.x = suggestion.x;
-  assert.equal(interactionFor(state), suggestion);
-  const events = update(state, { interactPressed: true }, step);
+  assert.equal(state.missionProgress.jobs[station.id], undefined);
+  state.player.x = station.x;
+  assert.equal(interactionFor(state), station);
+  update(state, { choice: { phase: 'request', answers: { context: 'latest' } } }, step);
+  assert.equal(state.missionProgress.jobs[station.id].status, 'review');
+  const events = update(state, { choice: { phase: 'review', answers: { date: 'target' } } }, step);
   assert.equal(events.some(event => event.type === 'missionTask'), true);
-  assert.equal(state.geometry.platforms.some(platform => platform.id === suggestion.bridge.id), true);
+  assert.equal(state.missionProgress.jobs[station.id].status, 'complete');
   const score = state.score;
   update(state, { interactPressed: true }, step);
   assert.equal(state.score, score);
 });
 
-test('bridge approval survives a fall with original character and health restored', () => {
+test('reviewed work survives a fall with original character and health restored', () => {
   const state = createState();
-  const suggestion = LEVEL.stations[0];
-  state.player.x = suggestion.x;
-  update(state, { interactPressed: true }, step);
+  const station = LEVEL.stations[0];
+  state.player.x = station.x;
+  update(state, { choice: { phase: 'request', answers: { context: 'latest' } } }, step);
+  update(state, { choice: { phase: 'review', answers: { date: 'target' } } }, step);
   state.checkpointIndex = 3;
   state.combat.health = 1;
   state.player.y = LEVEL.deathY + 10;
@@ -102,8 +104,8 @@ test('bridge approval survives a fall with original character and health restore
   assert.equal(state.player.x, LEVEL.checkpoints[3].spawn.x);
   assert.equal(state.combat.health, 3);
   assert.equal(state.party.leader, 'marco');
-  assert.equal(state.missionProgress.jobs[suggestion.id].status, 'complete');
-  assert.equal(state.geometry.platforms.some(platform => platform.id === suggestion.bridge.id), true);
+  assert.equal(state.missionProgress.jobs[station.id].status, 'complete');
+  assert.equal(state.missionProgress.jobs[station.id].artifact.title, 'Launch-brief.docx');
 });
 
 test('Orbit rebounds follow shield contact position without horizontal trajectories', () => {

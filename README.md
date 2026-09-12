@@ -8,53 +8,94 @@ There are no replacement protagonists or separate Campus/Team Quest/Orbit modes.
 The playfield uses the available page width, up to 1600 pixels, without a
 viewport-height width cap. A full-screen control is available. The original
 character art, attacks, recruitment, and independent companion AI are reused.
+All game controls, task workspaces, progress, captions, preferences, and the
+level map stay inside the game frame, including in full screen. The rendered
+playfield remains 16:9; portrait phones get a taller surrounding frame so task
+documents and controls remain usable without shrinking the scene's width.
 
 ## The Campaign
 
 | Level | World | Playable Theme | Boss |
 | --- | --- | --- | --- |
-| 1 | Copilot Campus | Optional suggestion bridge, pair construction, lab restoration, glass architecture and keyboard platforms | The Setup Wizard |
-| 2 | GitHub Copilot | Branching routes, delegated repair, load tests, bridge inspection, repository trees | The Merge Monster |
-| 3 | Cowork Central | Bounded plans, missing context, queued construction, approval, oversized bookshelves | The Scope Creep |
-| 4 | AI Foundry | Module choice, safe evaluation, staged deployment, rollback, conveyors and lifts | The Unstable Deployment |
-| 5 | Agent City | Dependent team assignments, signed evidence, scoped permissions, transit networks | The Infinite Planner |
-| 6 | Teams Tower | Shared objective, recovered decision, synchronized elevators, three audio systems | The Meeting Overlord |
+| 1 | Copilot Campus | A Word launch brief, an Excel workbook using Work IQ context, and a customer deck | The Setup Wizard |
+| 2 | GitHub Copilot | Fix an active-user counter, test a CSV exporter, and review a coding-agent PR | The Merge Monster |
+| 3 | Cowork Central | Triage six emails, protect calendar focus time, and prepare a meeting packet | The Scope Creep |
+| 4 | AI Foundry | Ground a policy answer, compare evaluations, and review a failed pilot rollout | The Unstable Deployment |
+| 5 | Agent City | Route an invoice for approval, enforce access boundaries, and coordinate a report | The Infinite Planner |
+| 6 | Teams Tower | Correct a meeting summary, assign agreed actions, and review a channel follow-up | The Meeting Overlord |
 | 7 | Azure Orbit | Five brick-breaking waves, portals, power-ups, resource-limited team support, selected character in the saucer | The Orbital Firewall |
-| 8 | The Intelligence Core | Combined environments, multi-step repair, low gravity, command systems, final saucer phase | Doctor Null and the Legacy Monolith |
+| 8 | The Intelligence Core | Reconcile conflicting evidence, align a briefing pack, approve its handoff, and complete the saucer finale | Doctor Null and the Legacy Monolith |
 
 Each platform world has its own route, four named chapter checkpoints, secret
 platforms, app collectibles, original combat encounters, mission terminals,
 boss objectives, artwork, dialogue, and musical arrangement. Main routes allow
 return visits without spending resources or relying on optional upgrades.
 
-Complete the required world tasks to enter its boss arena. Restore the arena's
-control systems, then attack during exposed windows. Finishing a level unlocks
-the next one and shows **Next: [world name]**. **Levels** opens the campaign map;
+Save all three deliverables to enter a platform world's boss arena. Review the
+final internal handoff at the arena desk, then attack during exposed windows.
+Finishing a level unlocks the next one and shows **Next: [world name]**.
+The **Level map** control opens the campaign map;
 unlocked worlds can be replayed. Azure Orbit is level seven, not a simulator.
 The final world transitions from the platform encounter into a saucer finale.
 
+### Completing A Workstation
+
+Each platform world has **three independent workstations**. There are no hidden
+prerequisite switches, waiting timers, or required pickups for these tasks.
+
+1. Approach a desk with a product label. Press **E**, click its monitor, or use
+	the **Open [product]** button floating above it.
+2. Read the goal and source evidence. Choose the request's context, scope, or
+	calculation, then use the product-specific command to generate a draft.
+3. Review the draft against the sources. Correct the discrepancy and save the
+	reviewed result. An incorrect or empty choice produces specific feedback
+	inside the workspace and does not award task credit.
+
+The header shows **Request**, **Review**, or **Saved**. The world stays paused
+while a workspace is open. **Continue later** retains a generated draft for the
+current run; **View saved result** reopens a completed deliverable. On a small
+screen, the workspace scrolls internally while its header and action bar stay
+inside the game frame. Only **Saved** tasks count toward **3 / 3**.
+
 ### Clearing Copilot Campus
 
-The counter tracks **three required tasks**, not collected items. The courtyard
-bridge is optional and does not change that count. Complete the tasks in order:
+Complete these in any order:
 
-1. **Lab power link**, near the **Keyboard Gardens checkpoint**: approach the
-	terminal, press **E** or **Build together** once, and stay nearby for **2.5
-	seconds** of active gameplay. Leaving pauses construction; returning resumes
-	it. Wait for **Complete**.
-2. **Innovation Lab**, near the checkpoint of the same name: press **E** or
-	**Restore lab**. This requires the completed power link.
-3. **Tower uplink**, in **Tower Ascent**: press **E** or **Open tower**. This
-	requires the restored lab.
+1. **Write the launch brief**: use the latest project plan and Teams decision.
+	The date is a target subject to legal approval, not a confirmed promise.
+2. **Create the sales workbook**: use the approved sales table and calculate
+	quantity times unit price minus discount. North is 600, South is 360, West is
+	400, and the corrected total is **1,360**, not the draft's 1,400.
+3. **Build the customer deck**: use approved customer-facing facts and remove
+	the unsupported savings claim.
 
-At **3 / 3**, the gate at the far right admits you to the Setup Wizard arena.
-If you reached it early, return left to the unfinished terminal rather than
-restarting. In the arena, reach the **Restart switch** on the right platform,
-activate **Restart wizard**, then attack the boss during exposed windows.
+The objective names the next unfinished deliverable, its chapter, and its
+direction. At **3 / 3**, the far-right gate admits you to the Setup Wizard arena.
+Review the handoff at the desk on the right platform, using only the reviewed
+files and internal recipients, before fighting the boss.
 
-Task labels identify missing prerequisites and their chapter. Pair construction
-shows remaining time and whether it is waiting for you. The objective and locked
-gate identify the next unfinished task and its direction.
+### Product Context
+
+The exercises contain fictional emails, project decisions, orders, code, model
+evaluations, and policies. Copilot drafts deliberately include a reviewable
+mistake. Cowork's inbox example classifies all six emails, prioritizes the urgent
+invoice, and keeps two replies as drafts: **zero sent, zero deleted**.
+
+Work IQ supplies permitted work context; it is not presented as a standalone
+spreadsheet generator. The workbook example combines that context with Copilot
+in Excel. Named outputs such as **Regional-sales.xlsx** and **Launch-brief.docx**
+are tables and records in the game's memory, not downloaded Office files or real
+Microsoft actions. No email is accessed, sent, or deleted. No cloud resource or
+repository is changed by completing a task.
+
+Product references:
+
+- [Copilot Cowork: a new way of getting work done](https://www.microsoft.com/en-us/microsoft-365/blog/2026/03/09/copilot-cowork-a-new-way-of-getting-work-done/)
+- [Announcing the new Work IQ APIs](https://www.microsoft.com/en-us/microsoft-365/blog/2026/06/02/announcing-the-new-work-iq-apis/)
+- [Copilot's agentic capabilities in Word, Excel, and PowerPoint](https://www.microsoft.com/en-us/microsoft-365/blog/2026/04/22/copilots-agentic-capabilities-in-word-excel-and-powerpoint-are-generally-available/)
+
+Actual availability, licensing, permissions, and product behavior vary. Fictional
+evaluation results are not model benchmarks or product guarantees.
 
 ## Run Locally
 
@@ -85,10 +126,10 @@ voice provided by your browser or operating system.
 | Melee attack | J or Attack; tap once per attack |
 | Debug Blaster | Hold F or Fire after collecting a blaster |
 | Command recruited companions | K or Helpers; companions also act automatically |
-| Terminal interaction | E or the contextual button below the canvas |
+| Workstation interaction | E, a nearby monitor, or its floating Open / Review / View saved result button |
 | Debug Pulse | Q after GitHub; reveals resource and task markers |
 | Focus Mode | Hold C after Teams to slow the game |
-| Pause/resume | Escape or the header control |
+| Pause/resume | Escape or the in-game toolbar control |
 | Saucer movement | A/D, arrows, mouse movement over the canvas, or touch dragging |
 | Saucer launch/release | Space, Launch core, or a canvas tap |
 | Saucer support | 1: repair net, 2: analyze targets, 3: defend shield |
@@ -97,9 +138,11 @@ Primary bindings can be changed in Preferences. Duplicate assignments are
 rejected. Arrow/W/right-Shift aliases remain unless assigned elsewhere. Touch
 controls use pointer capture and clear held input on release or cancellation.
 
-Mission decisions open a contextual dialog and slow simulation while you choose.
+Workstations open a contained workspace and freeze simulation while you choose.
 Opening Preferences or the level map, changing windows, or hiding the page pauses
-the game. Resume refocuses the canvas. Dialogue captions sit outside the playfield.
+the game. Resume refocuses the canvas. Escape closes an open workspace before
+handling gameplay pause. Dialogue captions and mouse/touch controls remain
+inside the playfield.
 
 ## Team And Recovery
 
@@ -111,13 +154,9 @@ levels. Companions retain the original independent navigation and combat rules.
 Falling or losing all three health points returns you to the current checkpoint.
 World retries retain collected items, used bricks, defeated enemies, completed
 tasks, and recruits. Boss retries restore health and the blaster and reset the
-arena task sequence. Repeating those tasks does not award their points again.
-
-Pair construction runs while you remain at its terminal. Delegated construction
-can run while you explore, but waits for missing dependencies or context. Wrong
-plans and failed evaluations leave the live route unchanged. Failed deployments
-must be explicitly rolled back. Model categories are fictional puzzle mechanics,
-not a representation of actual model availability or product guarantees.
+arena handoff. Repeating it does not award its points again. Drafts and saved
+world deliverables survive checkpoint recovery. Incorrect requests or reviews
+leave the task unfinished and preserve the source evidence.
 
 Orbit provides three recovery charges. Only losing the last ball spends a charge;
 losing one ball during multiball does not. A recovery net saves a missed ball
@@ -135,7 +174,7 @@ services. Compute regenerates during active play and through brick hits.
 
 The campaign save records unlocked/completed levels, selected leader, recruits,
 equipment, and best scores at progression events. A reload restarts the current
-level; exact live checkpoints, task queues, and wave state are not serialized.
+level; exact live checkpoints, drafts, artifacts, and wave state are not serialized.
 Older saves are left intact in their previous storage keys. Blocked storage falls
 back to session-only play. Preferences use their existing save key.
 
@@ -154,19 +193,22 @@ and stylesheet URL in [index.html](index.html); commit that HTML with the source
 The version check prevents mixed cached releases. Startup errors or a 15-second
 stall show a message and **Retry loading**, without deleting saves.
 
-The 57 passing tests cover original movement, all 16 companion regressions,
+The 59 tests cover original movement, all 16 companion regressions,
 every platform world's forward and return route connections, required world and
-boss tasks, safe plan/evaluation failures, queued dependencies, rollback,
-campaign continuity, saves, the final saucer transition, Orbit physics, and
-blocked-task/countdown/next-objective guidance.
+boss tasks, independent workstations, source/draft/artifact isolation, workbook
+totals, inbox scope, failed-pilot review, repeated-submission feedback, once-only
+task rewards, campaign continuity, saves, the final saucer transition, Orbit
+physics, and next-deliverable guidance.
 See [tests/campaign.test.mjs](tests/campaign.test.mjs) and
 [tests/engine.test.mjs](tests/engine.test.mjs).
 
-Browser checks include the large desktop canvas, all eight world renderers,
-the original selected character in Orbit, a real saucer launch and repair action,
-Campus bridge approval, Cowork plan rejection/acceptance, Preferences focus,
-and the eight-level map at desktop and emulated 390x844 phone sizes. Tests that
-start later levels use temporary campaign-save fixtures, restored afterward.
+Browser checks cover actual request/review/save submissions for the level-two
+patch, workbook, and inbox; incorrect-choice feedback; draft reopening; frozen
+gameplay during review; Preferences focus; the eight-level map; full screen;
+and a saucer launch and support action. Desktop and emulated 390x844 phone checks
+verify that controls and dialogs stay inside the game frame. Browser-only
+fixtures place the unchanged original player beside later workstations; these
+fixtures are removed and temporary save changes are restored after checking.
 
 This implementation still needs uninterrupted human campaign playthroughs,
 difficulty and duration tuning, real-device multitouch, broader browser and
@@ -179,6 +221,7 @@ recorded dialogue from the broader concept are not implemented.
 
 - [src/campaign.js](src/campaign.js): eight world definitions, progression, and saves.
 - [src/missions.js](src/missions.js): terminal interactions, dependencies, moving lifts, and objective gates.
+- [src/work-tasks.js](src/work-tasks.js): fictional workplace evidence, two-stage request/review validation, and saved artifacts.
 - [src/engine.js](src/engine.js): original fixed-step platform/combat engine, parameterized per world.
 - [src/world-art.js](src/world-art.js): themed architecture, platforms, terminals, and boss silhouettes.
 - [src/party.js](src/party.js) and [src/party-art.js](src/party-art.js): the original team and character artwork.
