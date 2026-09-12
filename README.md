@@ -1,4 +1,169 @@
-# Copilot Cloud Quest
+# Mission Copilot
+
+A first playable milestone of **Microsoft AI: Mission Copilot**, an unofficial
+adventure starring original characters Bit and Sparq. Doctor Null has frozen the
+campus in an endless approval meeting. Restore access, repair the Setup Wizard,
+and take a flying saucer into the Orbit simulator.
+
+This is a compact playable prototype, **not the full eight-world campaign** in
+the design brief. The AI agents are deterministic game mechanics, not live
+Copilot or Azure integrations. Compute is an in-game resource, not a cloud quota.
+
+## Playable Now
+
+- **Copilot Campus:** courtyard, keyboard gardens, innovation lab, optional upper
+	routes, patrolling enemies, corruption hazards, and four checkpoints.
+- **Assistance with a choice:** two dotted bridge proposals become solid only
+	after nearby approval. Both gaps also have an unassisted recovery route.
+- **Movement:** acceleration, variable-height jumps, coyote time, jump buffering,
+	and a story-unlocked Copilot Dash. Essential routes do not require the dash.
+- **The Setup Wizard:** telegraphed loading rings, three restart-switch strikes,
+	a fair boss checkpoint, and a locked exit until the repair is complete.
+- **Azure Orbit simulator:** five waves, armored blocks, paired portals, moving
+	barriers, telegraphed missiles, and a rotating Orbital Firewall encounter.
+- **A visible pilot:** Bit sits inside the saucer with his backpack connected to
+	the ship; Sparq is beside the controls. Shield contact position controls rebounds.
+- **Agent assignments:** Patch restores a recovery net, Query marks priority
+	targets, and Aegis intercepts missiles. Each has a compute cost and cooldown.
+- **Power-ups:** Wide Shield, Multiball, Magnetic Catch, Debug Laser, Recovery Net.
+- **Preferences:** remappable primary keys, independent music/effects controls,
+	reduced motion, high-contrast markers, subtitles, and zero-default Campus shake.
+
+## Run Locally
+
+Use a current browser with JavaScript modules, Canvas 2D, and Pointer Events.
+Web Audio is optional. From the repository root on macOS/Linux:
+
+```sh
+python3 -m http.server 8000 --bind 127.0.0.1
+```
+
+On Windows with the Python launcher:
+
+```sh
+py -3 -m http.server 8000 --bind 127.0.0.1
+```
+
+Open **http://127.0.0.1:8000/** and select **Begin mission**. If port 8000 is already
+occupied, use another free port. Stop the server with Ctrl+C.
+
+No build, package installation, account, API key, or external service is required
+to play. Browser libraries are bundled locally with their licenses in
+[vendor/README.md](vendor/README.md). Do not open the HTML directly: browser
+module loading requires HTTP. After editing modules, use a hard reload if old
+artwork or behavior remains cached.
+
+## Controls
+
+| Action | Default Input |
+| --- | --- |
+| Move | A/D or Left/Right arrows |
+| Jump | Hold Space, W, or Up; release for a shorter jump |
+| Approve a nearby bridge | E or the contextual Accept bridge button |
+| Copilot Dash | Shift, after completing Campus |
+| Pause/resume | Escape or the header Pause/Resume control |
+| Campus pointer controls | Hold the on-screen arrows and Jump button |
+| Orbit saucer | A/D, arrows, mouse movement over the canvas, or touch dragging |
+| Orbit launch/release | Space, Launch core, or a canvas tap |
+| Orbit agents | 1: Patch, 2: Query, 3: Aegis, or their buttons |
+| Preferences | Sliders icon in the header |
+
+Primary keys can be remapped in Preferences; duplicate assignments are rejected.
+Arrow/W/right-Shift aliases remain available unless explicitly assigned to another
+action. Escape remains the pause key. Keyboard gameplay targets the focused canvas.
+Opening Preferences, changing window focus, or hiding the page pauses the game.
+Resume refocuses the canvas. Touch controls use pointer capture and clear held
+input on release/cancellation.
+
+## Recovery And Progress
+
+Campus falls and enemy contact return Bit to the last checkpoint without removing
+collected cells or approved bridges. Cells cannot be farmed through repeated
+deaths. An unfinished Wizard fight resets to full health on a retry. Completing
+Campus unlocks both Dash and the Orbit simulator, including Dash on later replays.
+
+Orbit begins with three recovery charges. Losing the last ball spends one charge
+and relatches a fresh core; losing one ball during multiball does not spend a
+charge. Recovery nets bounce a missed core without spending a charge. Once no
+charges remain, another last-ball loss ends the flight. Retry sector restarts the
+current wave with full resources; the Firewall wave also restores reserves on entry.
+
+| Agent | Compute | Cooldown | Task |
+| --- | --- | --- | --- |
+| Patch | 30 | 9 seconds | Add one recovery net charge |
+| Query | 20 | 8 seconds | Highlight three priority targets |
+| Aegis | 25 | 10 seconds | Block missile damage for eight seconds |
+
+Compute regenerates during active play and is replenished by brick hits. Agent
+tasks within their assigned role execute immediately, without another approval.
+
+Campus awards Explorer for at least ten secret cells, Debugger for repairing the
+Wizard, and Collaborator for approving both bridges. Badges are optional.
+
+Completion unlocks, best scores, and preferences are saved in local storage.
+Current-run checkpoints, collected cells, and Orbit waves are kept in memory
+only and are not restored after a reload. Blocked storage falls back to a playable
+session-only game. Sound starts off on a fresh profile and needs a user gesture.
+Dialogue is text-only; there is no voice track or dialogue-volume control yet.
+
+## Verification
+
+Node 24 or newer is needed for development tests, not for browser gameplay:
+
+```sh
+npm test
+```
+
+This runs the 25 checks in [tests/engine.test.mjs](tests/engine.test.mjs), using
+Node's built-in test runner with no installation step. The same suite can be run
+with `node --test tests/engine.test.mjs`.
+
+Checks cover jump behavior, edge grace, buffering, pause, approvals, retries,
+each required unassisted route connection, boss-switch reachability, progression,
+Planck collisions, rebound angles, multiball recovery, agent budgets, portals,
+missiles, power-ups, sector checkpoints, and game-over rules.
+
+Browser smoke checks were performed on 2026-09-12 at desktop 1440x900 and emulated
+phone 390x844: startup, nonblank canvas/pilot pixels, horizontal overflow, keyboard
+bridge approval, remapped jumping, conflicting bindings, pointer controls,
+pause/resume focus, independent effects activation, subtitles, Orbit launch, and
+Patch assignment. Orbit checks used a temporary completed-Campus save fixture.
+
+Real-device multitouch, Safari/Firefox, assistive-technology usability, soundtrack
+listening/balance, and uninterrupted human playthroughs still need validation.
+Per-connection reachability tests are not a full human difficulty assessment.
+
+## Next Milestones
+
+The remaining six campaign worlds, the fully restorable Reboot Campus hub,
+command wheel, ladders, collapsing/moving Campus platforms, advanced delegation
+and model-evaluation puzzles, Capability Map, cosmetics, daily challenges, and
+voiced dialogue are not implemented. The full campaign's 12-18 minute level
+targets have not been met or validated by this compact milestone.
+
+## Code Map
+
+- [src/engine.js](src/engine.js): fixed-step Campus simulation and event API.
+- [src/level.js](src/level.js): immutable Campus geometry and mission configuration.
+- [src/orbit.js](src/orbit.js): Planck physics, waves, agents, and recovery rules.
+- [src/art.js](src/art.js), [src/character.js](src/character.js), and
+	[src/orbit-art.js](src/orbit-art.js): procedural world and character artwork.
+- [src/main.js](src/main.js): mode selection, input, focus, preferences, and saves.
+- [src/audio.js](src/audio.js) and [src/music.js](src/music.js): synthesized audio.
+- [index.html](index.html) and [styles.css](styles.css): responsive, accessible UI.
+
+Microsoft and GitHub names remain their owners' trademarks. This fan project is
+not affiliated with or endorsed by either company. Bit, Sparq, and the active
+game artwork are original; no official character sprites or soundtrack recordings
+are used. Preserve the included third-party library licenses when redistributing.
+
+<details>
+<summary>Archived Cloud Quest documentation and merge history</summary>
+
+The following records describe earlier versions and are superseded by the
+instructions and verification status above.
+
+## Copilot Cloud Quest (Archived)
 
 An unofficial Mario browser platformer through Microsoft-themed worlds. Collect Excel sheets, Outlook emails, Teams conversation bubbles, and Copilot ribbon icons across layered landscapes and dimensional platforms. Mario and the app illustrations are custom procedural Canvas artwork, not imported official sprites or icon assets. Mario belongs to Nintendo; Microsoft application names and marks belong to Microsoft. This project is not affiliated with or endorsed by either company.
 
@@ -298,3 +463,5 @@ Files in the approved proposal:
 - README.md
 
 Bumblebee has not run automated tests or verified runtime behavior for this change.
+
+</details>

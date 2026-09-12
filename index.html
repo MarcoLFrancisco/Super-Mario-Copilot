@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#09112b">
-  <meta name="description" content="A fan-made Mario platform adventure through Microsoft-themed worlds. Collect Outlook emails, Excel sheets, Copilot icons, and Teams conversations.">
-  <title>Copilot Cloud Quest</title>
+  <meta name="theme-color" content="#eff3ed">
+  <meta name="description" content="An unofficial Microsoft AI-inspired adventure. Restore Copilot Campus with Bit and Sparq, then take a flying saucer into Azure Orbit.">
+  <title>Mission Copilot</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./src/main.js"></script>
 </head>
@@ -14,145 +15,67 @@
   <main class="app-shell">
     <header class="masthead">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true">✦</span>
-        <div>
-          <p class="eyebrow">A productivity-powered platform adventure</p>
-          <h1>Copilot <span>Cloud Quest</span></h1>
-        </div>
+        <span class="brand-mark" aria-hidden="true"><i data-lucide="circuit-board"></i></span>
+        <div><p class="eyebrow">Microsoft AI / An unofficial adventure</p><h1>Mission <span>Copilot</span></h1></div>
       </div>
       <div class="header-actions">
-        <button id="sound-button" type="button" aria-pressed="false" disabled>Sound: off</button>
-        <button id="pause-button" type="button" aria-controls="pause-panel" disabled>Pause</button>
+        <span class="build-label">BIT + SPARQ <span class="status-dot"></span></span>
+        <button id="sound-button" class="icon-button" type="button" aria-label="Enable sound" aria-pressed="false" data-tooltip="Enable sound" disabled><span id="sound-icon"><i data-lucide="volume-x"></i></span></button>
+        <button id="pause-button" class="icon-button" type="button" aria-label="Pause" data-tooltip="Pause" aria-controls="pause-panel" disabled><span id="pause-icon"><i data-lucide="pause"></i></span></button>
+        <button id="settings-button" class="icon-button" type="button" aria-label="Preferences" data-tooltip="Preferences" aria-haspopup="dialog"><i data-lucide="sliders-horizontal"></i></button>
       </div>
     </header>
-
-    <section class="game-card" aria-labelledby="level-title">
+    <section class="game-shell" id="mission-panel" role="tabpanel" aria-labelledby="campus-tab">
       <header class="level-header">
-        <div>
-          <p class="eyebrow">World 01 · The connected cloud</p>
-          <h2 id="level-title">From Inbox to Infinity</h2>
-        </div>
-        <span class="difficulty-badge">Explore · Collect · Create</span>
+        <div class="mission-heading"><span id="mission-number" class="mission-number">01</span><div><p class="eyebrow" id="world-label">Restore the connection</p><h2 id="level-title">Copilot Campus</h2></div></div>
+        <nav class="mission-tabs" role="tablist" aria-label="Missions">
+          <button id="campus-tab" role="tab" aria-selected="true" aria-controls="mission-panel" type="button"><i data-lucide="trees" aria-hidden="true"></i>Campus</button>
+          <button id="orbit-tab" role="tab" aria-selected="false" aria-controls="mission-panel" tabindex="-1" type="button" disabled title="Restore Campus to unlock Orbit"><i data-lucide="orbit" aria-hidden="true"></i>Orbit<span id="orbit-lock"><i data-lucide="lock-keyhole" aria-hidden="true"></i></span></button>
+        </nav>
       </header>
-
-      <dl class="hud" aria-label="Game statistics">
-        <div class="hud-item"><dt>Score</dt><dd id="score-value">0</dd></div>
-        <div class="hud-item"><dt>App collectibles</dt><dd><span id="sparks-value">0</span> / <span id="sparks-total">—</span></dd></div>
-        <div class="hud-item"><dt>Combo</dt><dd id="combo-value">×1</dd></div>
-        <div class="hud-item"><dt>Checkpoint</dt><dd id="checkpoint-value">Launchpad</dd></div>
-        <div class="hud-item"><dt>Copilot boost</dt><dd id="boost-value">Ready</dd></div>
+      <dl class="hud" aria-label="Mission statistics">
+        <div><dt>Score</dt><dd id="score-value">0</dd></div>
+        <div><dt id="items-label">Energy cells</dt><dd><span id="sparks-value">0</span><span class="stat-divider"> / </span><span id="sparks-total">0</span></dd></div>
+        <div><dt id="combo-label">Combo</dt><dd id="combo-value">x1</dd></div>
+        <div><dt id="checkpoint-label">Checkpoint</dt><dd id="checkpoint-value">Courtyard</dd></div>
+        <div><dt id="boost-label">Copilot Dash</dt><dd id="boost-value">Locked</dd></div>
       </dl>
-
       <div class="game-viewport" id="game-viewport">
-        <canvas id="game-canvas" width="1280" height="720" tabindex="0" aria-label="Copilot Cloud Quest platform game" aria-describedby="keyboard-help game-objective">
-          This game requires a browser with Canvas and JavaScript support. Controls and the game objective are provided below.
-        </canvas>
-
+        <canvas id="game-canvas" width="1280" height="720" tabindex="-1" aria-label="Copilot Campus platform game" aria-describedby="game-objective keyboard-help">Canvas graphics are required to play.</canvas>
         <section class="game-overlay" id="start-panel" aria-labelledby="start-title">
-          <p class="eyebrow">Your next great idea is one jump away</p>
-          <h2 id="start-title">Jump into the connected cloud.</h2>
-          <p id="game-objective">Guide Mario across Excel terraces, Outlook mailways, and Teams skybridges. Collect Excel sheets, Outlook emails, Teams conversations, and Copilot icons. Discover upper routes with double-value collectibles and reach the Copilot beacon.</p>
-          <ul class="feature-pills" aria-label="Adventure features">
-            <li>Handcrafted world</li>
-            <li>Four app collectible types</li>
-            <li>Friendly checkpoints</li>
-          </ul>
-          <button id="start-button" class="primary-button" type="button" disabled>Start adventure</button>
-          <p id="load-status" role="status">Loading the adventure. If Start stays disabled, check that JavaScript is enabled and all game modules are served over HTTP.</p>
+          <p class="eyebrow" id="start-eyebrow">Mission 01 / Reboot Campus</p>
+          <h2 id="start-title">A little help.<br>A giant leap.</h2>
+          <p id="game-objective">Doctor Null has locked the campus in an endless approval meeting. Bit and Sparq have other plans.</p>
+          <button id="start-button" class="primary-button" type="button" disabled><i data-lucide="play" aria-hidden="true"></i><span id="start-label">Begin mission</span></button>
+          <p id="load-status" role="status">Loading mission...</p>
         </section>
-
         <section class="game-overlay" id="pause-panel" aria-labelledby="pause-title" hidden>
-          <p class="eyebrow">Take your time</p>
-          <h2 id="pause-title">Cloud connection paused</h2>
-          <p>Your progress is safe for this session. Ready for another leap?</p>
-          <div class="overlay-actions">
-            <button id="resume-button" class="primary-button" type="button">Resume adventure</button>
-            <button id="restart-button" type="button">Restart level</button>
-          </div>
+          <p class="eyebrow">Holding your place</p><h2 id="pause-title">Mission paused.</h2>
+          <div class="overlay-actions"><button id="resume-button" class="primary-button" type="button"><i data-lucide="play" aria-hidden="true"></i>Resume</button><button id="restart-button" type="button"><i data-lucide="rotate-ccw" aria-hidden="true"></i>Restart mission</button></div>
         </section>
-
         <section class="game-overlay" id="complete-panel" aria-labelledby="complete-title" hidden>
-          <p class="eyebrow">Idea delivered</p>
-          <h2 id="complete-title">You lit the Copilot beacon!</h2>
-          <p id="completion-summary">The cloud is shining a little brighter.</p>
-          <dl class="results">
-            <div><dt>Final score</dt><dd id="final-score">0</dd></div>
-            <div><dt>Items collected</dt><dd id="final-sparks">0</dd></div>
-            <div><dt>Best combo</dt><dd id="final-combo">×1</dd></div>
-          </dl>
-          <button id="replay-button" class="primary-button" type="button">Explore again</button>
+          <p class="eyebrow" id="result-eyebrow">Control restored</p><h2 id="complete-title">Campus, back online.</h2>
+          <p id="completion-summary"></p>
+          <dl class="results"><div><dt>Score</dt><dd id="final-score">0</dd></div><div><dt id="final-items-label">Cells</dt><dd id="final-sparks">0</dd></div><div><dt id="final-combo-label">Best combo</dt><dd id="final-combo">x1</dd></div></dl>
+          <div id="mission-badges" class="badges" aria-label="Mission badges"><span id="badge-explorer"><i data-lucide="compass" aria-hidden="true"></i>Explorer</span><span id="badge-debugger"><i data-lucide="scan-line" aria-hidden="true"></i>Debugger</span><span id="badge-collaborator"><i data-lucide="handshake" aria-hidden="true"></i>Collaborator</span></div>
+          <div class="overlay-actions"><button id="orbit-unlock-button" class="primary-button" type="button"><i data-lucide="orbit" aria-hidden="true"></i>Enter Orbit</button><button id="campus-return-button" type="button" hidden><i data-lucide="arrow-left" aria-hidden="true"></i>Back to Campus</button><button id="replay-button" type="button"><i data-lucide="rotate-ccw" aria-hidden="true"></i><span id="replay-label">Replay mission</span></button></div>
         </section>
       </div>
-
-      <div id="game-controls" class="controls-bar">
-        <p id="keyboard-help"><strong>Move</strong> <kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> <span aria-hidden="true">·</span> <strong>Jump</strong> <kbd>Space</kbd> / <kbd>W</kbd> / <kbd>↑</kbd> <span aria-hidden="true">·</span> <strong>Boost</strong> <kbd>Shift</kbd> <span aria-hidden="true">·</span> <strong>Pause</strong> <kbd>Esc</kbd></p>
-        <div class="touch-controls" id="touch-controls" role="group" aria-label="On-screen game controls">
-          <div class="direction-controls">
-            <button id="move-left" type="button" data-action="left" aria-label="Move left" disabled>←</button>
-            <button id="move-right" type="button" data-action="right" aria-label="Move right" disabled>→</button>
-          </div>
-          <div class="action-controls">
-            <button id="boost-button" type="button" data-action="boost" disabled>Boost</button>
-            <button id="jump-button" type="button" data-action="jump" disabled>Jump</button>
-          </div>
-        </div>
-      </div>
-      <section class="controls-bar" aria-labelledby="audio-title" aria-describedby="audio-status">
-        <h3 id="audio-title">Sound studio</h3>
-        <p id="audio-status" role="status">The new music and effects controls await the next integration step. The header Sound button still controls the existing action tones.</p>
-        <fieldset id="audio-settings" disabled>
-          <legend>Independent music and effects controls</legend>
-          <p>
-            <button id="music-button" type="button" aria-pressed="false">Music: off</button>
-            <label for="music-volume">Music volume</label>
-            <input id="music-volume" type="range" min="0" max="100" step="5" value="45" aria-describedby="music-help">
-          </p>
-          <p id="music-help">Original synthesized platformer music with melody, bass, chords, and percussion. No Nintendo recordings are used.</p>
-          <p>
-            <button id="effects-button" type="button" aria-pressed="false">Effects: off</button>
-            <label for="effects-volume">Effects volume</label>
-            <input id="effects-volume" type="range" min="0" max="100" step="5" value="65" aria-describedby="effects-help">
-          </p>
-          <p id="effects-help">App-specific pickups, jumping, boosts, checkpoint jingles, and a victory fanfare. New audio playback will require user activation.</p>
-        </fieldset>
-      </section>
+      <div class="mission-strip" id="game-controls"><div class="objective"><span class="status-dot"></span><span id="mission-objective">Restore campus access</span><span id="boss-health" hidden></span></div><button id="interact-button" type="button" data-action="interact" disabled><span id="interact-icon"><i data-lucide="check" aria-hidden="true"></i></span><span id="interact-label">Accept bridge</span></button></div>
+      <div class="touch-controls" id="touch-controls" role="group" aria-label="Game controls"><div class="direction-controls"><button type="button" class="icon-button" data-action="left" aria-label="Move left" disabled><i data-lucide="arrow-left"></i></button><button type="button" class="icon-button" data-action="right" aria-label="Move right" disabled><i data-lucide="arrow-right"></i></button></div><div class="action-controls"><button id="boost-button" type="button" class="icon-button" data-action="boost" aria-label="Copilot Dash" disabled><i data-lucide="zap"></i></button><button id="jump-button" type="button" class="icon-button" data-action="jump" aria-label="Jump" disabled><i data-lucide="arrow-up"></i></button></div></div>
+      <div id="agent-controls" class="agent-controls" role="group" aria-label="Agent assignments" hidden><button id="agent-patch" type="button" data-action="patch"><i data-lucide="wrench" aria-hidden="true"></i><span>Patch<small id="patch-status">Ready</small></span></button><button id="agent-query" type="button" data-action="query"><i data-lucide="search" aria-hidden="true"></i><span>Query<small id="query-status">Ready</small></span></button><button id="agent-aegis" type="button" data-action="aegis"><i data-lucide="shield" aria-hidden="true"></i><span>Aegis<small id="aegis-status">Ready</small></span></button></div>
+      <div class="dialogue-strip" id="dialogue-strip"><span class="speaker">SPARQ</span><p id="subtitle">The campus is quiet. A little too quiet.</p></div>
+      <p id="keyboard-help" class="sr-only">Arrow keys or A and D move. Hold Space to jump higher. E accepts a nearby bridge. Shift dashes after unlocking it. Escape pauses. Controls can be remapped in Preferences.</p>
       <p id="game-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
     </section>
-
-    <section class="field-guide" aria-labelledby="guide-title">
-      <div>
-        <p class="eyebrow">Field guide</p>
-        <h2 id="guide-title">A workspace worth exploring</h2>
-      </div>
-      <div class="guide-grid">
-        <article class="guide-card" data-app="excel">
-          <span class="app-token" aria-hidden="true">X</span>
-          <h3>Excel terraces</h3>
-          <p>Collect green Excel sheets above luminous cell platforms. Explore the upper route for double-value sheets marked with a golden ring.</p>
-        </article>
-        <article class="guide-card" data-app="outlook">
-          <span class="app-token" aria-hidden="true">O</span>
-          <h3>Outlook mailways</h3>
-          <p>Collect Outlook email envelopes along the mailways. Activate checkpoint flags to make missed jumps forgiving.</p>
-        </article>
-        <article class="guide-card" data-app="teams">
-          <span class="app-token" aria-hidden="true">T</span>
-          <h3>Teams skybridges</h3>
-          <p>Collect purple Teams conversation bubbles across the meeting skyline. Pick up items quickly to build your combo up to ×8.</p>
-        </article>
-        <article class="guide-card" data-app="copilot">
-          <span class="app-token" aria-hidden="true">✦</span>
-          <h3>Copilot boost</h3>
-          <p>Collect multicolor Copilot ribbon icons on the final stretch. Use Shift for a forward boost and watch the HUD for cooldown readiness.</p>
-        </article>
-      </div>
-    </section>
-
-    <footer class="site-footer">
-      <p>Unofficial fan-made platform adventure featuring custom procedural Mario artwork. Mario belongs to Nintendo. Microsoft application names and marks belong to Microsoft. Not affiliated with or endorsed by either company. App illustrations are not official assets.</p>
-      <p>No sign-in, purchases, or external Microsoft services required.</p>
-    </footer>
+    <footer class="site-footer"><p>Original characters and artwork. Unofficial Microsoft-inspired fan project; not affiliated with or endorsed by Microsoft or GitHub.</p><p id="storage-status">Local progress</p></footer>
   </main>
-  <noscript><p class="noscript-message">Enable JavaScript to play Copilot Cloud Quest. No account is required.</p></noscript>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-header"><div><p class="eyebrow">Make yourself at home</p><h2 id="settings-title">Preferences</h2></div><button id="close-settings" class="icon-button" type="button" aria-label="Close preferences" data-tooltip="Close"><i data-lucide="x"></i></button></div>
+    <fieldset id="audio-settings"><legend>Audio</legend><div class="audio-row"><label class="toggle"><input type="checkbox" id="music-enabled">Music</label><input id="music-volume" aria-label="Music volume" type="range" min="0" max="100" step="5" value="45"><output id="music-output" for="music-volume">45%</output></div><div class="audio-row"><label class="toggle"><input type="checkbox" id="effects-enabled">Effects</label><input id="effects-volume" aria-label="Effects volume" type="range" min="0" max="100" step="5" value="65"><output id="effects-output" for="effects-volume">65%</output></div><p id="audio-status" class="setting-status" role="status">Sound is off.</p></fieldset>
+    <fieldset><legend>Accessibility</legend><div class="access-options"><label class="toggle"><input type="checkbox" id="reduced-motion">Reduced motion</label><label class="toggle"><input type="checkbox" id="high-contrast">High-contrast markers</label><label class="toggle"><input type="checkbox" id="subtitles" checked>Subtitles</label></div><div class="audio-row"><label for="shake-volume">Screen shake</label><input id="shake-volume" type="range" min="0" max="100" step="10" value="0"><output id="shake-output" for="shake-volume">0%</output></div></fieldset>
+    <fieldset><legend>Controls</legend><div id="binding-grid" class="binding-grid"></div><p id="binding-status" class="setting-status" role="status"></p><button id="reset-bindings" type="button"><i data-lucide="rotate-ccw" aria-hidden="true"></i>Reset bindings</button></fieldset>
+  </dialog>
+  <noscript><p class="noscript-message">Enable JavaScript to play Mission Copilot.</p></noscript>
 </body>
 </html>

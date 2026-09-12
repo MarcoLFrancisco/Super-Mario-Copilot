@@ -3,8 +3,8 @@ import { APPS } from './level.js';
 // World-space drawing: caller applies the camera and skips collected IDs.
 // Items retain level.js fields {id,x,y,radius,secret,app}; physics is unchanged.
 export const COLLECTIBLE_NAMES = Object.freeze({
-  outlook: 'Outlook email', excel: 'Excel sheet',
-  copilot: 'Copilot icon', teams: 'Teams conversation'
+  outlook: 'Energy cell', excel: 'Energy cell',
+  copilot: 'Energy cell', teams: 'Energy cell'
 });
 
 function panel(ctx, x, y, w, h, radius, fill, stroke = '#ffffff99') {
@@ -93,9 +93,6 @@ export function drawCollectible(ctx, item, time = 0, reducedMotion = false) {
   ctx.save(); ctx.translate(item.x, item.y + bob);
   const scale = item.radius / 11;
   ctx.scale(scale, scale);
-  const halo = ctx.createRadialGradient(0, 0, 3, 0, 0, 25);
-  halo.addColorStop(0, APPS[app].color + '55'); halo.addColorStop(1, APPS[app].color + '00');
-  ctx.fillStyle = halo; ctx.fillRect(-25, -25, 50, 50);
   if (item.secret) {
     ctx.beginPath(); ctx.ellipse(0, 0, 18, 17, 0, 0, Math.PI * 2);
     ctx.strokeStyle = '#ffe49aaa'; ctx.lineWidth = 1; ctx.stroke();
@@ -103,7 +100,10 @@ export function drawCollectible(ctx, item, time = 0, reducedMotion = false) {
   }
   ctx.rotate(reducedMotion ? 0 : Math.sin(t * 2 + item.x) * .06);
   ctx.shadowColor = '#071d4b88'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;
-  ({ outlook: email, excel: sheet, teams: conversation, copilot })[app](ctx);
+  panel(ctx, -8, -11, 16, 22, 4, '#fff5d2', '#725e29');
+  panel(ctx, -5, -7, 10, 14, 2, APPS[app].color, null);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(-1, -5, 2, 10); ctx.fillRect(-4, -1, 8, 2);
+  ctx.fillStyle = '#725e29'; ctx.fillRect(-3, -13, 6, 2); ctx.fillRect(-3, 11, 6, 2);
   ctx.restore();
 }
 

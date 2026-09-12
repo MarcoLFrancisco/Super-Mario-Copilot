@@ -1,14 +1,72 @@
 import { LEVEL, VIEW, APPS, PHYSICS, zoneAt } from './level.js';
-import { drawCharacter } from './character.js';
+import { drawCharacter, drawSparq } from './character.js';
 import { drawCollectible, drawPickup } from './collectibles.js';
 import { drawBackground, drawPlatform } from './scenery.js';
+import { interactionAt, platformsFor } from './engine.js';
+
+function drawSuggestion(ctx, suggestion, accepted, time, reducedMotion) {
+  const surface = suggestion.platform;
+  ctx.save();
+  if (!accepted) {
+    ctx.setLineDash([9, 7]); ctx.lineWidth = 3; ctx.strokeStyle = '#186f72';
+    ctx.strokeRect(surface.x, surface.y, surface.w, surface.h);
+    ctx.fillStyle = '#167d7510'; ctx.fillRect(surface.x, surface.y, surface.w, surface.h);
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(surface.x + surface.w - 25, surface.y - 14);
+    ctx.lineTo(surface.x + surface.w - 15, surface.y - 20);
+    ctx.lineTo(surface.x + surface.w - 25, surface.y - 26); ctx.stroke();
+  }
+  ctx.fillStyle = '#2e6466'; ctx.fillRect(suggestion.x - 6, suggestion.y - 42, 12, 42);
+  ctx.fillStyle = accepted ? '#b7eed6' : '#fff7d4';
+  ctx.strokeStyle = '#2b6665'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.roundRect(suggestion.x - 22, suggestion.y - 66, 44, 30, 5); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#215553'; ctx.font = "bold 18px 'Trebuchet MS', sans-serif"; ctx.textAlign = 'center';
+  ctx.fillText(accepted ? '+' : '?', suggestion.x, suggestion.y - 44);
+  if (!accepted) drawSparq(ctx, suggestion.x + 42, suggestion.y - 87, time, reducedMotion);
+  ctx.restore();
+}
+
+function drawWizard(ctx, state) {
+  const boss = LEVEL.boss;
+  const exposed = state.boss.phase === 'exposed';
+  const repaired = state.boss.health === 0;
+  ctx.save();
+  ctx.lineWidth = 4; ctx.strokeStyle = '#354d4d';
+  ctx.beginPath(); ctx.moveTo(boss.x + 25, boss.y + 105); ctx.lineTo(boss.x - 80, 590);
+  ctx.moveTo(boss.x + 100, boss.y + 105); ctx.lineTo(boss.x + 190, 590); ctx.stroke();
+  ctx.fillStyle = '#fff3d7'; ctx.beginPath(); ctx.roundRect(boss.x, boss.y, boss.w, boss.h, 12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = repaired ? '#64c8aa' : '#ee8a6e'; ctx.fillRect(boss.x + 12, boss.y + 70, 96, 46);
+  ctx.fillStyle = '#234c51'; ctx.beginPath(); ctx.roundRect(boss.x + 12, boss.y + 12, 96, 43, 6); ctx.fill();
+  ctx.fillStyle = repaired ? '#baffd6' : '#fbeb9e';
+  ctx.fillRect(boss.x + 32, boss.y + 22, 13, 12); ctx.fillRect(boss.x + 74, boss.y + 22, 13, 12);
+  ctx.strokeStyle = exposed ? '#216450' : '#856754';
+  ctx.fillStyle = exposed ? '#8eefba' : '#6e7c76';
+  const target = boss.switch;
+  ctx.beginPath(); ctx.roundRect(target.x, target.y, target.w, target.h, 6); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = exposed ? '#133e35' : '#ffffff'; ctx.textAlign = 'center';
+  ctx.font = "bold 26px 'Trebuchet MS', sans-serif"; ctx.fillText(exposed ? '+' : '-', target.x + target.w / 2, target.y + 33);
+  if (exposed) {
+    ctx.fillStyle = '#244a42'; ctx.font = "bold 13px 'Trebuchet MS', sans-serif";
+    ctx.fillText('RESTART', target.x + target.w / 2, target.y - 12);
+  }
+  for (const pulse of state.boss.pulses) {
+    ctx.strokeStyle = '#8c3548'; ctx.lineWidth = 5; ctx.beginPath();
+    ctx.ellipse(pulse.x + 15, pulse.y + 14, 15, 14, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#fff3d0'; ctx.lineWidth = 2; ctx.stroke();
+  }
+  if (state.boss.phase === 'telegraph') {
+    ctx.setLineDash([12, 9]); ctx.strokeStyle = '#a24d43'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(LEVEL.boss.arenaX, 610); ctx.lineTo(boss.x, 610); ctx.stroke();
+  }
+  ctx.restore();
+}
 
 // Transient visuals stay outside simulation state and reset with each run.
 const visuals = new WeakMap();
-function renderUpgrade(ctx, state, reducedMotion) {
+function renderUpgrade(ctx, state, reducedMotion, options) {
   let effects = visuals.get(state);
   if (!effects) {
-    effects = { seen: new Set(state.collected), pickups: [] };
+    effects = { seen: new Set(state.collected), pickups: [], deaths: state.deaths, hitAt: -1 };
     visuals.set(state, effects);
   }
   for (const item of LEVEL.sparks) {
@@ -18,8 +76,9 @@ function renderUpgrade(ctx, state, reducedMotion) {
     }
   }
   effects.pickups = effects.pickups.filter(effect => state.time - effect.startedAt < .55);
+  if (effects.deaths !== state.deaths) { effects.deaths = state.deaths; effects.hitAt = state.time; }
   const camera = state.cameraX;
-  const visible = (x, width = 50) => x + width > camera - 80 && x < camera + VIEW.width + 80;
+  const visible = (x, width = 50) => x + width > camera - 80 && x < camera + state.viewWidth + 80;
   const rect = (x, y, w, h, color) => {
     ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
   };
@@ -30,11 +89,24 @@ function renderUpgrade(ctx, state, reducedMotion) {
   };
   ctx.save();
   try {
-    ctx.setTransform(ctx.canvas.width / VIEW.width, 0, 0, ctx.canvas.height / VIEW.height, 0, 0);
+    ctx.setTransform(ctx.canvas.width / state.viewWidth, 0, 0, ctx.canvas.height / VIEW.height, 0, 0);
     drawBackground(ctx, camera, zoneAt(state.player.x), state.time, reducedMotion);
+    const shake = !reducedMotion && state.time - effects.hitAt < .2
+      ? Math.sin(state.time * 110) * (options.shake ?? 0) * 4 : 0;
+    ctx.translate(shake, 0);
     ctx.translate(-camera, 0);
-    for (const platform of LEVEL.platforms) {
-      if (visible(platform.x, platform.w)) drawPlatform(ctx, platform, state.time, reducedMotion);
+    for (const platform of platformsFor(state)) {
+      if (!visible(platform.x, platform.w)) continue;
+      drawPlatform(ctx, platform, state.time, reducedMotion);
+      if (options.highContrast) {
+        ctx.strokeStyle = '#163a36'; ctx.lineWidth = 3;
+        ctx.strokeRect(platform.x, platform.y, platform.w, platform.h);
+      }
+    }
+    for (const suggestion of LEVEL.suggestions) {
+      if (visible(suggestion.x, suggestion.platform.w + 100)) {
+        drawSuggestion(ctx, suggestion, state.acceptedSuggestions.has(suggestion.id), state.time, reducedMotion);
+      }
     }
     for (const item of LEVEL.sparks) {
       if (visible(item.x) && !state.collected.has(item.id)) {
@@ -50,6 +122,15 @@ function renderUpgrade(ctx, state, reducedMotion) {
       }
       label('!', hazard.x + hazard.w / 2 - 3, hazard.y + 22, 15);
     }
+    for (const enemy of state.enemies) {
+      if (enemy.defeated || !visible(enemy.x)) continue;
+      rect(enemy.x - 2, enemy.y + 20, 38, 6, '#384e4b');
+      rect(enemy.x, enemy.y, enemy.w, 22, '#9c4051');
+      rect(enemy.x + 3, enemy.y + 3, 28, 4, '#ffccb2');
+      rect(enemy.x + 6, enemy.y + 10, 5, 6, '#fff8d5');
+      rect(enemy.x + 23, enemy.y + 10, 5, 6, '#fff8d5');
+    }
+    if (visible(LEVEL.boss.x - 200, 600)) drawWizard(ctx, state);
     LEVEL.checkpoints.forEach((checkpoint, index) => {
       if (!visible(checkpoint.x)) return;
       const active = index <= state.checkpointIndex;
@@ -72,9 +153,11 @@ function renderUpgrade(ctx, state, reducedMotion) {
       rect(goal.x, goal.y + goal.h - 9, goal.w, 9, '#ecf7ff');
       drawCollectible(ctx, { x: goal.x + goal.w / 2, y: goal.y + 48,
         radius: 23, app: 'copilot', secret: false }, state.time, reducedMotion);
-      label('FINISH', goal.x + 9, goal.y - 15, 12);
+      label(state.boss.health === 0 ? 'RESTORED' : 'LOCKED', goal.x + 3, goal.y - 15, 12);
     }
     drawCharacter(ctx, state.player, state.time, reducedMotion);
+    drawSparq(ctx, state.player.x - state.player.facing * 30,
+      state.player.y - 14, state.time, reducedMotion, Boolean(interactionAt(state)));
     for (const effect of effects.pickups) {
       if (visible(effect.item.x)) {
         drawPickup(ctx, effect.item, state.time - effect.startedAt, 0, reducedMotion);
@@ -88,8 +171,8 @@ function renderUpgrade(ctx, state, reducedMotion) {
 // Renderer contract: player {x,y,vx,facing,boostTime}, cameraX,
 // collected Set of spark IDs, checkpointIndex, time (seconds), status.
 // Rendering never changes simulation state. Coordinates remain 1280 × 720.
-export function render(ctx, state, reducedMotion = false) {
-  return renderUpgrade(ctx, state, reducedMotion);
+export function render(ctx, state, reducedMotion = false, options = {}) {
+  return renderUpgrade(ctx, state, reducedMotion, options);
 }
 
 // Legacy renderer retained temporarily; it is not called by the application.

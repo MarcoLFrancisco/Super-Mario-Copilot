@@ -135,7 +135,19 @@ export function createAudio() {
     const sounds = {
       jump: { voice: 'lead', midi:  sixty(), endMidi: 84, beats: .3, gain: .12 },
       boost: { voice: 'bass', midi: 48, endMidi: 79, beats: .45, gain: .17 },
-      respawn: { voice: 'lead', midi: 67, endMidi: 43, beats: .65, gain: .12 }
+      respawn: { voice: 'lead', midi: 67, endMidi: 43, beats: .65, gain: .12 },
+      suggestion: { voice: 'bell', midi: 76, endMidi: 88, beats: .45, gain: .12 },
+      bossHit: { voice: 'bell', midi: 72, endMidi: 91, beats: .55, gain: .14 },
+      enemy: { voice: 'bass', midi: 60, endMidi: 43, beats: .2, gain: .1 },
+      brick: { voice: 'bell', midi: 81, beats: .15, gain: .08 },
+      bounce: { voice: 'lead', midi: 69, beats: .1, gain: .065 },
+      launch: { voice: 'lead', midi: 60, endMidi: 84, beats: .3, gain: .1 },
+      recovery: { voice: 'lead', midi: 67, endMidi: 48, beats: .5, gain: .1 },
+      powerup: { voice: 'bell', midi: 84, endMidi: 96, beats: .5, gain: .12 },
+      agent: { voice: 'bell', midi: 74, endMidi: 81, beats: .3, gain: .1 },
+      net: { voice: 'lead', midi: 60, endMidi: 79, beats: .3, gain: .1 },
+      defend: { voice: 'bell', midi: 69, beats: .2, gain: .09 },
+      portal: { voice: 'lead', midi: 79, endMidi: 60, beats: .3, gain: .08 }
     };
     if (sounds[event.type]) note(sounds[event.type], now, 'effects');
   }
