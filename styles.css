@@ -96,6 +96,17 @@ dd { margin: 5px 0 0; font-size: 1rem; font-weight: 750; font-variant-numeric: t
 .is-orbit .results dd { color: #f7d17b; }
 .is-orbit .game-shell { border-top-color: #b67b4a; }
 .is-orbit .touch-controls { display: none; }
+.character-choice { display: flex; align-items: center; gap: 12px; font-size: .8rem; }
+.character-choice select { min-width: 130px; }
+.quest-readout { padding: 12px 20px; border-bottom: 1px solid var(--line); }
+.quest-stats { display: grid; grid-template-columns: .7fr 1.5fr 1fr; gap: 16px; margin-bottom: 10px; }
+.quest-stats dd { font-size: .8rem; }
+#party-status { font-size: .75rem; }
+.productivity-counts { font-size: .65rem; color: var(--muted); margin-top: 6px; }
+.quest-boss-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: .75rem; }
+.quest-boss-status progress { accent-color: #b95e4e; height: 12px; flex: 1; min-width: 100px; }
+.combat-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--line); }
+.is-quest .game-overlay { gap: 12px; }
 dialog { width: min(600px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 24px; color: var(--ink); background: var(--paper); border: 1px solid #a8bfb0; border-radius: 8px; overflow-y: auto; }
 dialog::backdrop { background: #173d4266; }
 .settings-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -128,6 +139,16 @@ select { width: 100%; min-height: 38px; padding: 5px 8px; color: var(--ink); bac
   .header-actions { gap: 3px; }
   .header-actions .icon-button { width: 40px; height: 40px; min-height: 40px; }
   .level-header { padding: 13px 12px; gap: 10px; min-height: 72px; }
+  .level-header { flex-wrap: wrap; }
+  .mission-tabs { width: 100%; }
+  .mission-tabs button { flex: 1; }
+  .is-quest .game-overlay { gap: 8px; padding: 12px; }
+  .is-quest .game-overlay h2 { font-size: 1.25rem; }
+  .is-quest .game-overlay p { font-size: .7rem; }
+  .is-quest .game-overlay #load-status:empty { display: none; }
+  .quest-readout { padding: 10px 12px; }
+  .combat-controls { padding: 10px 12px; gap: 6px; }
+  .combat-controls button { padding: 8px; font-size: .75rem; }
   .mission-heading { gap: 8px; }
   .mission-number { display: none; }
   h2 { font-size: 1rem; }

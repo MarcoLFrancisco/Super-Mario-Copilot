@@ -1,4 +1,4 @@
-import { SCORE, VOICES, JINGLES, musicStep, midiFrequency } from './music.js';
+import { SCORE, VOICES, JINGLES, musicStep, bossMusicStep, midiFrequency } from './music.js';
 
 // Call unlock() from a user gesture; failure returns false, never blocks play.
 // setStatus: playing/paused/complete/idle. Set complete before its event.
@@ -6,6 +6,8 @@ import { SCORE, VOICES, JINGLES, musicStep, midiFrequency } from './music.js';
 export function createAudio() {
   let ctx, buses, noise, timer;
   let status = 'idle', disposed = false, step = 0, next = 0;
+  let stage = 'world', bossPhase = 0;
+  const lastEffects = new Map();
   const volumes = { music: 0, effects: 0 };
   const active = new Set();
   const beat = 60 / SCORE.bpm;
@@ -61,7 +63,8 @@ export function createAudio() {
     const now = ctx.currentTime;
     if (next < now) next = now + .02;
     while (next < now + .12) {
-      musicStep(step).forEach(event => note(event, next, 'music'));
+      const notes = stage === 'boss' ? bossMusicStep(step, bossPhase) : musicStep(step);
+      notes.forEach(event => note(event, next, 'music'));
       step = (step + 1) % SCORE.loopSteps;
       next += SCORE.secondsPerStep;
     }
@@ -113,37 +116,73 @@ export function createAudio() {
     if (!['idle', 'playing', 'paused', 'complete'].includes(value)) return;
     status = value; sync();
   }
+  // Main integration calls this with state.stage and state.boss?.phase.
+  // Repeated calls are safe; phase changes preserve musical position.
+  function setStage(value, phase = 0) {
+    if (disposed || !['world', 'boss'].includes(value)) return;
+    bossPhase = Number.isFinite(phase) ? Math.max(0, Math.min(2, Math.floor(phase))) : 0;
+    if (value === stage) return;
+    stage = value;
+    stop('music'); step = 0;
+    clearInterval(timer); timer = undefined; sync();
+  }
   function reset() {
-    stop(); step = 0;
+    stop(); step = 0; stage = 'world'; bossPhase = 0;
+    lastEffects.clear();
     clearInterval(timer); timer = undefined; sync();
   }
   function effect(event, app = 'copilot') {
     if (!audible() || !volumes.effects) return;
     if (status !== 'playing' && !(status === 'complete' && event.type === 'complete')) return;
     const now = ctx.currentTime + .005;
+    // Bound repeated impacts without suppressing distinct attack warnings.
+    const key = event.type === 'spark' ? `spark:${app}` : event.type;
+    const spacing = event.type === 'shoot' ? .08 : .045;
+    if (now - (lastEffects.get(key) ?? -Infinity) < spacing) return;
+    lastEffects.set(key, now);
     if (JINGLES[event.type]) {
       JINGLES[event.type].forEach(n => note(n, now + n.at * beat, 'effects'));
       return;
     }
     if (event.type === 'spark') {
-      const root = { outlook: 79, excel: 76, teams: 81, copilot: 84 }[app] || 84;
+      const root = { outlook: 79, excel: 76, word: 74, teams: 81, copilot: 84 }[app] || 84;
       const offset = Math.min(7, Math.max(0, (event.combo || 1) - 1));
       [0, 7].forEach((interval, i) => note({ voice: 'bell', midi: root + offset + interval,
         beats: .18, gain: .1 }, now + i * .045, 'effects'));
       return;
     }
+    if (event.type === 'powerup' || event.type === 'bossEnter' || event.type === 'bossPhase') {
+      const power = event.type === 'powerup';
+      const pitches = power ? (event.kind === 'microsoft' ? [72, 76, 79, 84] : [67, 74, 79]) : [45, 52, 57];
+      pitches.forEach((midi, i) => note({ voice: power ? 'bell' : 'bass', midi,
+        beats: power ? .28 : .5, gain: .095 }, now + i * .085, 'effects'));
+      return;
+    }
+    if (event.type === 'bossWarning') {
+      [0, .18].forEach(offset => note({ voice: 'bell', midi: 83, endMidi: 81,
+        beats: .18, gain: .085 }, now + offset, 'effects'));
+      return;
+    }
     const sounds = {
-      jump: { voice: 'lead', midi:  sixty(), endMidi: 84, beats: .3, gain: .12 },
+      jump: { voice: 'lead', midi: 60, endMidi: 84, beats: .3, gain: .12 },
       boost: { voice: 'bass', midi: 48, endMidi: 79, beats: .45, gain: .17 },
       respawn: { voice: 'lead', midi: 67, endMidi: 43, beats: .65, gain: .12 },
+      shoot: { voice: 'lead', midi: 88, endMidi: 65, beats: .12, gain: .065 },
+      stomp: { voice: 'bass', midi: 48, endMidi: 67, beats: .2, gain: .12 },
+      damage: { voice: 'bass', midi: 55, endMidi: 32, beats: .4, gain: .14 },
+      brickBreak: { voice: 'snare', midi: null, beats: .12, gain: .095 },
+      blockReward: { voice: 'bell', midi: 79, endMidi: 84, beats: .24, gain: .09 },
+      enemyHit: { voice: 'lead', midi: 62, endMidi: 48, beats: .12, gain: .075 },
+      enemyDefeated: { voice: 'bass', midi: 60, endMidi: 36, beats: .25, gain: .1 },
+      bossHit: { voice: 'bell', midi: 74, endMidi: 62, beats: .18, gain: .09 },
+      bossAttack: { voice: 'kick', midi: null, beats: .22, gain: .12 },
+      bossExposed: { voice: 'bell', midi: 88, beats: .6, gain: .09 },
       suggestion: { voice: 'bell', midi: 76, endMidi: 88, beats: .45, gain: .12 },
-      bossHit: { voice: 'bell', midi: 72, endMidi: 91, beats: .55, gain: .14 },
       enemy: { voice: 'bass', midi: 60, endMidi: 43, beats: .2, gain: .1 },
       brick: { voice: 'bell', midi: 81, beats: .15, gain: .08 },
       bounce: { voice: 'lead', midi: 69, beats: .1, gain: .065 },
       launch: { voice: 'lead', midi: 60, endMidi: 84, beats: .3, gain: .1 },
       recovery: { voice: 'lead', midi: 67, endMidi: 48, beats: .5, gain: .1 },
-      powerup: { voice: 'bell', midi: 84, endMidi: 96, beats: .5, gain: .12 },
       agent: { voice: 'bell', midi: 74, endMidi: 81, beats: .3, gain: .1 },
       net: { voice: 'lead', midi: 60, endMidi: 79, beats: .3, gain: .1 },
       defend: { voice: 'bell', midi: 69, beats: .2, gain: .09 },
@@ -151,7 +190,6 @@ export function createAudio() {
     };
     if (sounds[event.type]) note(sounds[event.type], now, 'effects');
   }
-  function sixty() { return 60; }
   function visibility() {
     if (document.hidden) status = 'paused';
     sync();
@@ -165,5 +203,5 @@ export function createAudio() {
       try { await ctx.close(); } catch { /* Closing is best effort. */ }
     }
   }
-  return { unlock, setVolume, setStatus, reset, effect, dispose };
+  return { unlock, setVolume, setStatus, setStage, reset, effect, dispose };
 }

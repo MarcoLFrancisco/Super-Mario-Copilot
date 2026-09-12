@@ -1,5 +1,5 @@
 import { ORBIT, ballPosition, reboundVelocity } from './orbit.js';
-import { drawCharacter, drawSparq } from './character.js';
+import { drawCharacter, drawSparq } from './bit.js';
 
 const colors = ['#e5ba55', '#df897a', '#67c9b6', '#79b9d5'];
 

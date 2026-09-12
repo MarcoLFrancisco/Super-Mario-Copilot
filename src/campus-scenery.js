@@ -1,12 +1,12 @@
-import { VIEW, APPS } from './level.js';
+import { VIEW, APPS } from './campus-level.js';
 
 // Background uses viewport coordinates; platforms use world coordinates.
 // Caller sets canvas scaling and applies camera translation only to platforms.
 const palettes = {
-  excel: ['#398fd0', '#c5f7e5', '#77c9b4', '#419c91'],
-  outlook: ['#398bdb', '#d3f3ff', '#86c3e6', '#538fb8'],
-  teams: ['#7776cc', '#e7ddff', '#afa6dc', '#777caf'],
-  copilot: ['#7977d6', '#ffe0df', '#c6a9df', '#8e88c0']
+  excel: ['#abd9e5', '#e6f3dc', '#a3cbbb', '#7bab9f'],
+  outlook: ['#adcfeb', '#edf5df', '#a9c9c6', '#8bb3b4'],
+  teams: ['#c4dae8', '#f4e2dc', '#b4c6c4', '#8fafa9'],
+  copilot: ['#e7d9c9', '#f8e9ce', '#b7c8ba', '#8cafa4']
 };
 function rect(ctx, x, y, w, h, color) {
   ctx.fillStyle = color; ctx.fillRect(x, y, w, h);
@@ -39,9 +39,6 @@ export function drawBackground(ctx, cameraX, zone, time = 0, reducedMotion = fal
   const t = reducedMotion ? 0 : time;
   ctx.save();
   rect(ctx, 0, 0, VIEW.width, VIEW.height, gradient(ctx, 0, VIEW.height, colors[0], colors[1]));
-  const sunlight = ctx.createRadialGradient(1050, 95, 15, 1050, 95, 260);
-  sunlight.addColorStop(0, '#fff6cbaa'); sunlight.addColorStop(1, '#fff6cb00');
-  rect(ctx, 790, 0, 490, 355, sunlight);
   oval(ctx, 1050, 95, 39, 39, '#fff6d6');
   for (let band = 0; band < 3; band++) {
     ctx.beginPath();
@@ -69,24 +66,14 @@ export function drawBackground(ctx, cameraX, zone, time = 0, reducedMotion = fal
     const y = 565 - h;
     rect(ctx, x + 9, y - 8, 104, h + 8, '#ffffff20');
     rect(ctx, x, y, 100, h, gradient(ctx, y, h, '#eefaff99', '#b9d7ed44'));
-    rect(ctx, x, y, 100, 17, APPS[zone.app]?.color ?? '#b0a0ff');
+    rect(ctx, x, y, 100, 17, '#f2f9ed77');
     for (let row = 0; row < Math.floor((h - 28) / 23); row++) {
       for (let col = 0; col < 4; col++) rect(ctx, x + 10 + col * 22, y + 28 + row * 23, 12, 10, '#ffffff55');
-    }
-    if (zone.app === 'teams') {
-      oval(ctx, x + 75, y - 22, 13, 13, '#ddd4ff');
-      rect(ctx, x + 60, y - 7, 30, 7, '#b5a6e5');
     }
   }
   for (let i = 0; i < 8; i++) {
     const x = ((i * 233 - cameraX * .12 + t * 6) % 1600 + 1600) % 1600 - 140;
     cloud(ctx, x, 95 + (i * 79 % 200), .6 + i % 3 * .22);
-    if (i % 2 === 0) {
-      ctx.save(); ctx.translate(x + 30, 190 + i * 28); ctx.rotate(-.13);
-      rect(ctx, -18, -11, 36, 22, '#f4fbff99');
-      line(ctx, [[-18, -11], [0, 3], [18, -11]], '#468cca80', 1.5);
-      ctx.restore();
-    }
   }
   const mist = gradient(ctx, 600, 120, '#d9f3ff00', '#e2f8ff88');
   rect(ctx, 0, 600, VIEW.width, 120, mist);
@@ -119,7 +106,7 @@ export function drawPlatform(ctx, p, time = 0, reducedMotion = false) {
       for (let j = 0; j < 3; j++) oval(ctx, x + 9 + j * 7, p.y + 16, 1.5, 1.5, '#ffffff');
     } else {
       for (let j = 0; j < 3; j++) {
-        oval(ctx, x + 8 + j * 8, p.y + 16 + Math.sin(t * 2 + i + j) * 2, 6, 4, ['#83edff', '#b9acff', '#ffd4ba'][j]);
+        oval(ctx, x + 8 + j * 8, p.y + 16 + Math.sin(t * 2 + i + j) * 2, 6, 4, ['#b7f5dd', '#fff2b4', '#ffc7b2'][j]);
       }
     }
   }

@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createState, setPaused, update, interactionAt, platformsFor } from '../src/engine.js';
-import { LEVEL, PHYSICS } from '../src/level.js';
+import { createState, setPaused, update, interactionAt, platformsFor } from '../src/campus-engine.js';
+import { LEVEL, PHYSICS } from '../src/campus-level.js';
 import { createOrbit, updateOrbit, setOrbitPaused, reboundVelocity, ballPosition } from '../src/orbit.js';
+import { runTests as runPartyTests } from './party-tests.js';
 
 const step = 1 / 120;
 
@@ -362,3 +363,5 @@ test('wide shield changes the collider and Debug Laser damages actual targets', 
   assert.ok(state.lasers.length > 0);
   assert.ok(state.score > 0);
 });
+
+await runPartyTests({ test: (name, run) => test(`Team Quest: ${name}`, run), assert: assert.ok });

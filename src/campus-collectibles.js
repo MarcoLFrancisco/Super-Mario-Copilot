@@ -1,10 +1,10 @@
-import { APPS } from './level.js';
+import { APPS } from './campus-level.js';
 
 // World-space drawing: caller applies the camera and skips collected IDs.
 // Items retain level.js fields {id,x,y,radius,secret,app}; physics is unchanged.
 export const COLLECTIBLE_NAMES = Object.freeze({
-  outlook: 'Outlook email', excel: 'Excel sheet', word: 'Word document',
-  copilot: 'Copilot icon', teams: 'Teams conversation'
+  outlook: 'Energy cell', excel: 'Energy cell',
+  copilot: 'Energy cell', teams: 'Energy cell'
 });
 
 function panel(ctx, x, y, w, h, radius, fill, stroke = '#ffffff99') {
@@ -58,21 +58,6 @@ function sheet(ctx) {
   badge(ctx, 'X', -14, -4, '#107c41');
   line(ctx, [[-2, -9], [6, -9]], '#c5ffe3');
 }
-function documentIcon(ctx) {
-  // Original document illustration, not a downloaded Microsoft icon.
-  panel(ctx, -6, -11, 19, 24, 2, '#164993', '#82bcff');
-  panel(ctx, -9, -13, 19, 24, 2, gradient(ctx, '#ffffff', '#d6e8ff'), '#f0f7ff');
-  panel(ctx, -9, -13, 19, 5, 2, '#2868c9', null);
-  // Folded page corner and miniature heading/body text.
-  ctx.beginPath();
-  ctx.moveTo(5, -8); ctx.lineTo(10, -3); ctx.lineTo(5, -3);
-  ctx.closePath(); ctx.fillStyle = '#8fbbf1'; ctx.fill();
-  line(ctx, [[-4, -5], [2, -5]], '#2455a2', 1.5);
-  for (let row = 0; row < 4; row++) {
-    line(ctx, [[-4, -1 + row * 2.6], [row === 3 ? 3 : 7, -1 + row * 2.6]], '#719bcf', .8);
-  }
-  badge(ctx, 'W', -14, -3, '#185abd');
-}
 function conversation(ctx) {
   panel(ctx, -3, -11, 17, 14, 4, gradient(ctx, '#c9baff', '#7767c9'));
   line(ctx, [[10, 2], [12, 6], [5, 2]], '#a898ec', 2);
@@ -108,9 +93,6 @@ export function drawCollectible(ctx, item, time = 0, reducedMotion = false) {
   ctx.save(); ctx.translate(item.x, item.y + bob);
   const scale = item.radius / 11;
   ctx.scale(scale, scale);
-  const halo = ctx.createRadialGradient(0, 0, 3, 0, 0, 25);
-  halo.addColorStop(0, APPS[app].color + '55'); halo.addColorStop(1, APPS[app].color + '00');
-  ctx.fillStyle = halo; ctx.fillRect(-25, -25, 50, 50);
   if (item.secret) {
     ctx.beginPath(); ctx.ellipse(0, 0, 18, 17, 0, 0, Math.PI * 2);
     ctx.strokeStyle = '#ffe49aaa'; ctx.lineWidth = 1; ctx.stroke();
@@ -118,7 +100,10 @@ export function drawCollectible(ctx, item, time = 0, reducedMotion = false) {
   }
   ctx.rotate(reducedMotion ? 0 : Math.sin(t * 2 + item.x) * .06);
   ctx.shadowColor = '#071d4b88'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;
-  ({ outlook: email, excel: sheet, word: documentIcon, teams: conversation, copilot })[app](ctx);
+  panel(ctx, -8, -11, 16, 22, 4, '#fff5d2', '#725e29');
+  panel(ctx, -5, -7, 10, 14, 2, APPS[app].color, null);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(-1, -5, 2, 10); ctx.fillRect(-4, -1, 8, 2);
+  ctx.fillStyle = '#725e29'; ctx.fillRect(-3, -13, 6, 2); ctx.fillRect(-3, 11, 6, 2);
   ctx.restore();
 }
 

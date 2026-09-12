@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cloud Quest — Party Regression Checks</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #091326; color: #edf5ff; }
+    body { max-width: 900px; margin: auto; padding: 24px; line-height: 1.6; }
+    h1 { line-height: 1.2; }
+    a { color: #8eeaff; }
+    button { padding: 12px 18px; border: 2px solid #8eeaff; border-radius: 8px; background: #173c55; color: white; font: inherit; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    :focus-visible { outline: 3px solid #ffe18a; outline-offset: 4px; }
+    #summary, li { border: 1px solid #7185a6; border-radius: 8px; padding: 12px 16px; }
+    #results { list-style: none; padding: 0; }
+    li { margin: 12px 0; background: #122139; }
+    li[data-status="pass"] { border-left: 5px solid #79e2ba; }
+    li[data-status="fail"] { border-left: 5px solid #ffa7ad; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
+    code { overflow-wrap: anywhere; }
+    .note { color: #c1d0e6; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Party regression checks</h1>
+    <p>Deterministic source-level browser checks for the independent character team. No account, external service, or package installation is required.</p>
+    <p>Open the repository root in VS Code and use the local HTTP server documented in <a href="../README.md">README.md</a>. With its default port, open <code>http://127.0.0.1:8000/tests/party.html</code>. Do not open this file using <code>file://</code>.</p>
+    <p class="note">The companion test module is delivered separately. A missing module, import failure, or empty suite is a failure—not a passing result. Passing checks do not establish visual quality, real-device controls, audio playback, or full-level navigation performance.</p>
+    <button id="run" type="button">Run checks</button>
+    <p id="summary" role="status" aria-live="polite">Not run.</p>
+    <ol id="results" aria-label="Individual test results"></ol>
+    <p><a href="../index.html">Open the game for manual validation</a></p>
+    <noscript><p>JavaScript is required to execute these checks.</p></noscript>
+  </main>
+  <script type="module">
+    const button = document.getElementById('run');
+    const summary = document.getElementById('summary');
+    const results = document.getElementById('results');
+    let running = false;
+
+    function report(name, error) {
+      const item = document.createElement('li');
+      item.dataset.status = error ? 'fail' : 'pass';
+      const title = document.createElement('strong');
+      title.textContent = `${error ? 'FAIL' : 'PASS'} — ${name}`;
+      item.append(title);
+      if (error) {
+        const details = document.createElement('pre');
+        details.textContent = error instanceof Error
+          ? `${error.name}: ${error.message}\n${error.stack || ''}` : String(error);
+        item.append(details);
+      }
+      results.append(item);
+    }
+
+    async function run() {
+      if (running) return;
+      running = true;
+      button.disabled = true;
+      results.replaceChildren();
+      summary.textContent = 'Running checks…';
+      document.body.dataset.testStatus = 'running';
+      let passed = 0;
+      let failed = 0;
+      let count = 0;
+      let accepting = true;
+      const names = new Set();
+      const pending = [];
+      const assert = (condition, message = 'Assertion failed') => {
+        if (!condition) throw new Error(message);
+      };
+      // Suite contract: export async function runTests({ test, assert }).
+      // Every test must construct fresh state and return/await its own work.
+      // test(name, callback) returns a promise; callbacks may be asynchronous.
+      const test = (name, callback) => {
+        if (!accepting) throw new Error('Tests must be registered before runTests returns');
+        if (typeof name !== 'string' || !name.trim() || names.has(name)) {
+          throw new Error('Each test requires a nonempty, unique name');
+        }
+        if (typeof callback !== 'function') throw new TypeError('Test callback must be a function');
+        names.add(name);
+        count++;
+        const task = Promise.resolve().then(callback).then(() => {
+          passed++;
+          report(name, null);
+        }, error => {
+          failed++;
+          report(name, error ?? new Error('Test rejected without an error'));
+        });
+        pending.push(task);
+        return task;
+      };
+      try {
+        if (location.protocol === 'file:') throw new Error('Serve the repository over local HTTP first.');
+        const suite = await import('./party-tests.js');
+        if (typeof suite.runTests !== 'function') {
+          throw new TypeError('party-tests.js must export runTests({ test, assert })');
+        }
+        await suite.runTests({ test, assert });
+        accepting = false;
+        await Promise.all(pending);
+        if (count === 0) throw new Error('No tests registered; the suite is incomplete.');
+      } catch (error) {
+        failed++;
+        report('Suite loading or execution', error);
+      } finally {
+        accepting = false;
+        await Promise.all(pending);
+        document.body.dataset.testStatus = failed ? 'failed' : 'passed';
+        summary.textContent = `${passed} passed; ${failed} failed. ${failed
+          ? 'Review the failures below. A missing party-tests.js means the staged suite is not integrated yet.'
+          : 'Registered checks passed. Browser gameplay, graphics, touch, and audio still require manual validation.'}`;
+        running = false;
+        button.disabled = false;
+      }
+    }
+    button.addEventListener('click', run);
+  </script>
+</body>
+</html>
