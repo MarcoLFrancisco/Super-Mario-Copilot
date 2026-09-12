@@ -33,6 +33,29 @@ the next one and shows **Next: [world name]**. **Levels** opens the campaign map
 unlocked worlds can be replayed. Azure Orbit is level seven, not a simulator.
 The final world transitions from the platform encounter into a saucer finale.
 
+### Clearing Copilot Campus
+
+The counter tracks **three required tasks**, not collected items. The courtyard
+bridge is optional and does not change that count. Complete the tasks in order:
+
+1. **Lab power link**, near the **Keyboard Gardens checkpoint**: approach the
+	terminal, press **E** or **Build together** once, and stay nearby for **2.5
+	seconds** of active gameplay. Leaving pauses construction; returning resumes
+	it. Wait for **Complete**.
+2. **Innovation Lab**, near the checkpoint of the same name: press **E** or
+	**Restore lab**. This requires the completed power link.
+3. **Tower uplink**, in **Tower Ascent**: press **E** or **Open tower**. This
+	requires the restored lab.
+
+At **3 / 3**, the gate at the far right admits you to the Setup Wizard arena.
+If you reached it early, return left to the unfinished terminal rather than
+restarting. In the arena, reach the **Restart switch** on the right platform,
+activate **Restart wizard**, then attack the boss during exposed windows.
+
+Task labels identify missing prerequisites and their chapter. Pair construction
+shows remaining time and whether it is waiting for you. The objective and locked
+gate identify the next unfinished task and its direction.
+
 ## Run Locally
 
 Use a current browser with JavaScript modules, import maps, Canvas 2D, and Pointer
@@ -131,10 +154,11 @@ and stylesheet URL in [index.html](index.html); commit that HTML with the source
 The version check prevents mixed cached releases. Startup errors or a 15-second
 stall show a message and **Retry loading**, without deleting saves.
 
-The 53 passing tests cover original movement, all 16 companion regressions,
+The 57 passing tests cover original movement, all 16 companion regressions,
 every platform world's forward and return route connections, required world and
 boss tasks, safe plan/evaluation failures, queued dependencies, rollback,
-campaign continuity, saves, the final saucer transition, and Orbit physics.
+campaign continuity, saves, the final saucer transition, Orbit physics, and
+blocked-task/countdown/next-objective guidance.
 See [tests/campaign.test.mjs](tests/campaign.test.mjs) and
 [tests/engine.test.mjs](tests/engine.test.mjs).
 

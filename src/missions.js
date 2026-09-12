@@ -34,15 +34,55 @@ export function interactionFor(state) {
     .sort((first, second) => Math.abs(first.x - center) - Math.abs(second.x - center))[0] ?? null;
 }
 
+export function stationLabel(state, station) {
+  const location = state.stage === 'boss' ? null
+    : state.world.zones?.find(zone => station.x >= zone.x && station.x < zone.end)?.name;
+  return location && location !== station.title ? `${station.title} (${location})` : station.title;
+}
+
+export function missionObjective(state) {
+  const required = missionStations(state).filter(station => !station.optional);
+  const incomplete = required.filter(station => progressFor(state, station).status !== 'complete');
+  const completed = required.length - incomplete.length;
+  const next = incomplete[0];
+  const resource = next?.resource && !state.missionProgress.resources.has(next.resource)
+    ? state.world.resources?.find(item => item.key === next.resource) : null;
+  const target = resource ? { ...resource, title: resource.label } : next;
+  const heading = `${completed} / ${required.length} required tasks complete.`;
+  if (!target) return { completed, total: required.length, target: null,
+    summary: `${heading} ${state.stage === 'boss' ? 'Control systems restored.' : 'Boss gate open.'}` };
+  const horizontal = target.x - state.player.x - PHYSICS.playerWidth / 2;
+  const vertical = target.y - state.player.y - PHYSICS.playerHeight;
+  const direction = horizontal < -100 ? 'left' : horizontal > 100 ? 'right'
+    : vertical < -70 ? 'above' : vertical > 70 ? 'below' : 'nearby';
+  const label = stationLabel(state, target);
+  return { completed, total: required.length, target, label, direction,
+    summary: `${heading} Next: ${label}, ${direction}.` };
+}
+
+function dependencyLabels(state, missing) {
+  const stations = missionStations(state);
+  return missing.map(key => {
+    const station = stations.find(candidate => candidate.key === key);
+    return station ? stationLabel(state, station) : key;
+  });
+}
+
 export function stationStatus(state, station) {
   const job = progressFor(state, station);
   if (job.status === 'complete') return 'Complete';
   if (job.status === 'rollback') return 'Rollback required';
+  const missing = dependenciesFor(state, station);
+  if (missing.length) return `Blocked: ${dependencyLabels(state, missing).join(', ')}`;
+  const resource = state.world.resources?.find(item => item.key === station.resource);
+  if (station.resource && !state.missionProgress.resources.has(station.resource)) {
+    return `Needs ${resource?.label ?? station.resource}`;
+  }
   if (job.status === 'working' || job.status === 'queued') {
-    const missing = dependenciesFor(state, station);
-    if (missing.length) return `Blocked: ${missing.join(', ')}`;
-    if (station.resource && !state.missionProgress.resources.has(station.resource)) return `Needs ${station.resource}`;
-    if (station.action === 'pair' && interactionFor(state)?.id !== station.id) return 'Waiting at terminal';
+    if (station.action === 'pair') {
+      const remaining = `${job.remaining.toFixed(1)}s remaining`;
+      return interactionFor(state)?.id === station.id ? `Building together: ${remaining}` : `Waiting for you: ${remaining}`;
+    }
     return `Working: ${Math.ceil(job.remaining)}s`;
   }
   return 'Ready';
@@ -65,7 +105,8 @@ function complete(state, station, events) {
     state.geometry.platforms.push({ ...station.bridge }); state.missionProgress.geometryVersion += 1;
   }
   if (station.action === 'sync') state.missionProgress.liftsSynchronized = true;
-  message(state, station.message ?? `${station.title} complete.`, events);
+  const detail = station.action !== 'pair' && station.message ? ` ${station.message}` : '';
+  message(state, `${station.title} complete.${detail}`, events);
   events.push({ type: 'missionTask', id: station.id, title: station.title });
 }
 
@@ -81,7 +122,8 @@ export function interact(state, choice, events) {
   }
   const missing = dependenciesFor(state, station);
   if (missing.length && station.action !== 'delegate') {
-    message(state, `Blocked: complete ${missing.join(' and ')} first.`, events); return false;
+    message(state, `${station.label ?? station.title} blocked: ${dependencyLabels(state, missing).join(' and ')} incomplete.`, events);
+    return false;
   }
   if (station.choices && !choice) {
     message(state, `${station.title}: a decision is required.`, events); return false;
@@ -94,8 +136,8 @@ export function interact(state, choice, events) {
   }
   if (station.duration) {
     job.status = 'queued'; job.remaining = station.duration;
-    message(state, station.resource && !state.missionProgress.resources.has(station.resource)
-      ? `${station.title} queued. Missing ${station.resource}.` : `${station.title} assigned.`, events);
+    const detail = stationStatus(state, station);
+    message(state, `${station.title} ${station.action === 'pair' ? 'started' : 'assigned'}. ${detail}.`, events);
   } else complete(state, station, events);
   return true;
 }

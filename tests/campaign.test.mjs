@@ -6,7 +6,7 @@ import { ARENA } from '../src/encounters.js';
 import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, saveCampaign, pauseCampaign, retryLevel } from '../src/campaign.js';
 import { createBoss } from '../src/boss.js';
 import { worldMusicStep } from '../src/music.js';
-import { interact, updateMission, missionReady } from '../src/missions.js';
+import { interact, updateMission, missionReady, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
 
 test('the original engine accepts a mission without changing the selected character', () => {
   const world = { ...LEVEL, width: 2000, spawn: { x: 180, y: 564 }, sparks: [], hazards: [],
@@ -48,6 +48,70 @@ function atStation(state, key) {
   state.player.vx = 0; state.player.vy = 0; state.player.grounded = true;
   return station;
 }
+
+test('blocked terminals name the missing task and its chapter before and after interaction', () => {
+  const state = createState('marco', CAMPAIGN[0]);
+  const tower = atStation(state, 'tower');
+  assert.equal(stationStatus(state, tower), 'Blocked: Innovation Lab');
+  const events = [];
+  assert.equal(interact(state, null, events), false);
+  assert.equal(events.at(-1).text, 'Open tower blocked: Innovation Lab incomplete.');
+  assert.equal(state.missionProgress.jobs[tower.id].status, 'idle');
+  const lab = atStation(state, 'restore');
+  assert.equal(stationStatus(state, lab), 'Blocked: Lab power link (Keyboard Gardens)');
+  assert.equal(interact(state, null, events), false);
+  assert.match(events.at(-1).text, /Lab power link \(Keyboard Gardens\)/);
+  assert.equal(state.score, 0);
+});
+
+test('pair construction reports remaining time, nearby waiting, and unambiguous completion', () => {
+  const state = createState('marco', CAMPAIGN[0]);
+  const station = atStation(state, 'pair');
+  assert.equal(stationLabel(state, station), 'Lab power link (Keyboard Gardens)');
+  const events = [];
+  interact(state, null, events);
+  assert.equal(stationStatus(state, station), 'Building together: 2.5s remaining');
+  updateMission(state, {}, .5, events);
+  assert.equal(stationStatus(state, station), 'Building together: 2.0s remaining');
+  state.player.x = 0;
+  updateMission(state, {}, 1, events);
+  assert.equal(stationStatus(state, station), 'Waiting for you: 2.0s remaining');
+  atStation(state, 'pair');
+  updateMission(state, {}, 2, events);
+  assert.equal(stationStatus(state, station), 'Complete');
+  assert.ok(events.some(event => event.type === 'missionMessage' && event.text === 'Lab power link complete.'));
+});
+
+test('the end gate identifies the next required task and its direction without counting the optional bridge', () => {
+  const state = createState('marco', CAMPAIGN[0]);
+  atStation(state, 'suggestion'); interact(state, null, []);
+  state.player.x = state.world.goal.x;
+  let objective = missionObjective(state);
+  assert.equal(objective.summary, '0 / 3 required tasks complete. Next: Lab power link (Keyboard Gardens), left.');
+  const pair = atStation(state, 'pair'); interact(state, null, []);
+  updateMission(state, {}, pair.duration, []);
+  state.player.x = state.world.goal.x;
+  objective = missionObjective(state);
+  assert.equal(objective.completed, 1);
+  assert.equal(objective.target.key, 'restore');
+  assert.equal(objective.direction, 'left');
+  atStation(state, 'restore'); interact(state, null, []);
+  state.player.x = state.world.goal.x;
+  assert.equal(missionObjective(state).summary, '2 / 3 required tasks complete. Next: Tower uplink (Tower Ascent), left.');
+  atStation(state, 'tower'); interact(state, null, []);
+  assert.equal(missionObjective(state).summary, '3 / 3 required tasks complete. Boss gate open.');
+  assert.equal(missionReady(state), true);
+});
+
+test('guidance targets a missing context record before the waiting construction terminal', () => {
+  const state = createState('marco', CAMPAIGN[2]);
+  atStation(state, 'plan'); interact(state, 'bounded', []);
+  atStation(state, 'build'); interact(state, null, []);
+  const objective = missionObjective(state);
+  assert.equal(objective.target.title, 'Roof access record');
+  assert.equal(objective.direction, 'right');
+  assert.match(objective.summary, /Roof access record \(Context Archives\)/);
+});
 
 test('pair work waits nearby, delegated work resumes only when context arrives', () => {
   const campus = createState('marco', CAMPAIGN[0]);

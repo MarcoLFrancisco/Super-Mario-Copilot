@@ -8,7 +8,7 @@ import { ARENA } from './encounters.js';
 import { drawEnemy, drawProjectile, drawPowerup } from './enemy-art.js';
 import { drawArena, drawBossWarnings, drawBoss } from './boss-art.js';
 import { drawWorldBackground, drawWorldPlatform, drawMissionObjects, drawCampaignBoss } from './world-art.js';
-import { missionReady } from './missions.js';
+import { missionObjective } from './missions.js';
 
 function drawCombatScene(ctx, state, reducedMotion, visible) {
   const { combat, blocks, player } = state;
@@ -179,7 +179,15 @@ function renderUpgrade(ctx, state, reducedMotion, options) {
       rect(goal.x, goal.y + goal.h - 9, goal.w, 9, '#ecf7ff');
       drawCollectible(ctx, { x: goal.x + goal.w / 2, y: goal.y + 48,
         radius: 23, app: 'copilot', secret: false }, state.time, reducedMotion);
-      label(campaign && !missionReady(state) ? 'TASKS PENDING' : 'BOSS GATE', goal.x + 9, goal.y - 15, 12);
+      const objective = campaign ? missionObjective(state) : null;
+      if (objective?.target) {
+        ctx.save(); ctx.textAlign = 'center';
+        const labelX = Math.max(camera + 220, Math.min(camera + VIEW.width - 220, goal.x + goal.w / 2));
+        label(`NEXT: ${objective.label}`, labelX, goal.y - 34, 12);
+        label(`${objective.completed} / ${objective.total} TASKS COMPLETE | ${objective.direction.toUpperCase()}`,
+          labelX, goal.y - 16, 11);
+        ctx.restore();
+      } else label('BOSS GATE', goal.x + 9, goal.y - 15, 12);
     }
     }
     drawCombatScene(ctx, state, reducedMotion, visible);

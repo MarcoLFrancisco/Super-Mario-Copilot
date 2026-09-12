@@ -8,7 +8,7 @@ import { CHARACTERS, companionIds } from './party.js';
 import { COMBAT } from './encounters.js';
 import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, retryLevel,
   saveCampaign, pauseCampaign, chapterAt } from './campaign.js';
-import { interactionFor, missionStations, stationStatus, missionReady } from './missions.js';
+import { interactionFor, missionStations, stationStatus, missionReady, missionObjective } from './missions.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -183,8 +183,7 @@ function hud() {
   const request = orbit ? null : interactionFor(state);
   const status = request ? stationStatus(state, request) : '';
   const stations = orbit ? [] : missionStations(state);
-  const required = stations.filter(station => !station.optional);
-  const completed = required.filter(station => stationStatus(state, station) === 'Complete').length;
+  const objective = orbit ? null : missionObjective(state);
   text('score-value', state.score.toLocaleString());
   text('items-label', orbit ? 'Recoveries' : 'App items');
   text('sparks-value', orbit ? state.charges : state.collected.size);
@@ -197,13 +196,13 @@ function hud() {
   text('boost-label', orbit ? 'Compute' : 'Copilot boost');
   text('boost-value', orbit ? `${Math.floor(state.compute)} / 100`
     : state.player.boostCooldown > 0 ? `${state.player.boostCooldown.toFixed(1)}s` : 'Ready');
-  const next = required.find(station => stationStatus(state, station) !== 'Complete');
+  const localStatus = !request ? '' : status.startsWith('Blocked:')
+    ? `${request.label ?? request.title} blocked. ` : status === 'Ready' ? '' : `${request.title}: ${status}. `;
   text('mission-objective', orbit ? state.phase === 'ready' ? 'Core latched' : state.finale
     ? 'Restore the Monolith command interface' : mission.boss
-    : request ? `${request.title}: ${status}` : state.stage === 'boss' ? state.boss.objectivesLocked
-      ? `${next?.title ?? 'Control systems'} / ${completed} of ${required.length}`
-      : `${state.arena.phases[state.boss.phase].name}: ${state.boss.mode}`
-    : next ? `${next.title} / ${completed} of ${required.length}` : 'Boss gate open');
+    : state.stage === 'boss' && !state.boss.objectivesLocked
+      ? `${state.arena.phases[state.boss.phase].name}: ${state.boss.mode}`
+      : `${localStatus}${objective.summary}`);
   text('chapter-name', orbit ? state.finale ? 'Final command' : ORBIT.waves[state.wave]
     : state.stage === 'boss' ? mission.boss : chapterAt(mission, state.player.x).name);
   el('interact-button').disabled = !active || (orbit ? state.phase !== 'ready'
@@ -245,10 +244,12 @@ function hud() {
   const signature = stations.map(station => `${station.id}:${stationStatus(state, station)}`).join('|');
   if (signature !== taskSignature) {
     taskSignature = signature;
+    let requiredNumber = 0;
     el('task-ribbon').replaceChildren(...stations.map(station => {
       const item = document.createElement('li');
       item.className = stationStatus(state, station) === 'Complete' ? 'complete' : '';
-      const name = document.createElement('span'); name.textContent = station.title;
+      const name = document.createElement('span');
+      name.textContent = station.optional ? `${station.title} (optional)` : `${++requiredNumber}. ${station.title}`;
       const detail = document.createElement('small'); detail.textContent = stationStatus(state, station);
       item.append(name, detail); return item;
     }));
