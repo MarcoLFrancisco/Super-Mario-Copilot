@@ -7,8 +7,81 @@
   <meta name="description" content="An unofficial Microsoft AI-inspired adventure. Restore Copilot Campus with Bit and Sparq, then take a flying saucer into Azure Orbit.">
   <title>Mission Copilot</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles.css">
-  <script type="module" src="./src/main.js"></script>
+  <link rel="stylesheet" href="./styles.css?v=27fc566037090528">
+  <script type="importmap">
+{
+  "imports": {
+    "./src/actor-physics.js": "./src/actor-physics.js?v=27fc566037090528",
+    "./src/art.js": "./src/art.js?v=27fc566037090528",
+    "./src/audio.js": "./src/audio.js?v=27fc566037090528",
+    "./src/bit.js": "./src/bit.js?v=27fc566037090528",
+    "./src/blocks.js": "./src/blocks.js?v=27fc566037090528",
+    "./src/boss-art.js": "./src/boss-art.js?v=27fc566037090528",
+    "./src/boss-dialogue.js": "./src/boss-dialogue.js?v=27fc566037090528",
+    "./src/boss.js": "./src/boss.js?v=27fc566037090528",
+    "./src/campus-art.js": "./src/campus-art.js?v=27fc566037090528",
+    "./src/campus-collectibles.js": "./src/campus-collectibles.js?v=27fc566037090528",
+    "./src/campus-engine.js": "./src/campus-engine.js?v=27fc566037090528",
+    "./src/campus-level.js": "./src/campus-level.js?v=27fc566037090528",
+    "./src/campus-scenery.js": "./src/campus-scenery.js?v=27fc566037090528",
+    "./src/character.js": "./src/character.js?v=27fc566037090528",
+    "./src/collectibles.js": "./src/collectibles.js?v=27fc566037090528",
+    "./src/combat.js": "./src/combat.js?v=27fc566037090528",
+    "./src/encounters.js": "./src/encounters.js?v=27fc566037090528",
+    "./src/enemy-art.js": "./src/enemy-art.js?v=27fc566037090528",
+    "./src/engine.js": "./src/engine.js?v=27fc566037090528",
+    "./src/level.js": "./src/level.js?v=27fc566037090528",
+    "./src/main.js": "./src/main.js?v=27fc566037090528",
+    "./src/music.js": "./src/music.js?v=27fc566037090528",
+    "./src/orbit-art.js": "./src/orbit-art.js?v=27fc566037090528",
+    "./src/orbit.js": "./src/orbit.js?v=27fc566037090528",
+    "./src/party-ai.js": "./src/party-ai.js?v=27fc566037090528",
+    "./src/party-art.js": "./src/party-art.js?v=27fc566037090528",
+    "./src/party-bubbles.js": "./src/party-bubbles.js?v=27fc566037090528",
+    "./src/party-dialogue.js": "./src/party-dialogue.js?v=27fc566037090528",
+    "./src/party-navigation.js": "./src/party-navigation.js?v=27fc566037090528",
+    "./src/party.js": "./src/party.js?v=27fc566037090528",
+    "./src/scenery.js": "./src/scenery.js?v=27fc566037090528",
+    "./vendor/lucide.min.js": "./vendor/lucide.min.js?v=27fc566037090528",
+    "./vendor/planck.mjs": "./vendor/planck.mjs?v=27fc566037090528"
+  }
+}
+  </script>
+  <script type="module">
+    const status = document.getElementById('load-status');
+    const button = document.getElementById('start-button');
+    const label = document.getElementById('start-label');
+    let retryVisible = false;
+    function retry(event) {
+      event.stopImmediatePropagation();
+      const address = new URL(location.href);
+      address.searchParams.set('reload', Date.now());
+      location.replace(address);
+    }
+    function failed(error) {
+      console.error('Mission startup failed:', error);
+      status.textContent = `Mission could not load: ${error.message || error}`;
+      label.textContent = 'Retry loading';
+      button.disabled = false;
+      button.addEventListener('click', retry, { capture: true });
+      retryVisible = true;
+    }
+    const timeout = setTimeout(() => failed(new Error('Loading timed out. Check your connection and retry.')), 15000);
+    try {
+      if (!HTMLScriptElement.supports?.('importmap')) {
+        throw new Error('Please update to a current version of Edge, Chrome, Firefox, or Safari.');
+      }
+      await import('./src/main.js');
+      if (retryVisible) {
+        button.removeEventListener('click', retry, { capture: true });
+        label.textContent = 'Begin mission';
+      }
+    } catch (error) {
+      failed(error);
+    } finally {
+      clearTimeout(timeout);
+    }
+  </script>
 </head>
 <body>
   <a class="skip-link" href="#game-controls">Skip to game controls</a>

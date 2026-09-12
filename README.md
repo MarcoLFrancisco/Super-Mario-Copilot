@@ -40,7 +40,7 @@ Copilot or Azure integrations. Compute is an in-game resource, not a cloud quota
 
 ## Run Locally
 
-Use a current browser with JavaScript modules, Canvas 2D, and Pointer Events.
+Use a current browser with JavaScript modules, import maps, Canvas 2D, and Pointer Events.
 Web Audio is optional. From the repository root on macOS/Linux:
 
 ```sh
@@ -61,6 +61,29 @@ to play. Browser libraries are bundled locally with their licenses in
 [vendor/README.md](vendor/README.md). Do not open the HTML directly: browser
 module loading requires HTTP. After editing modules, use a hard reload if old
 artwork or behavior remains cached.
+
+## Publish Source Changes
+
+After changing JavaScript or CSS, run these commands before committing:
+
+```sh
+npm run build
+npm test
+```
+
+The dependency-free build updates the import map and CSS URL in
+[index.html](index.html) using a hash of the source assets. Commit that generated
+HTML together with the changed source. GitHub Pages still serves the project
+directly; no separate hosting service or package installation is needed.
+
+Every module, including transitive imports and local libraries, receives the
+same version token. This prevents a new page from reusing older cached modules
+or styles. The test suite rejects an outdated import map so a release cannot
+silently forget to refresh its asset version.
+
+If startup fails or exceeds 15 seconds, the page reports the error and offers
+**Retry loading** instead of remaining indefinitely on **Loading mission**.
+Retry reloads the page without clearing saved progress or preferences.
 
 ## Controls
 
@@ -142,7 +165,7 @@ Node 24 or newer is needed for development tests, not for browser gameplay:
 npm test
 ```
 
-This runs 41 checks through [tests/engine.test.mjs](tests/engine.test.mjs), using
+This runs 42 checks through [tests/engine.test.mjs](tests/engine.test.mjs), using
 Node's built-in test runner with no installation step. The same suite can be run
 with `node --test tests/engine.test.mjs`.
 
@@ -163,6 +186,10 @@ phone 390x844: startup, nonblank canvas/pilot pixels, horizontal overflow, keybo
 bridge approval, remapped jumping, conflicting bindings, pointer controls,
 pause/resume focus, independent effects activation, subtitles, Orbit launch, and
 Patch assignment. Orbit checks used a temporary completed-Campus save fixture.
+
+Startup recovery was also checked with deliberately stale unversioned assets
+and a blocked entry-module request. The versioned graph ignored the stale assets,
+reported the blocked request, and recovered successfully through Retry.
 
 Real-device multitouch, Safari/Firefox, assistive-technology usability, soundtrack
 listening/balance, and uninterrupted human playthroughs still need validation.

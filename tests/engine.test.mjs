@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { assetManifest } from '../scripts/build-assets.mjs';
 import { createState, setPaused, update, interactionAt, platformsFor } from '../src/campus-engine.js';
 import { LEVEL, PHYSICS } from '../src/campus-level.js';
 import { createOrbit, updateOrbit, setOrbitPaused, reboundVelocity, ballPosition } from '../src/orbit.js';
@@ -365,3 +367,14 @@ test('wide shield changes the collider and Debug Laser damages actual targets', 
 });
 
 await runPartyTests({ test: (name, run) => test(`Team Quest: ${name}`, run), assert: assert.ok });
+
+test('the published page versions every module and CSS from the current source', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const match = html.match(/<script type="importmap">([\s\S]*?)<\/script>/);
+  assert.ok(match, 'The startup import map must exist');
+  const actual = JSON.parse(match[1]);
+  const expected = assetManifest();
+  assert.deepEqual(actual.imports, expected.imports, 'Run npm run build before publishing source changes');
+  assert.ok(html.includes(`href="./styles.css?v=${expected.version}"`), 'CSS must use the same release version');
+  assert.ok(actual.imports['./src/main.js'], 'The entry module must be versioned too');
+});
