@@ -306,7 +306,7 @@ function panels() {
   el('combat-controls').hidden = orbit;
   el('touch-controls').hidden = orbit;
   el('task-ribbon').hidden = orbit;
-  text('build-label', `${CHARACTERS[campaign.leader].name.toUpperCase()} / LEVEL ${mission.number} OF 8`);
+  text('build-label', `${CHARACTERS[campaign.leader].name.toUpperCase()} / TRIVIA / LEVEL ${mission.number} OF 8`);
   text('mission-number', String(mission.number).padStart(2, '0'));
   text('world-label', mission.subtitle);
   text('level-title', mission.title);
