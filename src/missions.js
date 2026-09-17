@@ -1,5 +1,5 @@
 import { PHYSICS } from './level.js';
-import { submitWork } from './work-tasks.js';
+import { submitWork } from './trivia-tasks.js';
 
 export function createMissionProgress() {
   return { jobs: {}, resources: new Set(), rewardedTasks: new Set(), module: 'speed', pulse: 0, pulseCooldown: 0, focused: 0,
@@ -50,7 +50,7 @@ export function missionObjective(state) {
     ? state.world.resources?.find(item => item.key === next.resource) : null;
   const target = resource ? { ...resource, title: resource.label } : next;
   const heading = required.some(station => station.workflow)
-    ? `${completed} / ${required.length} deliverables saved.` : `${completed} / ${required.length} required tasks complete.`;
+    ? `${completed} / ${required.length} trivia badges earned.` : `${completed} / ${required.length} required tasks complete.`;
   if (!target) return { completed, total: required.length, target: null,
     summary: `${heading} ${state.stage === 'boss' ? 'Control systems restored.' : 'Boss gate open.'}` };
   const horizontal = target.x - state.player.x - PHYSICS.playerWidth / 2;
@@ -73,7 +73,7 @@ function dependencyLabels(state, missing) {
 export function stationStatus(state, station) {
   const job = progressFor(state, station);
   if (job.status === 'complete') return 'Complete';
-  if (station.workflow) return job.status === 'review' ? 'Draft ready for review' : 'Ready';
+  if (station.workflow) return job.status === 'review' ? 'Question 2 ready' : 'Ready';
   if (job.status === 'rollback') return 'Rollback required';
   const missing = dependenciesFor(state, station);
   if (missing.length) return `Blocked: ${dependencyLabels(state, missing).join(', ')}`;

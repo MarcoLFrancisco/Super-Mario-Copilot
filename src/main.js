@@ -9,7 +9,7 @@ import { COMBAT } from './encounters.js';
 import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, retryLevel,
   saveCampaign, pauseCampaign, chapterAt } from './campaign.js';
 import { interactionFor, missionStations, stationStatus, missionReady, missionObjective, interact } from './missions.js';
-import { workView } from './work-tasks.js';
+import { workView } from './trivia-tasks.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -229,7 +229,7 @@ function hud() {
   el('game-viewport').classList.toggle('has-workstation', !el('interact-button').hidden);
   el('interact-button').disabled = !active;
   text('interact-label', orbit ? 'Launch core' : status === 'Complete' ? 'View saved result'
-    : status === 'Draft ready for review' ? 'Review AI draft' : `Open ${request?.workflow?.product ?? 'workspace'}`);
+    : status === 'Question 2 ready' ? 'Answer question 2' : `Open ${request?.workflow?.product ?? 'trivia'}`);
   if (!el('interact-button').hidden) positionWorkstation(request);
   controls.forEach(button => { if (!['interact','patch','query','aegis'].includes(button.dataset.action)) button.disabled = !active; });
   if (!orbit) {
@@ -418,9 +418,9 @@ function renderWorkstation(feedback = '') {
   text('task-goal', view.task.goal);
   text('task-context', view.task.context);
   icon('task-product-icon', view.task.icon);
-  text('work-phase', complete ? '3 / 3 - Saved' : view.phase === 'request' ? '1 / 3 - Request' : '2 / 3 - Review');
-  text('work-step-title', complete ? 'Deliverable saved' : view.current.title);
-  text('work-step-prompt', complete ? `${view.output.title} is saved. This workstation is complete.` : view.current.prompt);
+  text('work-phase', complete ? '2 / 2 - Complete' : view.phase === 'request' ? '1 / 2 - Question' : '2 / 2 - Question');
+  text('work-step-title', complete ? 'Trivia complete' : view.current.title);
+  text('work-step-prompt', complete ? `${view.output.title} earned. This checkpoint is complete.` : view.current.prompt);
   renderTable('work-sources', view.task.sources);
   el('work-output').hidden = view.phase === 'request';
   if (view.phase !== 'request') renderTable('work-output', view.output);

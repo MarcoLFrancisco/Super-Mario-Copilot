@@ -7,7 +7,7 @@ import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel,
 import { createBoss } from '../src/boss.js';
 import { worldMusicStep } from '../src/music.js';
 import { interact, updateMission, missionReady, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
-import { WORK_TASKS, submitWork, workView } from '../src/work-tasks.js';
+import { WORK_TASKS, submitWork, workView } from '../src/trivia-tasks.js';
 
 test('the original engine accepts a mission without changing the selected character', () => {
   const world = { ...LEVEL, width: 2000, spawn: { x: 180, y: 564 }, sparks: [], hazards: [],
@@ -59,32 +59,32 @@ function finishWork(state, key, events = []) {
   return station;
 }
 
-test('the workbook task uses Work IQ context, checks discounts, and produces a corrected workbook artifact', () => {
+test('campus trivia teaches tokens and context with corrective feedback', () => {
   const station = { workflow: WORK_TASKS.campus.find(task => task.key === 'workbook') };
   const job = {};
   assert.equal(submitWork(station, job, { phase: 'review', answers: {} }).accepted, false);
-  assert.equal(submitWork(station, job, { phase: 'request', answers: { scope: 'approved', formula: 'net' } }).accepted, true);
+  assert.equal(submitWork(station, job, { phase: 'request', answers: { answer: 'piece' } }).accepted, true);
   assert.equal(workView(station, job).phase, 'review');
-  assert.equal(submitWork(station, job, { phase: 'review', answers: { total: 'gross' } }).accepted, false);
+  assert.equal(submitWork(station, job, { phase: 'review', answers: { answer: 'train' } }).accepted, false);
   assert.equal(job.artifact, undefined);
-  const result = submitWork(station, job, { phase: 'review', answers: { total: 'sum' } });
+  const result = submitWork(station, job, { phase: 'review', answers: { answer: 'ground' } });
   assert.equal(result.complete, true);
-  assert.equal(job.artifact.title, 'Regional-sales.xlsx');
-  assert.deepEqual(job.artifact.rows.at(-1), ['Grand total', '1360']);
+  assert.equal(job.artifact.title, 'Tokens and context badge');
+  assert.deepEqual(job.artifact.rows.at(-1), ['2 / 2 correct', 'prompts and context windows']);
 });
 
-test('Cowork inbox review requires the urgent invoice and retains unsent drafts', () => {
+test('Cowork trivia reinforces bounded agent delegation', () => {
   const station = { workflow: WORK_TASKS.cowork[0] };
   const job = {};
-  submitWork(station, job, { phase: 'request', answers: { scope: 'drafts' } });
-  const rejected = submitWork(station, job, { phase: 'review', answers: { invoice: 'today', sending: 'send' } });
+  submitWork(station, job, { phase: 'request', answers: { answer: 'steps' } });
+  const rejected = submitWork(station, job, { phase: 'review', answers: { answer: 'unlimited' } });
   assert.equal(rejected.accepted, false);
-  assert.match(rejected.message, /not sending/);
-  assert.equal(submitWork(station, job, { phase: 'review', answers: { invoice: 'today', sending: 'hold' } }).complete, true);
-  assert.deepEqual(job.artifact.rows.at(-1), ['Drafts', '2 prepared; 0 sent; 0 deleted']);
+  assert.match(rejected.message, /scope and approval/);
+  assert.equal(submitWork(station, job, { phase: 'review', answers: { answer: 'bounded' } }).complete, true);
+  assert.deepEqual(job.artifact.rows.at(-1), ['2 / 2 correct', 'AI agents']);
 });
 
-test('all workplace examples provide evidence, actionable feedback, and a reviewable deliverable', () => {
+test('all trivia checkpoints provide clues, corrective feedback, and a badge', () => {
   for (const tasks of Object.values(WORK_TASKS)) for (const task of tasks) {
     const job = {};
     assert.ok(task.product && task.goal && task.sources.rows.length && task.result.rows.length);
@@ -114,67 +114,67 @@ test('each workstation can be completed independently without an unrelated prere
   }
 });
 
-test('level-two draft, repeated submission, completion, and out-of-range inputs provide immediate feedback', () => {
+test('level-two trivia, repeated submission, completion, and out-of-range inputs provide immediate feedback', () => {
   const state = createState('marco', CAMPAIGN[1]);
   const station = atStation(state, 'fix');
   const events = [];
-  const request = { phase: 'request', answers: { scope: 'counter' } };
+  const request = { phase: 'request', answers: { answer: 'context' } };
   assert.equal(interact(state, request, events), true);
-  assert.equal(stationStatus(state, station), 'Draft ready for review');
+  assert.equal(stationStatus(state, station), 'Question 2 ready');
   assert.equal(interact(state, request, events), false);
-  assert.match(events.at(-1).text, /Current step: Review before keeping/);
-  assert.equal(interact(state, { phase: 'review', answers: { tests: 'all' } }, events), true);
+  assert.match(events.at(-1).text, /Current step: Question 2 of 2/);
+  assert.equal(interact(state, { phase: 'review', answers: { answer: 'developer' } }, events), true);
   const score = state.score;
   assert.equal(interact(state, null, events), false);
-  assert.match(events.at(-1).text, /Issue-42.patch is already saved/);
+  assert.match(events.at(-1).text, /Complete the code badge is already earned/);
   assert.equal(state.score, score);
   state.player.x = -500;
   assert.equal(interact(state, null, events), false);
   assert.match(events.at(-1).text, /No workstation in range/);
 });
 
-test('drafts do not count as saved deliverables or open the end gate', () => {
+test('one trivia answer does not count as a badge or open the end gate', () => {
   const state = createState('marco', CAMPAIGN[0]);
   state.player.x = state.world.goal.x;
   let objective = missionObjective(state);
-  assert.equal(objective.summary, '0 / 3 deliverables saved. Next: Write the launch brief (Campus Courtyard), left.');
+  assert.equal(objective.summary, '0 / 3 trivia badges earned. Next: AI or automation? (Campus Courtyard), left.');
   atStation(state, 'brief');
-  interact(state, { phase: 'request', answers: { context: 'latest' } }, []);
+  interact(state, { phase: 'request', answers: { answer: 'spam' } }, []);
   assert.equal(missionObjective(state).completed, 0);
   assert.equal(missionReady(state), false);
-  interact(state, { phase: 'review', answers: { date: 'target' } }, []);
+  interact(state, { phase: 'review', answers: { answer: 'generate' } }, []);
   state.player.x = state.world.goal.x;
   objective = missionObjective(state);
   assert.equal(objective.completed, 1);
   assert.equal(objective.target.key, 'workbook');
   assert.equal(objective.direction, 'left');
   finishWork(state, 'workbook'); finishWork(state, 'deck');
-  assert.equal(missionObjective(state).summary, '3 / 3 deliverables saved. Boss gate open.');
+  assert.equal(missionObjective(state).summary, '3 / 3 trivia badges earned. Boss gate open.');
 });
 
-test('the source, draft, and saved artifact remain distinct while a task is reviewed', () => {
+test('the clue, checkpoint result, and badge remain distinct during trivia', () => {
   const state = createState('marco', CAMPAIGN[0]);
   const station = atStation(state, 'workbook');
   const source = JSON.stringify(station.workflow);
-  interact(state, { phase: 'request', answers: { scope: 'approved', formula: 'net' } }, []);
+  interact(state, { phase: 'request', answers: { answer: 'piece' } }, []);
   state.player.x = 0;
   updateMission(state, {}, 20, []);
-  assert.equal(stationStatus(state, station), 'Draft ready for review');
+  assert.equal(stationStatus(state, station), 'Question 2 ready');
   atStation(state, 'workbook');
-  interact(state, { phase: 'review', answers: { total: 'sum' } }, []);
+  interact(state, { phase: 'review', answers: { answer: 'ground' } }, []);
   state.missionProgress.jobs[station.id].artifact.rows[0][1] = 'local-copy';
   assert.equal(JSON.stringify(station.workflow), source);
-  assert.match(stationLabel(state, station), /Create the sales workbook/);
+  assert.match(stationLabel(state, station), /Tokens and context/);
 });
 
-test('a bad rollout is not approved merely because the AI draft recommends scaling', () => {
+test('Foundry rollout trivia teaches pilot containment', () => {
   const state = createState('marco', CAMPAIGN[3]);
   const station = atStation(state, 'rollout');
-  interact(state, { phase: 'request', answers: { gate: 'inspect' } }, []);
-  assert.equal(interact(state, { phase: 'review', answers: { recovery: 'continue' } }, []), false);
+  interact(state, { phase: 'request', answers: { answer: 'limit' } }, []);
+  assert.equal(interact(state, { phase: 'review', answers: { answer: 'scale' } }, []), false);
   assert.equal(state.missionProgress.jobs[station.id].artifact, undefined);
-  assert.equal(interact(state, { phase: 'review', answers: { recovery: 'rollback' } }, []), true);
-  assert.deepEqual(state.missionProgress.jobs[station.id].artifact.rows[0], ['v1','100%','Known-good service restored']);
+  assert.equal(interact(state, { phase: 'review', answers: { answer: 'rollback' } }, []), true);
+  assert.deepEqual(state.missionProgress.jobs[station.id].artifact.rows[0], ['2 / 2 correct', 'responsible deployment']);
 });
 
 test('campaign progression carries the original leader, recruits, and equipment through all eight levels', () => {

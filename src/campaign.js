@@ -3,7 +3,7 @@ import { ARENA, ENEMY_TYPES } from './encounters.js';
 import { createState, update, setPaused } from './engine.js';
 import { createOrbit, updateOrbit, setOrbitPaused } from './orbit.js';
 import { CHARACTERS, resetPartyMotion } from './party.js';
-import { WORK_TASKS, handoffTask } from './work-tasks.js';
+import { WORK_TASKS, handoffTask } from './trivia-tasks.js';
 
 const definitions = [
   {
@@ -11,7 +11,7 @@ const definitions = [
     color: '#65e0d2', sky: ['#459bcc', '#d4f0ed'], ground: ['#d6f6ed', '#277b80'],
     chapters: ['Campus Courtyard', 'Keyboard Gardens', 'Innovation Lab', 'Tower Ascent'],
     boss: 'The Setup Wizard', bossStyle: 'wizard', unlock: 'Copilot Dash',
-    intro: 'The launch team needs a Word brief, an Excel sales workbook, and a customer deck. Use Copilot with the right work context, review its drafts, and deliver the files.',
+    intro: 'Cross the campus by mastering AI fundamentals: machine learning, tokens, context, hallucinations, and verification.',
     ending: 'Campus access restored. The repository forest is still splitting into unstable branches.',
     phases: ['Loading Rings', 'Popup Cascade', 'Restart Required'], attacks: ['waves', 'agents', 'tokens'],
     route: [[0,610,720],[820,560,290],[1210,500,280],[1590,565,390],[2090,610,640],[2830,550,310],[3240,485,280],[3620,545,450],[4180,600,650],[4930,535,300],[5340,475,270],[5710,535,430],[6250,600,700],[7050,540,320],[7470,485,290],[7860,550,840]],
@@ -22,7 +22,7 @@ const definitions = [
     color: '#99edaf', sky: ['#172e39', '#376a63'], ground: ['#b6f3d1', '#235852'],
     chapters: ['Main Branch Grove', 'Feature Canopy', 'Test Caverns', 'Merge Gate'],
     boss: 'The Merge Monster', bossStyle: 'merge', unlock: 'Debug Pulse',
-    intro: 'Use GitHub Copilot to fix an active-user counter, strengthen exporter tests, and review a coding agent pull request. Keep the changes scoped to the real issue.',
+    intro: 'Branch through AI coding trivia about useful context, regression tests, scoped changes, and responsible review.',
     ending: 'The branches are stable. Cowork Central has a growing pile of unfinished plans.',
     phases: ['Conflicting Branches', 'Regression Swarm', 'Merge Window'], attacks: ['tokens', 'agents', 'waves'],
     route: [[0,610,700],[800,540,270],[1180,460,280],[1570,390,370],[2050,465,650],[2800,390,280],[3180,320,280],[3570,400,390],[4070,480,630],[4800,550,280],[5180,465,280],[5570,390,420],[6100,465,650],[6860,540,290],[7250,470,300],[7660,540,890]],
@@ -33,7 +33,7 @@ const definitions = [
     color: '#ffd18d', sky: ['#5a464d', '#b18773'], ground: ['#fff4d5', '#976a60'],
     chapters: ['Planning Plaza', 'Context Archives', 'Creation Corner', 'Review Rooftops'],
     boss: 'The Scope Creep', bossStyle: 'scope', unlock: 'Delegation Queue',
-    intro: 'Delegate a busy workday to Copilot Cowork: process the project inbox, protect focus time, and prepare a customer meeting pack. Review the proposed changes before they take effect.',
+    intro: 'Navigate Cowork Central with trivia about AI agents, bounded delegation, human approval, and permission-aware context.',
     ending: 'The agreed work is complete. The factory has been deploying helpers without evaluating them.',
     phases: ['Extra Requirements', 'Duplicate Tasks', 'Agreed Outcome'], attacks: ['agents', 'tokens', 'waves'],
     route: [[0,620,780],[880,555,300],[1290,485,340],[1740,555,310],[2170,610,720],[3000,545,280],[3390,475,320],[3820,410,360],[4290,490,660],[5060,560,300],[5470,490,270],[5850,425,370],[6330,510,690],[7130,580,330],[7570,515,340],[8020,560,880]],
@@ -44,7 +44,7 @@ const definitions = [
     color: '#ffad6b', sky: ['#252e3d', '#697580'], ground: ['#ffce8c', '#526370'],
     chapters: ['Model Gallery', 'Evaluation Labs', 'Conveyor District', 'Deployment Chamber'],
     boss: 'The Unstable Deployment', bossStyle: 'foundry', unlock: 'Model Switch',
-    intro: 'Prepare an evidence-grounded support assistant in Microsoft Foundry, compare evaluation results, and contain a failed pilot before it reaches more customers.',
+    intro: 'Fire up the Foundry with trivia about RAG, grounded answers, model evaluation, pilots, and rollback.',
     ending: 'The factory is stable. Agent City needs a team that can finish a bounded job.',
     phases: ['Latency Burst', 'Pattern Shift', 'Rollback Window'], attacks: ['tokens', 'waves', 'agents'],
     route: [[0,610,760],[870,550,360],[1330,490,300],[1740,550,380],[2230,610,760],[3090,545,330],[3530,480,340],[3980,545,330],[4420,610,700],[5230,550,350],[5690,485,300],[6100,425,310],[6520,505,720],[7350,575,330],[7790,510,310],[8210,570,850]],
@@ -56,7 +56,7 @@ const definitions = [
     color: '#96ecc1', sky: ['#1c3541', '#4c8490'], ground: ['#9ce9c3', '#2e706d'],
     chapters: ['Construction Quarter', 'Knowledge District', 'Security Transit', 'Coordination Tower'],
     boss: 'The Infinite Planner', bossStyle: 'planner', unlock: 'Parallel Assignments',
-    intro: 'Use scoped agents to prepare invoice approvals, reject an unauthorized sharing instruction, and coordinate a weekly report with verified figures.',
+    intro: 'Restore Agent City by answering questions about planning, least privilege, tool boundaries, and multi-agent orchestration.',
     ending: 'The city is moving again. Teams Tower is trapped in a meeting with no final action item.',
     phases: ['Planning Loop', 'Dependency Storm', 'Execute the Plan'], attacks: ['agents', 'waves', 'tokens'],
     route: [[0,615,740],[850,550,330],[1290,485,290],[1690,550,430],[2230,610,700],[3040,550,310],[3460,480,320],[3890,410,340],[4340,485,740],[5190,550,320],[5620,485,320],[6050,550,390],[6550,610,700],[7360,545,330],[7800,475,300],[8210,550,870]],
@@ -67,7 +67,7 @@ const definitions = [
     color: '#c4b2ff', sky: ['#373754', '#8589ac'], ground: ['#e2dbff', '#636286'],
     chapters: ['Chat Lobby', 'Channel Gardens', 'Calendar Shafts', 'Meeting Auditorium'],
     boss: 'The Meeting Overlord', bossStyle: 'meeting', unlock: 'Focus Mode',
-    intro: 'Use Copilot in Teams to summarize the meeting, extract owners and due dates, and prepare a reviewed follow-up for the right channel.',
+    intro: 'Climb Teams Tower with trivia about grounded summaries, decisions, action items, audiences, and responsible sharing.',
     ending: 'Meeting adjourned. The repaired campus has a clear path to Azure Orbit.',
     phases: ['Recurring Invitation', 'Echo Countdown', 'Final Action Item'], attacks: ['tokens', 'waves', 'agents'],
     route: [[0,615,700],[810,535,300],[1220,455,330],[1660,375,350],[2120,455,690],[2910,530,310],[3320,450,310],[3740,370,390],[4240,450,700],[5050,530,300],[5460,450,310],[5880,370,360],[6350,460,700],[7160,540,330],[7600,460,310],[8020,535,850]],
@@ -86,7 +86,7 @@ const definitions = [
     color: '#ffcf6d', sky: ['#12292f', '#335258'], ground: ['#c9f3e0', '#447278'],
     chapters: ['Repository Feed', 'Multi-agent Repair', 'Deployment Corridor', 'Command Chamber'],
     boss: 'Doctor Null & the Legacy Monolith', bossStyle: 'monolith', unlock: 'Human Oversight Restored',
-    intro: 'Reconcile work context with Work IQ, coordinate a launch pack with Cowork, and authorize a reviewed internal handoff. Doctor Null still mistakes unbounded automation for good work.',
+    intro: 'Reach the Intelligence Core by combining everything you learned about evidence, orchestration, oversight, and AI accountability.',
     ending: 'You did not replace the humans. You gave them better tools. And a flying saucer.',
     phases: ['Take Control', 'Delegate', 'Orchestrate'], attacks: ['waves', 'agents', 'tokens'],
     route: [[0,610,740],[850,535,320],[1280,455,310],[1700,385,380],[2190,465,710],[3010,545,320],[3440,470,320],[3870,395,370],[4350,475,730],[5190,550,320],[5610,475,330],[6050,400,380],[6540,490,730],[7380,565,330],[7820,490,340],[8270,550,900]],

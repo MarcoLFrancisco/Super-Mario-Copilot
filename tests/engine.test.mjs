@@ -73,16 +73,16 @@ test('pausing discards pending actions and freezes simulation', () => {
   assert.equal(update(state, {}, step).some(event => event.type === 'jump'), false);
 });
 
-test('workstation submissions require proximity and a reviewed deliverable', () => {
+test('trivia submissions require proximity and two correct answers', () => {
   const state = createState();
   const station = LEVEL.stations[0];
   update(state, { interactPressed: true }, step);
   assert.equal(state.missionProgress.jobs[station.id], undefined);
   state.player.x = station.x;
   assert.equal(interactionFor(state), station);
-  update(state, { choice: { phase: 'request', answers: { context: 'latest' } } }, step);
+  update(state, { choice: { phase: 'request', answers: { answer: 'spam' } } }, step);
   assert.equal(state.missionProgress.jobs[station.id].status, 'review');
-  const events = update(state, { choice: { phase: 'review', answers: { date: 'target' } } }, step);
+  const events = update(state, { choice: { phase: 'review', answers: { answer: 'generate' } } }, step);
   assert.equal(events.some(event => event.type === 'missionTask'), true);
   assert.equal(state.missionProgress.jobs[station.id].status, 'complete');
   const score = state.score;
@@ -90,12 +90,12 @@ test('workstation submissions require proximity and a reviewed deliverable', () 
   assert.equal(state.score, score);
 });
 
-test('reviewed work survives a fall with original character and health restored', () => {
+test('earned trivia badges survive a fall with original character and health restored', () => {
   const state = createState();
   const station = LEVEL.stations[0];
   state.player.x = station.x;
-  update(state, { choice: { phase: 'request', answers: { context: 'latest' } } }, step);
-  update(state, { choice: { phase: 'review', answers: { date: 'target' } } }, step);
+  update(state, { choice: { phase: 'request', answers: { answer: 'spam' } } }, step);
+  update(state, { choice: { phase: 'review', answers: { answer: 'generate' } } }, step);
   state.checkpointIndex = 3;
   state.combat.health = 1;
   state.player.y = LEVEL.deathY + 10;
@@ -105,7 +105,7 @@ test('reviewed work survives a fall with original character and health restored'
   assert.equal(state.combat.health, 3);
   assert.equal(state.party.leader, 'marco');
   assert.equal(state.missionProgress.jobs[station.id].status, 'complete');
-  assert.equal(state.missionProgress.jobs[station.id].artifact.title, 'Launch-brief.docx');
+  assert.equal(state.missionProgress.jobs[station.id].artifact.title, 'AI or automation? badge');
 });
 
 test('Orbit rebounds follow shield contact position without horizontal trajectories', () => {
