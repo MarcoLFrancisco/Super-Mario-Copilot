@@ -117,6 +117,8 @@ test('earned trivia badges survive a fall with original character and health res
 
 test('the quiz player renders single-select cards, feedback, Next and scored retry controls without a browser', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const quizMarkup = html.match(/<dialog id="task-dialog"[\s\S]*?<\/dialog>/)[0];
+  assert.doesNotMatch(quizMarkup, /<table\b|work-evidence|work-sources|work-output/);
   const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
   const makeNode = tagName => ({ tagName, dataset: {}, children: [], listeners: {}, textContent: '',
     append(...children) { this.children.push(...children); },
@@ -135,6 +137,8 @@ test('the quiz player renders single-select cards, feedback, Next and scored ret
   render();
   const choices = nodes.get('task-choices');
   assert.equal(choices.children.length, 3);
+  assert.deepEqual(choices.children.map(label => label.dataset.tone), ['mint', 'sky', 'coral']);
+  assert.deepEqual(choices.children.map(label => label.children[1].textContent), ['A', 'B', 'C']);
   assert.equal(choices.disabled, false);
   assert.equal(nodes.get('work-phase').textContent, 'Question 1 of 3');
   assert.equal(nodes.get('task-confirm').disabled, true);
@@ -143,6 +147,7 @@ test('the quiz player renders single-select cards, feedback, Next and scored ret
     assert.equal(input.type, 'radio'); assert.equal(input.name, 'answer'); assert.equal(input.required, true);
   }
   assert.deepEqual(inputs.map(input => input.value), job.optionOrder[0]);
+  assert.ok(inputs.every(input => input.className === 'sr-only'));
   inputs[0].listeners.change();
   assert.equal(nodes.get('task-confirm').disabled, false);
   for (const [questionIndex, question] of station.workflow.questions.entries()) {

@@ -17,11 +17,15 @@ export function renderQuiz(document, view, levelName, feedback = '') {
   el('task-dialog').dataset.phase = view.phase;
   el('task-choices').hidden = complete;
   el('task-choices').disabled = checked || complete;
-  el('task-choices').replaceChildren(...view.options.map(option => {
+  el('task-choices').replaceChildren(...view.options.map((option, position) => {
     const label = document.createElement('label'); label.className = 'quiz-answer';
+    label.dataset.tone = ['mint', 'sky', 'coral'][position];
     const input = document.createElement('input'); input.type = 'radio'; input.name = 'answer';
+    input.className = 'sr-only';
     input.value = option.id; input.required = true; input.checked = view.response?.answer === option.id;
     input.addEventListener('change', () => { el('task-confirm').disabled = false; });
+    const letter = document.createElement('span'); letter.className = 'answer-letter';
+    letter.textContent = ['A', 'B', 'C'][position];
     const name = document.createElement('span'); name.className = 'answer-text'; name.textContent = option.text;
     const mark = document.createElement('small'); mark.className = 'answer-mark';
     if (checked && option.id === view.current.correctOption) {
@@ -29,7 +33,7 @@ export function renderQuiz(document, view, levelName, feedback = '') {
     } else if (checked && input.checked) {
       label.dataset.result = 'incorrect'; mark.textContent = 'Your answer';
     }
-    label.append(input, name, mark);
+    label.append(input, letter, name, mark);
     return label;
   }));
   el('task-feedback').textContent = complete ? '' : feedback;
