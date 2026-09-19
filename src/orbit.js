@@ -12,6 +12,7 @@ const scale = 50;
 const step = 1 / 120;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const speedFor = state => 450 + state.wave * 25;
+const brickApps = ['word', 'excel', 'outlook', 'teams', 'copilot'];
 
 export function reboundVelocity(offset, speed = 450) {
   const angle = clamp(offset, -1, 1) * Math.PI / 3;
@@ -51,8 +52,8 @@ function prepareWave(state) {
   for (const item of [...state.bricks, ...state.barriers, ...state.balls]) state.world.destroyBody(item.body);
   state.bricks = []; state.barriers = []; state.balls = []; state.drops = []; state.missiles = [];
   state.portals = state.wave === 2 ? [{ x: state.width * .2, y: 390 }, { x: state.width * .8, y: 390 }] : [];
-  const addBrick = (x, y, width, height, hp, kind = 'brick', angle = 0) => {
-    const brick = { id: state.serial++, x, y, w: width, h: height, hp, maxHp: hp, kind, angle };
+  const addBrick = (x, y, width, height, hp, kind = 'brick', angle = 0, app = 'copilot') => {
+    const brick = { id: state.serial++, x, y, w: width, h: height, hp, maxHp: hp, kind, angle, app };
     brick.body = rectangle(state, brick, 'brick');
     state.bricks.push(brick);
   };
@@ -61,7 +62,7 @@ function prepareWave(state) {
     for (let armor = 0; armor < 9; armor += 1) {
       const angle = armor * Math.PI * 2 / 9;
       addBrick(state.width / 2 + Math.cos(angle) * 150, 240 + Math.sin(angle) * 125,
-        60, 30, 2, 'armor', angle);
+        60, 30, 2, 'armor', angle, brickApps[armor % brickApps.length]);
     }
     state.charges = 3; state.compute = 100;
   } else {
@@ -72,7 +73,8 @@ function prepareWave(state) {
       for (let column = 0; column < columns; column += 1) {
         if (state.wave === 2 && (column + row) % 5 === 0) continue;
         addBrick(56 + spacing * (column + .5), 110 + row * 40,
-          spacing - 9, 27, state.wave > 0 && row < 2 ? 2 : 1);
+          spacing - 9, 27, state.wave > 0 && row < 2 ? 2 : 1, 'brick', 0,
+          brickApps[(row * 2 + column + state.wave) % brickApps.length]);
       }
     }
   }

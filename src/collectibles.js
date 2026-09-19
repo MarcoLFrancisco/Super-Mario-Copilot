@@ -101,6 +101,13 @@ function copilot(ctx) {
   dot(ctx, 0, 0, 2.3, '#eaffff');
 }
 
+export function drawAppIcon(ctx, app, x, y, size = 32) {
+  const draw = ({ outlook: email, excel: sheet, word: documentIcon, teams: conversation, copilot })[app] ?? copilot;
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 32, size / 32);
+  draw(ctx);
+  ctx.restore();
+}
+
 export function drawCollectible(ctx, item, time = 0, reducedMotion = false) {
   const app = Object.hasOwn(APPS, item.app) ? item.app : 'copilot';
   const t = reducedMotion ? 0 : time;
@@ -118,7 +125,7 @@ export function drawCollectible(ctx, item, time = 0, reducedMotion = false) {
   }
   ctx.rotate(reducedMotion ? 0 : Math.sin(t * 2 + item.x) * .06);
   ctx.shadowColor = '#071d4b88'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 2;
-  ({ outlook: email, excel: sheet, word: documentIcon, teams: conversation, copilot })[app](ctx);
+  drawAppIcon(ctx, app, 0, 0);
   ctx.restore();
 }
 

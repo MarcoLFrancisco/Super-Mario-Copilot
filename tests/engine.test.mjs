@@ -9,12 +9,29 @@ import { workView, prepareQuiz, submitWork } from '../src/trivia-tasks.js';
 import { renderQuiz } from '../src/quiz-ui.js';
 import { createArcade, updateArcade, setArcadePaused } from '../src/arcade.js';
 import { renderArcade } from '../src/arcade-art.js';
-import { createOrbit, updateOrbit, setOrbitPaused, reboundVelocity, ballPosition } from '../src/orbit.js';
+import { ORBIT, createOrbit, updateOrbit, setOrbitPaused, reboundVelocity, ballPosition } from '../src/orbit.js';
+import { APPS } from '../src/level.js';
+import { renderOrbit } from '../src/orbit-art.js';
 import { runTests as runPartyTests } from './party-tests.js';
 
 const step = 1 / 120;
 const LEVEL = CAMPAIGN[0].world;
 const createState = () => createOriginalState('marco', CAMPAIGN[0]);
+
+function canvasRecorder(width = 1280) {
+  const calls = [];
+  const context = new Proxy({ canvas: { width, height: 720 } }, {
+    get(target, key) {
+      if (key in target) return target[key];
+      return (...args) => {
+        assert.ok(args.filter(value => typeof value === 'number').every(Number.isFinite));
+        calls.push([key, ...args]);
+        if (String(key).includes('Gradient')) return { addColorStop() {} };
+      };
+    }
+  });
+  return { context, calls };
+}
 
 function jumpHeight(held) {
   const state = createState();
@@ -185,7 +202,8 @@ test('Orbit rebounds follow shield contact position without horizontal trajector
 });
 
 test('arcade interludes move, pause, fail, retry and finish without advancing after completion', () => {
-  for (const kind of ['drive', 'invaders', 'pang']) {
+  assert.throws(() => createArcade('drive'), RangeError);
+  for (const kind of ['invaders', 'pang']) {
     const state = createArcade(kind, { pilot: 'donkey' });
     const startX = state.player.x;
     updateArcade(state, { right: true, fire: true }, .1);
@@ -201,7 +219,6 @@ test('arcade interludes move, pause, fail, retry and finish without advancing af
     assert.equal(state.status, 'failed');
     assert.equal(createArcade(kind).health, 3);
     const won = createArcade(kind);
-    if (kind === 'drive') won.distance = won.goal;
     if (kind === 'invaders') { won.wave = 2; won.invaders.forEach(enemy => { enemy.dead = true; }); }
     if (kind === 'pang') won.bubbles = [];
     assert.ok(updateArcade(won, {}, step).some(event => event.type === 'complete'));
@@ -237,47 +254,45 @@ test('Bubble Firewall splits a hit bubble into two smaller physical bubbles', ()
   assert.equal(state.score, 100);
 });
 
-test('coastal racing boosts temporarily and conserves the damage grace window', () => {
-  const state = createArcade('drive');
-  updateArcade(state, { jumpPressed: true }, .1);
-  assert.ok(state.boostTime > 0 && state.boostCooldown > 0);
-  const initial = state.boostCooldown;
-  updateArcade(state, { jumpPressed: true }, .1);
-  assert.ok(state.boostCooldown < initial);
-  assert.ok(state.distance > 0);
-  assert.equal(state.kind, 'drive');
-  for (let collision = 0; collision < 2; collision += 1) {
-    state.spawnTimer = 0;
-    updateArcade(state, {}, 1 / 60);
-    const traffic = state.traffic.find(item => !item.token && !item.dead);
-    traffic.z = 44; traffic.lane = 0; state.steering = 0;
-    updateArcade(state, {}, .05);
-    assert.equal(state.health, 2);
-  }
-  assert.ok(state.grace > 0);
-});
-
 test('arcade renderers produce distinct scenes without mutating simulation state', () => {
   const signatures = new Set();
-  for (const kind of ['drive', 'invaders', 'pang']) {
+  for (const kind of ['invaders', 'pang']) {
     const state = createArcade(kind);
-    const calls = [];
-    const context = new Proxy({ canvas: { width: 1280, height: 720 } }, {
-      get(target, key) {
-        if (key in target) return target[key];
-        return (...args) => {
-          assert.ok(args.filter(value => typeof value === 'number').every(Number.isFinite));
-          calls.push([key, ...args]);
-          if (String(key).includes('Gradient')) return { addColorStop() {} };
-        };
-      }
-    });
+    if (kind === 'pang') state.bubbles.forEach((bubble, tier) => { bubble.tier = tier; bubble.radius = [19, 32, 50][tier]; });
+    const { context, calls } = canvasRecorder();
     renderArcade(context, state, true);
     assert.equal(state.time, 0);
     assert.ok(calls.length > 100);
     signatures.add(JSON.stringify(calls));
+    if (kind === 'pang') {
+      for (const bubble of state.bubbles) {
+        assert.ok(calls.some(([name, x, y]) => name === 'translate' && x === bubble.x && y === bubble.y));
+        const size = bubble.radius * 1.55 / 32;
+        assert.ok(calls.some(([name, horizontal, vertical]) => name === 'scale' && horizontal === size && vertical === size));
+      }
+      assert.ok(calls.filter(([name]) => name === 'bezierCurveTo').length >= state.bubbles.length * 12);
+      assert.ok(!calls.some(([name, text]) => name === 'fillText' && ['{ }', '< >', '*'].includes(text)));
+    }
   }
-  assert.equal(signatures.size, 3);
+  assert.equal(signatures.size, 2);
+});
+
+test('Orbit bricks display Microsoft app icons in every wave without changing their physics', () => {
+  for (const width of [720, 1280]) for (let wave = 0; wave < ORBIT.waves.length; wave += 1) {
+    const state = createOrbit({ width, wave });
+    const before = state.bricks.map(brick => ({ x: brick.x, y: brick.y, w: brick.w, h: brick.h, hp: brick.hp, app: brick.app }));
+    assert.ok(state.bricks.every(brick => Object.hasOwn(APPS, brick.app)));
+    assert.equal(new Set(state.bricks.map(brick => brick.app)).size, 5);
+    const { context, calls } = canvasRecorder(width);
+    renderOrbit(context, state, true, { highContrast: true });
+    for (const [app, glyph] of [['word', 'W'], ['excel', 'X'], ['outlook', 'O']]) {
+      assert.equal(calls.filter(([name, text]) => name === 'fillText' && text === glyph).length,
+        state.bricks.filter(brick => brick.app === app).length);
+    }
+    assert.ok(calls.some(([name]) => name === 'bezierCurveTo'), 'Copilot ribbons are rendered');
+    assert.deepEqual(state.bricks.map(brick => ({ x: brick.x, y: brick.y, w: brick.w, h: brick.h, hp: brick.hp, app: brick.app })), before);
+    assert.equal(state.time, 0);
+  }
 });
 
 test('Orbit follows pointer input precisely, clamps at walls, and launches on demand', () => {

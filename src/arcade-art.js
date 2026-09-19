@@ -1,5 +1,6 @@
 import { VIEW } from './level.js';
 import { drawPartyActor } from './party-art.js';
+import { drawAppIcon } from './collectibles.js';
 
 function panel(ctx, x, y, width, height, color, radius = 4) {
   ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(x, y, width, height, radius); ctx.fill();
@@ -30,80 +31,6 @@ function pilot(ctx, state, x, y, scale = 1, moving = false, reducedMotion = fals
   drawPartyActor(ctx, { id: state.pilot, x: -17, y: 0, facing: 1, vx: moving ? 180 : 0,
     vy: 0, grounded: true, boostTime: 0, attack: null }, state.time, reducedMotion);
   ctx.restore();
-}
-
-function roadPoint(state, depth) {
-  return { x: 640 + state.curve * (1 - depth) * 160, y: 225 + depth * depth * 390, half: 25 + depth * 315 };
-}
-
-function car(ctx, x, y, scale, color, driver, state, reducedMotion) {
-  ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
-  panel(ctx, -34, -10, 68, 49, '#24363e', 8);
-  panel(ctx, -38, -8, 11, 38, '#17272d', 3); panel(ctx, 27, -8, 11, 38, '#17272d', 3);
-  polygon(ctx, [[-31,22],[-27,-34],[-19,-48],[19,-48],[27,-34],[31,22]], color);
-  polygon(ctx, [[-23,-12],[-18,-33],[18,-33],[23,-12]], '#224e65');
-  line(ctx, [[-15,-28],[13,-17]], '#a6eef5', 3);
-  if (driver) pilot(ctx, state, 0, -51, .66, false, reducedMotion);
-  panel(ctx, -33, 8, 66, 25, color, 5);
-  panel(ctx, -29, 17, 16, 6, '#ffe284', 2); panel(ctx, 13, 17, 16, 6, '#ffe284', 2);
-  panel(ctx, -11, 20, 22, 7, '#eef9ea', 1);
-  panel(ctx, -34, 30, 68, 6, '#bddbe0', 2);
-  ctx.restore();
-}
-
-function driving(ctx, state, reducedMotion) {
-  const sky = ctx.createLinearGradient(0, 0, 0, 370);
-  sky.addColorStop(0, state.difficulty > 1 ? '#519ab5' : '#63c9dc'); sky.addColorStop(1, '#ffdfb0');
-  ctx.fillStyle = sky; ctx.fillRect(0, 0, VIEW.width, VIEW.height);
-  circle(ctx, 1020, 174, 58, '#fff1b5');
-  polygon(ctx, [[0,280],[210,110],[340,255],[530,138],[680,290],[860,170],[1120,288],[1280,180],[1280,405],[0,405]], '#548d83');
-  polygon(ctx, [[0,330],[180,260],[370,323],[540,241],[700,320],[980,243],[1280,325],[1280,430],[0,430]], '#7db888');
-  ctx.fillStyle = '#63c8d5'; ctx.fillRect(0, 285, 470, 435);
-  for (let wave = 0; wave < 14; wave += 1) {
-    const height = 300 + wave * 31;
-    line(ctx, [[0,height],[420 - wave * 12,height]], wave % 2 ? '#95e3e4' : '#c2f0eb', 3);
-  }
-  polygon(ctx, [[455,230],[690,230],[1280,720],[95,720]], '#a4d189');
-  for (let strip = 0; strip < 55; strip += 1) {
-    const far = roadPoint(state, strip / 54); const near = roadPoint(state, (strip + 1) / 54);
-    const band = (strip + Math.floor(state.distance / 20)) % 4 < 2;
-    polygon(ctx, [[far.x-far.half-14,far.y],[far.x+far.half+14,far.y],[near.x+near.half+16,near.y],[near.x-near.half-16,near.y]], band ? '#fff0d2' : '#e8836b');
-    polygon(ctx, [[far.x-far.half,far.y],[far.x+far.half,far.y],[near.x+near.half,near.y],[near.x-near.half,near.y]], band ? '#46565c' : '#405159');
-    if (band) for (const lane of [-1/3, 1/3]) polygon(ctx,
-      [[far.x+far.half*lane-1,far.y],[far.x+far.half*lane+1,far.y],
-        [near.x+near.half*lane+3,near.y],[near.x+near.half*lane-3,near.y]], '#f0f1cc');
-  }
-  for (let tree = 0; tree < 12; tree += 1) {
-    const depth = ((tree / 12 + state.distance / 2500) % 1);
-    const position = roadPoint(state, depth); const side = tree % 2 ? 1 : -1;
-    const x = position.x + side * (position.half + 60 + depth * 90); const size = .2 + depth;
-    line(ctx, [[x,position.y],[x - 10*size,position.y-90*size]], '#7e7156', 7*size);
-    for (const reach of [-1,1]) {
-      polygon(ctx, [[x-10*size,position.y-90*size],[x+reach*65*size,position.y-112*size],[x+reach*42*size,position.y-72*size]], '#286e57');
-      polygon(ctx, [[x-10*size,position.y-90*size],[x+reach*52*size,position.y-60*size],[x+reach*43*size,position.y-40*size]], '#348767');
-    }
-  }
-  for (const item of state.traffic.filter(item => !item.dead).sort((first, second) => second.z - first.z)) {
-    if (item.token) {
-      circle(ctx, item.x, item.y, 15*item.scale, '#ffdb70');
-      label(ctx, '+', item.x, item.y + 7*item.scale, 22*item.scale, '#5e5526');
-    } else car(ctx, item.x, item.y, item.scale, item.color, false, state, reducedMotion);
-  }
-  if (state.boostTime > 0) {
-    for (const side of [-1,1]) polygon(ctx, [[state.player.x+side*20-6,621],[state.player.x+side*20+6,621],
-      [state.player.x+side*20,650]], '#ffd06b');
-  }
-  ctx.save(); ctx.globalAlpha = state.grace > 0 ? .65 : 1;
-  car(ctx, state.player.x, state.player.y, 1.35, '#f45e64', true, state, reducedMotion);
-  ctx.restore();
-  const remaining = Math.max(0, state.goal - state.distance);
-  if (remaining < 800) {
-    const position = roadPoint(state, Math.max(.1, 1 - remaining / 900));
-    line(ctx, [[position.x-position.half,position.y],[position.x-position.half,position.y-70],
-      [position.x+position.half,position.y-70],[position.x+position.half,position.y]], '#effcf2', 6);
-    panel(ctx, position.x-position.half, position.y-90, position.half*2, 24, '#27545c', 1);
-    label(ctx, 'FINISH', position.x, position.y-72, 16, '#ffdf86');
-  }
 }
 
 function invaders(ctx, state, reducedMotion) {
@@ -171,8 +98,7 @@ function pang(ctx, state, reducedMotion) {
     ctx.strokeStyle = '#ffffffaa'; ctx.lineWidth = 3; ctx.beginPath();
     ctx.arc(bubble.x-2, bubble.y-2, bubble.radius-5, Math.PI*1.05, Math.PI*1.6); ctx.stroke();
     ctx.strokeStyle = '#315760'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(bubble.x,bubble.y,bubble.radius,0,Math.PI*2); ctx.stroke();
-    label(ctx, bubble.tier === 2 ? '{ }' : bubble.tier === 1 ? '< >' : '*', bubble.x, bubble.y+7,
-      bubble.radius*.6, '#36575f');
+    drawAppIcon(ctx, 'copilot', bubble.x, bubble.y, bubble.radius * 1.55);
   }
   ctx.save(); ctx.globalAlpha = state.grace > 0 ? .65 : 1;
   pilot(ctx, state, state.player.x, 571, 1.08, false, reducedMotion);
@@ -183,6 +109,6 @@ export function renderArcade(ctx, state, reducedMotion = false) {
   ctx.save();
   try {
     ctx.setTransform(ctx.canvas.width / VIEW.width, 0, 0, ctx.canvas.height / VIEW.height, 0, 0);
-    ({ drive: driving, invaders, pang })[state.kind](ctx, state, reducedMotion);
+    ({ invaders, pang })[state.kind](ctx, state, reducedMotion);
   } finally { ctx.restore(); }
 }

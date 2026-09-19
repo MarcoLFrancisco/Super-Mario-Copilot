@@ -258,7 +258,9 @@ function startLevel(campaign, index, wave = 0, finale = false) {
 export function createCampaign(leader = 'marco', saved = {}, quizOverrides = {}) {
   if (!Object.hasOwn(CHARACTERS, leader)) leader = 'marco';
   const unlocked = Number.isInteger(saved.unlocked) ? Math.max(0, Math.min(7, saved.unlocked)) : 0;
-  const current = Number.isInteger(saved.current) ? Math.max(0, Math.min(unlocked, saved.current)) : 0;
+  let current = Number.isInteger(saved.current) ? Math.max(0, Math.min(unlocked, saved.current)) : 0;
+  const retiredRace = { campus: 'coast-run', foundry: 'cloud-circuit' }[CAMPAIGN[current].id];
+  if (retiredRace && saved.interlude === retiredRace && current < unlocked) current += 1;
   const recruits = new Set((Array.isArray(saved.recruits) ? saved.recruits : [])
     .filter(id => id !== leader && Object.hasOwn(CHARACTERS, id)));
   const scores = Object.fromEntries(CAMPAIGN.map(mission => [mission.id,
@@ -280,7 +282,7 @@ function startInterlude(campaign) {
   if (!definition) return false;
   const state = createArcade(definition.kind, { difficulty: definition.difficulty, pilot: campaign.leader });
   state.mission = { ...definition, type: 'arcade', subtitle: 'Arcade interlude', index: campaign.levelIndex,
-    number: campaign.levelIndex + 1, theme: definition.kind === 'drive' ? 'campus' : definition.kind === 'pang' ? 'cowork' : 'orbit' };
+    number: campaign.levelIndex + 1, theme: definition.kind === 'pang' ? 'cowork' : 'orbit' };
   state.missionProgress = createMissionProgress();
   state.campaignLevel = campaign.levelIndex;
   campaign.run = state; campaign.interlude = definition.id;

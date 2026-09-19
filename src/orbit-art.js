@@ -1,7 +1,7 @@
 import { ORBIT, ballPosition, reboundVelocity } from './orbit.js';
 import { drawPartyActor } from './party-art.js';
-
-const colors = ['#e5ba55', '#df897a', '#67c9b6', '#79b9d5'];
+import { APPS } from './level.js';
+import { drawAppIcon } from './collectibles.js';
 
 function rectangle(ctx, x, y, width, height, color, radius = 3) {
   ctx.beginPath(); ctx.roundRect(x, y, width, height, radius);
@@ -75,20 +75,32 @@ export function renderOrbit(ctx, state, reducedMotion = false, options = {}) {
   ctx.quadraticCurveTo(state.width / 2, 650, state.width, 702); ctx.stroke();
   const armorRemaining = state.bricks.some(brick => brick.kind === 'armor');
   for (const [index, brick] of state.bricks.entries()) {
-    const color = brick.kind === 'core' ? armorRemaining ? '#7e9291' : '#a1f1c4'
-      : colors[(Math.floor(brick.y / 40) + state.wave) % colors.length];
+    const app = APPS[brick.app] ?? APPS.copilot;
+    const core = brick.kind === 'core';
+    const color = core ? armorRemaining ? '#415c65' : '#277954' : app.dark;
     rectangle(ctx, brick.x - brick.w / 2, brick.y - brick.h / 2 + 4, brick.w, brick.h, '#081c23');
     rectangle(ctx, brick.x - brick.w / 2, brick.y - brick.h / 2, brick.w, brick.h, color);
-    ctx.fillStyle = '#ffffff70'; ctx.fillRect(brick.x - brick.w / 2 + 3, brick.y - brick.h / 2 + 2, brick.w - 6, 2);
+    ctx.fillStyle = app.color; ctx.fillRect(brick.x - brick.w / 2 + 3, brick.y - brick.h / 2 + 2, brick.w - 6, 2);
+    const named = !core && brick.w >= 95;
+    const size = core ? 30 : Math.min(23, brick.h - 7, brick.w - 8);
+    const iconX = named ? brick.x - brick.w / 2 + size / 2 + 6 : brick.x;
+    const iconY = brick.y - (core ? 9 : 1);
+    rectangle(ctx, iconX - size / 2 - 1, iconY - size / 2 - 1, size + 2, size + 2, '#f5fafa');
+    drawAppIcon(ctx, brick.app, iconX, iconY, size);
+    if (named) {
+      ctx.textAlign = 'left';
+      label(ctx, app.label, iconX + size / 2 + 8, brick.y + 2, 11, '#f2fcff');
+    }
     if (options.highContrast || (state.queryTime > 0 && index < 3)) {
       ctx.strokeStyle = state.queryTime > 0 && index < 3 ? '#ffeb8a' : '#ffffff'; ctx.lineWidth = 2;
       ctx.strokeRect(brick.x - brick.w / 2 - 2, brick.y - brick.h / 2 - 2, brick.w + 4, brick.h + 4);
     }
-    for (let health = 0; health < brick.hp; health += 1) {
-      rectangle(ctx, brick.x - brick.hp * 4 + health * 8, brick.y - 2, 5, 4, '#254d51', 1);
+    for (let health = 0; health < brick.maxHp; health += 1) {
+      rectangle(ctx, brick.x + brick.w / 2 - 5 - brick.maxHp * 6 + health * 6,
+        brick.y + brick.h / 2 - 5, 4, 3, health < brick.hp ? '#fff3b4' : '#16343d', 1);
     }
     if (brick.kind === 'core') {
-      ctx.textAlign = 'center'; label(ctx, armorRemaining ? state.finale ? 'MONOLITH' : 'FIREWALL' : 'RESTORE', brick.x, brick.y + 21, 10, '#204748');
+      ctx.textAlign = 'center'; label(ctx, armorRemaining ? state.finale ? 'MONOLITH' : 'FIREWALL' : 'RESTORE', brick.x, brick.y + 21, 10, '#edffeb');
       ctx.textAlign = 'left';
     }
   }

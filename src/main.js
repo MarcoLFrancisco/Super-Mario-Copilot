@@ -161,7 +161,6 @@ function press(action) {
   if (!orbitMode() && state.boss?.defeated || el('task-dialog').open) return;
   if (arcadeMode()) {
     if (['jump', 'fire', 'attack', 'interact'].includes(action)) jumpPressed = true;
-    if (action === 'boost') boostPressed = true;
     if (['left', 'right'].includes(action)) orbitPointer = null;
     return;
   }
@@ -224,12 +223,12 @@ function arcadeHud() {
   controls.forEach(button => { button.disabled = !active; });
   text('score-value', state.score.toLocaleString());
   text('items-label', 'Health'); text('sparks-value', state.health); text('sparks-total', 3);
-  text('combo-label', state.kind === 'drive' ? 'Speed' : 'Cleared');
-  text('combo-value', state.kind === 'drive' ? `${Math.round(state.speed)} km/h` : state.destroyed);
+  text('combo-label', 'Cleared');
+  text('combo-value', state.destroyed);
   text('checkpoint-label', 'Stage'); text('checkpoint-value', 'Arcade');
   text('boost-label', 'Time'); text('boost-value', `${Math.ceil(state.remaining)}s`);
   text('mission-objective', arcadeObjective(state)); text('chapter-name', 'Arcade interlude');
-  text('arcade-action-label', state.kind === 'drive' ? state.boostCooldown > 0 ? `Boost ${Math.ceil(state.boostCooldown)}s` : 'Boost' : 'Fire');
+  text('arcade-action-label', 'Fire');
   el('interact-button').hidden = true;
   el('climb-controls').hidden = true;
   el('game-viewport').classList.remove('has-workstation', 'has-climb');
@@ -368,12 +367,11 @@ function panels() {
   text('game-objective', mission.intro);
   text('start-label', 'Start level');
   icon('interact-icon', orbit && !interactionFor(state) ? 'play' : 'brain-circuit');
-  icon('arcade-action-icon', arcade && state.kind === 'drive' ? 'zap' : 'crosshair');
+  icon('arcade-action-icon', 'crosshair');
   canvas.setAttribute('aria-label', `${mission.title}, level ${mission.number}, ${CHARACTERS[campaign.leader].name}`);
   const bindings = Object.fromEntries(Object.entries(preferences.bindings).map(([action, code]) => [action, keyLabel(code)]));
   text('keyboard-help', arcade
-    ? `${bindings.left} and ${bindings.right} move; mouse or touch dragging also steers. ${state.kind === 'drive'
-      ? `${bindings.jump} or ${bindings.boost} boosts, ${bindings.climbDown} brakes.` : `Hold ${bindings.jump} or ${bindings.fire} to fire.`} Escape pauses.`
+    ? `${bindings.left} and ${bindings.right} move; mouse or touch dragging also moves your character. Hold ${bindings.jump} or ${bindings.fire} to fire. Escape pauses.`
     : orbit
     ? `${bindings.left} and ${bindings.right} move the saucer. Mouse or touch dragging also moves it. ${bindings.jump} launches. ${bindings.patch}, ${bindings.query}, ${bindings.aegis} activate repair, analysis, defense. Escape pauses.`
     : `${bindings.left} and ${bindings.right} move. Hold ${bindings.jump}, W, or Up Arrow for a full jump. ${bindings.climbUp} and ${bindings.climbDown} climb ladders or ropes. Jump to dismount. ${bindings.boost} boosts. ${bindings.attack} attacks, ${bindings.fire} fires, ${bindings.helper} commands your recruited team. ${bindings.interact} interacts with terminals. ${bindings.pulse} activates Debug Pulse. Escape pauses.`);
@@ -427,8 +425,8 @@ function showResults() {
   text('complete-title', won ? campaign.finished ? 'Control restored.' : `${mission.title} restored.` : 'Signal lost.');
   text('completion-summary', won ? mission.ending : arcade ? 'Your campaign progress is safe.' : 'The current wave is checkpointed. Retry with a fresh reserve.');
   text('final-score', (state.score + (state.finale ? campaign.segmentScore : 0)).toLocaleString());
-  text('final-items-label', arcade ? state.kind === 'drive' ? 'Distance' : 'Cleared' : orbit ? 'Wave' : 'Items');
-  text('final-sparks', arcade ? state.kind === 'drive' ? `${Math.floor(state.distance)} m` : state.destroyed
+  text('final-items-label', arcade ? 'Cleared' : orbit ? 'Wave' : 'Items');
+  text('final-sparks', arcade ? state.destroyed
     : orbit ? `${state.wave + 1} / 5` : `${state.collected.size} / ${state.world.sparks.length}`);
   text('final-combo-label', 'Campaign best');
   text('final-combo', [...Object.values(campaign.scores), ...Object.values(campaign.arcadeScores)]

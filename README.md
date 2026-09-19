@@ -1,6 +1,6 @@
 # Copilot Cloud Quest
 
-An eight-world Microsoft AI-themed campaign with six arcade interludes extending the original platform game.
+An eight-world Microsoft AI-themed campaign with four arcade interludes extending the original platform game.
 Choose **Marco, Mario, or Donkey**, recruit the other two, and keep your existing
 combat, blaster, checkpoints, and companions as you travel through the worlds.
 There are no replacement protagonists or separate Campus/Team Quest/Orbit modes.
@@ -33,7 +33,7 @@ return visits without spending resources or relying on optional upgrades.
 
 Complete all three quizzes to enter a platform world's boss arena, then attack
 during exposed windows. There are no additional boss questions.
-Finishing a level unlocks the next one and offers its arcade interlude first.
+Finishing a level unlocks the next one and offers its arcade interlude first, when available.
 The **Level map** control opens the campaign map;
 unlocked worlds can be replayed. Azure Orbit is level seven, not a simulator.
 The final world transitions from the platform encounter into a saucer finale.
@@ -73,17 +73,22 @@ bubble motion. Interludes do not add or replace any of the 72 questions.
 
 | After World | Interlude | Game |
 | --- | --- | --- |
-| Campus | Copilot Coast | Coastal racing with traffic, pickups, boost, and a finish line |
 | GitHub | AI Invaders | Two bot formations, projectiles, and destructible cover |
-| Cowork | Bubble Firewall | Harpoons split bouncing bubbles into smaller targets |
-| Foundry | Cloud Circuit | A faster, more curved racing stage |
+| Cowork | Bubble Firewall | Harpoons split bouncing Copilot-symbol bubbles into smaller targets |
 | Agent City | AI Invaders: Night Shift | Faster formations and enemy fire |
-| Teams | Bubble Festival | A larger bubble-splitting challenge before Azure Orbit |
+| Teams | Bubble Festival | A larger Copilot-bubble challenge before Azure Orbit |
 
-Move with **A/D**, Left/Right arrows, mouse, or touch dragging. In races, **Space**
-or **Shift** boosts and **V** brakes. In AI Invaders and Bubble Firewall, hold
-**Space** or **F** to fire. Dedicated on-screen buttons are available. Escape
+Move with **A/D**, Left/Right arrows, mouse, or touch dragging. Hold **Space** or
+**F** to fire. Dedicated on-screen buttons are available. Escape
 pauses every game. The selected original character appears in each interlude.
+
+The racing interludes have been removed. Campus continues directly to GitHub;
+Foundry continues directly to Agent City. Saves left inside a removed race resume
+at the next already-unlocked world, retaining main-world progress and equipment.
+
+Every bubble carries a multicolor Copilot symbol at each split size. Azure Orbit's
+breakable tiles display Word, Excel, Outlook, Teams, and Copilot icons, with app
+colors and separate durability marks. Their physical size and behavior are unchanged.
 
 Each interlude has a timer, three health points, a score, and a win/loss screen.
 A failed round offers both Retry and Continue, so an arcade break cannot block
@@ -175,7 +180,7 @@ voice provided by your browser or operating system.
 | Saucer launch/release | Space, Launch core, or a canvas tap |
 | Saucer support | 1: repair net, 2: analyze targets, 3: defend shield |
 | Arcade movement | A/D, Left/Right, mouse, or touch dragging |
-| Arcade action | Space/F fires in Invaders and Bubble Firewall; Space/Shift boosts in racing |
+| Arcade action | Space/F fires in Invaders and Bubble Firewall |
 
 Primary bindings can be changed in Preferences. Duplicate assignments are
 rejected. Arrow/W/right-Shift aliases remain unless assigned elsewhere. Touch
@@ -276,7 +281,7 @@ recorded dialogue from the broader concept are not implemented.
 - [src/engine.js](src/engine.js): original fixed-step platform/combat engine, parameterized per world.
 - [src/world-art.js](src/world-art.js): themed architecture, platforms, terminals, and boss silhouettes.
 - [src/world-routes.js](src/world-routes.js): additive upper paths, ladders, ropes, conveyors, and complexity labels.
-- [src/arcade.js](src/arcade.js) and [src/arcade-art.js](src/arcade-art.js): original racing, AI Invaders, and bubble-splitting interludes.
+- [src/arcade.js](src/arcade.js) and [src/arcade-art.js](src/arcade-art.js): AI Invaders and Copilot-bubble interludes.
 - [src/party.js](src/party.js) and [src/party-art.js](src/party-art.js): the original team and character artwork.
 - [src/orbit.js](src/orbit.js) and [src/orbit-art.js](src/orbit-art.js): saucer physics and the selected original pilot.
 - [src/main.js](src/main.js): campaign UI, input, decisions, preferences, and lifecycle.

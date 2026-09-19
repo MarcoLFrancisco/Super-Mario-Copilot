@@ -386,6 +386,31 @@ test('campaign progression carries the original leader, recruits, and equipment 
   assert.equal(advanceCampaign(campaign), false);
 });
 
+test('retired racing interludes are skipped without losing saved campaign progress', () => {
+  assert.deepEqual(Object.keys(INTERLUDES), ['github', 'cowork', 'agents', 'teams']);
+  for (const [current, interlude, next] of [[0, 'coast-run', 'github'], [3, 'cloud-circuit', 'agents']]) {
+    const campaign = createCampaign('mario', { unlocked: current + 1, current, interlude,
+      blaster: true, recruits: ['marco', 'donkey'], completed: [CAMPAIGN[current].id],
+      scores: { [CAMPAIGN[current].id]: 2400 } });
+    assert.equal(campaign.levelIndex, current + 1);
+    assert.equal(campaign.run.mission.id, next);
+    assert.equal(campaign.interlude, null);
+    assert.equal(campaign.run.party.leader, 'mario');
+    assert.equal(campaign.run.combat.blaster, true);
+    assert.deepEqual([...campaign.recruits], ['marco', 'donkey']);
+    assert.ok(campaign.completed.has(CAMPAIGN[current].id));
+    assert.equal(campaign.scores[CAMPAIGN[current].id], 2400);
+    assert.equal(selectInterlude(campaign, current), false);
+    selectLevel(campaign, current);
+    assert.equal(nextDestination(campaign).id, next);
+    campaign.run.status = 'complete'; campaign.recorded = true;
+    assert.equal(advanceCampaign(campaign), true);
+    assert.equal(campaign.run.mission.id, next);
+    const locked = createCampaign('marco', { current, unlocked: current, interlude });
+    assert.equal(locked.levelIndex, current);
+  }
+});
+
 test('arcade interludes save independently, replay safely, and allow continuing after a failed round', () => {
   const campaign = createCampaign('donkey', { unlocked: 4, current: 1, blaster: true, recruits: ['marco'] });
   assert.equal(selectInterlude(campaign, 5), false);
