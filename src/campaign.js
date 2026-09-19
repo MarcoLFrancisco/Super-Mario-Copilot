@@ -3,7 +3,9 @@ import { ARENA, ENEMY_TYPES } from './encounters.js';
 import { createState, update, setPaused } from './engine.js';
 import { createOrbit, updateOrbit, setOrbitPaused } from './orbit.js';
 import { CHARACTERS, resetPartyMotion } from './party.js';
-import { WORK_TASKS, handoffTask } from './trivia-tasks.js';
+import { WORK_TASKS, QUIZ_THEMES } from './quiz-catalog.js';
+import { createMissionProgress, interactionFor } from './missions.js';
+import { validQuizOverrides } from './trivia-tasks.js';
 
 const definitions = [
   {
@@ -123,7 +125,10 @@ function deepFreeze(value) {
 }
 
 function buildMission(definition, index) {
-  if (definition.type === 'orbit') return { ...definition, number: index + 1, index };
+  definition = { ...definition, quizTheme: QUIZ_THEMES[definition.id], intro: QUIZ_THEMES[definition.id] };
+  if (definition.type === 'orbit') return { ...definition, number: index + 1, index,
+    stations: WORK_TASKS.orbit.map((workflow, position) => ({ key: workflow.key,
+      id: `orbit-${workflow.key}`, title: workflow.title, workflow, wave: position * 2 })) };
   const platforms = definition.route.map(([x, y, w], position) => ({ id: `${definition.id}-floor-${position}`,
     x, y, w, h: 30, app: definition.app, kind: 'normal', theme: definition.theme }));
   const mainRoute = [...platforms];
@@ -138,7 +143,7 @@ function buildMission(definition, index) {
   const stations = WORK_TASKS[definition.id].map((workflow, position) => {
     const floor = mainRoute[[0, 6, 12][position]];
     return { key: workflow.key, title: workflow.title, action: 'work', workflow,
-      label: 'Open workspace', id: `${definition.id}-${workflow.key}`,
+      label: 'Open quiz', id: `${definition.id}-${workflow.key}`,
       x: floor.x + (position === 0 ? 510 : floor.w / 2), y: floor.y };
   });
   const checkpoints = [0, 4, 8, 12].map((routeIndex, chapter) => {
@@ -200,13 +205,9 @@ function buildMission(definition, index) {
       theme: definition.id === 'core' ? ['github','agents','foundry','core'][chapter] : definition.theme })),
     goal: { x: last.x + last.w - 125, y: last.y - 130, w: 76, h: 130 } };
   const health = index === 7 ? 24 : 12 + Math.min(index, 5) * 2;
-  const handoff = handoffTask(definition.id);
   const arena = { ...ARENA, name: definition.boss, theme: definition.theme, bossStyle: definition.bossStyle,
     dialogue: bossDialogue[definition.id],
-    checkpointName: `${definition.boss} checkpoint`, stations: [
-      { key: 'handoff', id: `${definition.id}-arena-handoff`, title: handoff.title,
-        action: 'work', label: 'Review handoff', workflow: handoff, x: 855, y: 520, arena: true }
-    ],
+    checkpointName: `${definition.boss} checkpoint`, stations: [],
     boss: { ...ARENA.boss, health },
     phases: definition.phases.map((name, phase) => ({ ...ARENA.phases[phase], name,
       healthAbove: phase === 2 ? 0 : Math.floor(health * (phase === 0 ? 2 / 3 : 1 / 3)),
@@ -231,6 +232,12 @@ function startLevel(campaign, index, wave = 0, finale = false) {
   state.pilot = campaign.leader;
   state.finale = finale;
   state.campaignLevel = index;
+  state.quizOverrides = structuredClone(campaign.quizOverrides ?? {});
+  if (orbital) {
+    state.mission = mission;
+    state.quizStations = finale ? [] : mission.stations;
+    state.missionProgress = createMissionProgress();
+  }
   if (!orbital) {
     state.combat.blaster = campaign.blaster;
     for (const recruit of campaign.recruits) state.party.unlocked.add(recruit);
@@ -244,7 +251,7 @@ function startLevel(campaign, index, wave = 0, finale = false) {
   return state;
 }
 
-export function createCampaign(leader = 'marco', saved = {}) {
+export function createCampaign(leader = 'marco', saved = {}, quizOverrides = {}) {
   if (!Object.hasOwn(CHARACTERS, leader)) leader = 'marco';
   const unlocked = Number.isInteger(saved.unlocked) ? Math.max(0, Math.min(7, saved.unlocked)) : 0;
   const current = Number.isInteger(saved.current) ? Math.max(0, Math.min(unlocked, saved.current)) : 0;
@@ -252,7 +259,7 @@ export function createCampaign(leader = 'marco', saved = {}) {
     .filter(id => id !== leader && Object.hasOwn(CHARACTERS, id)));
   const scores = Object.fromEntries(CAMPAIGN.map(mission => [mission.id,
     Number.isFinite(saved.scores?.[mission.id]) ? Math.max(0, saved.scores[mission.id]) : 0]));
-  const campaign = { leader, unlocked, recruits, scores, blaster: saved.blaster === true,
+  const campaign = { leader, unlocked, recruits, scores, quizOverrides: validQuizOverrides(quizOverrides), blaster: saved.blaster === true,
     completed: new Set((Array.isArray(saved.completed) ? saved.completed : []).filter(id => CAMPAIGN.some(mission => mission.id === id))),
     levelIndex: current, finalStage: false, segmentScore: 0, recorded: false, finished: false, run: null };
   startLevel(campaign, current);
@@ -279,8 +286,16 @@ export function selectLevel(campaign, index) {
 }
 
 export function retryLevel(campaign) {
-  const wave = campaign.run.mode === 'orbit' && campaign.run.status === 'failed' ? campaign.run.wave : 0;
+  const retryWave = campaign.run.mode === 'orbit' && campaign.run.status === 'failed';
+  const wave = retryWave ? campaign.run.wave : 0;
+  const progress = retryWave ? structuredClone(campaign.run.missionProgress) : null;
+  const overrides = retryWave ? campaign.run.quizOverrides : null;
   startLevel(campaign, campaign.levelIndex, campaign.finalStage ? 4 : wave, campaign.finalStage);
+  if (progress) {
+    campaign.run.missionProgress = progress;
+    campaign.run.quizOverrides = overrides;
+    campaign.run.score = progress.rewardedTasks.size * 250;
+  }
 }
 
 export function pauseCampaign(campaign, paused) {
@@ -289,6 +304,13 @@ export function pauseCampaign(campaign, paused) {
 
 export function updateCampaign(campaign, input = {}, dt = 0) {
   const state = campaign.run;
+  if (state.mode === 'orbit' && state.status === 'playing') {
+    const station = interactionFor(state);
+    if (station) {
+      state.pendingLaunch = false;
+      return input.jumpPressed || input.interactPressed ? [{ type: 'quizRequired', station }] : [];
+    }
+  }
   const events = (state.mode === 'orbit' ? updateOrbit : update)(state, input, dt);
   if (state.party) {
     campaign.recruits = new Set(state.party.unlocked);

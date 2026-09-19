@@ -1,5 +1,5 @@
 import { PHYSICS } from './level.js';
-import { submitWork } from './trivia-tasks.js';
+import { submitWork, workView } from './trivia-tasks.js';
 
 export function createMissionProgress() {
   return { jobs: {}, resources: new Set(), rewardedTasks: new Set(), module: 'speed', pulse: 0, pulseCooldown: 0, focused: 0,
@@ -7,11 +7,21 @@ export function createMissionProgress() {
 }
 
 export function missionStations(state) {
-  return (state.stage === 'boss' ? state.arena : state.world).stations ?? [];
+  const stations = state.mode === 'orbit' ? state.quizStations ?? []
+    : (state.stage === 'boss' ? state.arena : state.world).stations ?? [];
+  return stations.map(station => {
+    const workflow = state.quizOverrides?.[station.id];
+    return workflow ? { ...station, title: workflow.title, workflow } : station;
+  });
 }
 
 function progressFor(state, station) {
   return state.missionProgress.jobs[station.id] ?? { status: 'idle', remaining: station.duration ?? 0 };
+}
+
+function completedFor(state, station) {
+  const job = progressFor(state, station);
+  return job.completed === true || job.status === 'complete';
 }
 
 function dependenciesFor(state, station) {
@@ -24,11 +34,16 @@ function dependenciesFor(state, station) {
 
 export function missionReady(state) {
   return missionStations(state).filter(station => !station.optional)
-    .every(station => progressFor(state, station).status === 'complete');
+    .every(station => completedFor(state, station));
 }
 
-export function interactionFor(state) {
+export function interactionFor(state, stationId) {
   if (!state.missionProgress) return null;
+  if (state.mode === 'orbit') {
+    if (state.phase !== 'ready') return null;
+    return missionStations(state).find(station => station.wave <= state.wave
+      && (stationId ? station.id === stationId : !completedFor(state, station))) ?? null;
+  }
   const center = state.player.x + PHYSICS.playerWidth / 2;
   const feet = state.player.y + PHYSICS.playerHeight;
   return missionStations(state).filter(station => Math.abs(center - station.x) < 100 && Math.abs(feet - station.y) < 70)
@@ -43,9 +58,11 @@ export function stationLabel(state, station) {
 
 export function missionObjective(state) {
   const required = missionStations(state).filter(station => !station.optional);
-  const incomplete = required.filter(station => progressFor(state, station).status !== 'complete');
+  const incomplete = required.filter(station => !completedFor(state, station));
   const completed = required.length - incomplete.length;
   const next = incomplete[0];
+  if (state.mode === 'orbit') return { completed, total: required.length, target: next ?? null,
+    summary: `${completed} / ${required.length} quizzes complete.${next ? ` ${next.title}, sector ${next.wave + 1}.` : ''}` };
   const resource = next?.resource && !state.missionProgress.resources.has(next.resource)
     ? state.world.resources?.find(item => item.key === next.resource) : null;
   const target = resource ? { ...resource, title: resource.label } : next;
@@ -73,7 +90,11 @@ function dependencyLabels(state, missing) {
 export function stationStatus(state, station) {
   const job = progressFor(state, station);
   if (job.status === 'complete') return 'Complete';
-  if (station.workflow) return job.status === 'review' ? 'Question 2 ready' : 'Ready';
+  if (state.mode === 'orbit' && station.wave > state.wave) return `Sector ${station.wave + 1}`;
+  if (station.workflow) {
+    const view = workView(station, job);
+    return job.status === 'idle' ? 'Ready' : `Question ${Math.min(view.questionIndex + 1, view.total)} of ${view.total}`;
+  }
   if (job.status === 'rollback') return 'Rollback required';
   const missing = dependenciesFor(state, station);
   if (missing.length) return `Blocked: ${dependencyLabels(state, missing).join(', ')}`;
@@ -114,7 +135,7 @@ function complete(state, station, events) {
 }
 
 export function interact(state, choice, events) {
-  const station = interactionFor(state);
+  const station = interactionFor(state, choice?.stationId);
   if (!station) {
     message(state, 'No workstation in range. Follow the next objective marker.', events);
     return false;

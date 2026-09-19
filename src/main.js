@@ -9,7 +9,8 @@ import { COMBAT } from './encounters.js';
 import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, retryLevel,
   saveCampaign, pauseCampaign, chapterAt } from './campaign.js';
 import { interactionFor, missionStations, stationStatus, missionReady, missionObjective, interact } from './missions.js';
-import { workView } from './trivia-tasks.js';
+import { workView, prepareQuiz, validQuizOverrides } from './trivia-tasks.js';
+import { renderQuiz, createQuizEditor } from './quiz-ui.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -44,8 +45,10 @@ function writeStorage(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); }
   catch { storageAvailable = false; }
   text('storage-status', storageAvailable ? 'Local progress' : 'Session-only progress');
+  return storageAvailable;
 }
 const campaignKey = 'cloud-quest-campaign-v1';
+const quizStorageKey = 'cloud-quest-quizzes-v1';
 const savedProgress = readStorage(campaignKey, {});
 const savedPrefs = readStorage('mission-copilot-preferences-v1', {});
 const volume = (value, fallback) => Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : fallback;
@@ -62,7 +65,8 @@ for (const action of Object.keys(defaultBindings)) {
     preferences.bindings[action] = binding;
   }
 }
-let campaign = createCampaign(savedProgress?.leader ?? 'marco', savedProgress ?? {});
+let campaign = createCampaign(savedProgress?.leader ?? 'marco', savedProgress ?? {},
+  validQuizOverrides(readStorage(quizStorageKey, {})));
 let state = campaign.run;
 let started = false;
 let previous = 0;
@@ -91,7 +95,7 @@ const keys = new Map();
 const pointers = new Map();
 const orbitMode = () => state.mode === 'orbit';
 const currentMission = () => CAMPAIGN[campaign.levelIndex];
-const openDialog = () => ['task-dialog','settings-dialog','level-dialog'].map(el).find(dialog => dialog.open);
+const openDialog = () => ['task-dialog','settings-dialog','level-dialog','quiz-editor-dialog'].map(el).find(dialog => dialog.open);
 const playing = () => started && state.status === 'playing' && !openDialog();
 const finished = () => state.status === 'complete' || state.status === 'failed';
 const announce = message => text('game-announcement', message);
@@ -148,6 +152,10 @@ function clearInput() {
 }
 function press(action) {
   if (!orbitMode() && state.boss?.defeated || el('task-dialog').open) return;
+  if (orbitMode() && ['jump', 'interact'].includes(action)) {
+    const station = interactionFor(state);
+    if (station) { openTask(station); return; }
+  }
   if (action === 'attack') attackPressed = true;
   if (action === 'helper') helperPressed = true;
   if (action === 'fire') fireUntil = performance.now() + 100;
@@ -202,10 +210,10 @@ function hud() {
   const orbit = orbitMode();
   const mission = currentMission();
   const active = playing() && !state.boss?.defeated;
-  const request = orbit ? null : interactionFor(state);
+  const request = interactionFor(state);
   const status = request ? stationStatus(state, request) : '';
-  const stations = orbit ? [] : missionStations(state);
-  const objective = orbit ? null : missionObjective(state);
+  const stations = missionStations(state);
+  const objective = missionObjective(state);
   text('score-value', state.score.toLocaleString());
   text('items-label', orbit ? 'Recoveries' : 'App items');
   text('sparks-value', orbit ? state.charges : state.collected.size);
@@ -218,8 +226,8 @@ function hud() {
   text('boost-label', orbit ? 'Compute' : 'Copilot boost');
   text('boost-value', orbit ? `${Math.floor(state.compute)} / 100`
     : state.player.boostCooldown > 0 ? `${state.player.boostCooldown.toFixed(1)}s` : 'Ready');
-  text('mission-objective', orbit ? state.phase === 'ready' ? 'Core latched' : state.finale
-    ? 'Restore the Monolith command interface' : mission.boss
+  text('mission-objective', orbit ? state.finale ? 'Restore the Monolith command interface'
+    : objective.summary
     : state.stage === 'boss' && !state.boss.objectivesLocked
       ? `${state.arena.phases[state.boss.phase].name}: ${state.boss.mode}`
       : objective.summary);
@@ -228,8 +236,8 @@ function hud() {
   el('interact-button').hidden = !active || (orbit ? state.phase !== 'ready' : !request);
   el('game-viewport').classList.toggle('has-workstation', !el('interact-button').hidden);
   el('interact-button').disabled = !active;
-  text('interact-label', orbit ? 'Launch core' : status === 'Complete' ? 'View saved result'
-    : status === 'Question 2 ready' ? 'Answer question 2' : `Open ${request?.workflow?.product ?? 'trivia'}`);
+  text('interact-label', orbit && !request ? 'Launch core' : status === 'Complete' ? 'View score'
+    : status === 'Ready' ? 'Open quiz' : 'Continue quiz');
   if (!el('interact-button').hidden) positionWorkstation(request);
   controls.forEach(button => { if (!['interact','patch','query','aegis'].includes(button.dataset.action)) button.disabled = !active; });
   if (!orbit) {
@@ -263,7 +271,8 @@ function hud() {
       el(`agent-${name}`).disabled = !active || remaining > 0 || state.compute < agent.cost;
     }
   }
-  const signature = stations.map(station => `${station.id}:${stationStatus(state, station)}`).join('|');
+  const signature = stations.map(station => `${station.id}:${stationStatus(state, station)}`).join('|')
+    + (orbit ? `:${active}:${state.phase}` : '');
   if (signature !== taskSignature) {
     taskSignature = signature;
     let requiredNumber = 0;
@@ -273,12 +282,17 @@ function hud() {
       const name = document.createElement('span');
       name.textContent = station.optional ? `${station.title} (optional)` : `${++requiredNumber}. ${station.title}`;
       const detail = document.createElement('small'); detail.textContent = stationStatus(state, station);
-      item.append(name, detail); return item;
+      if (orbit) {
+        const button = document.createElement('button'); button.type = 'button';
+        button.disabled = !active || state.phase !== 'ready' || station.wave > state.wave;
+        button.append(name, detail); button.addEventListener('click', () => openTask(station)); item.append(button);
+      } else item.append(name, detail);
+      return item;
     }));
   }
   if (request && request.id !== lastStation && active) {
     lastStation = request.id;
-    say(request.workflow?.goal ?? `${request.title} is available.`);
+    say(`${request.title} is available.`);
     missionMessageUntil = state.time + 4;
   }
 }
@@ -305,7 +319,7 @@ function panels() {
   el('quest-readout').hidden = orbit;
   el('combat-controls').hidden = orbit;
   el('touch-controls').hidden = orbit;
-  el('task-ribbon').hidden = orbit;
+  el('task-ribbon').hidden = orbit && state.finale;
   text('build-label', `${CHARACTERS[campaign.leader].name.toUpperCase()} / TRIVIA / LEVEL ${mission.number} OF 8`);
   text('mission-number', String(mission.number).padStart(2, '0'));
   text('world-label', mission.subtitle);
@@ -315,7 +329,7 @@ function panels() {
   text('start-title', mission.title);
   text('game-objective', mission.intro);
   text('start-label', 'Start level');
-  icon('interact-icon', orbit ? 'play' : 'folder-open');
+  icon('interact-icon', orbit && !interactionFor(state) ? 'play' : 'brain-circuit');
   canvas.setAttribute('aria-label', `${mission.title}, level ${mission.number}, ${CHARACTERS[campaign.leader].name}`);
   const bindings = Object.fromEntries(Object.entries(preferences.bindings).map(([action, code]) => [action, keyLabel(code)]));
   text('keyboard-help', orbit
@@ -390,59 +404,13 @@ function showResults() {
   announce(won ? `${mission.title} complete.` : 'Flight ended. Retry the current wave.');
 }
 
-function renderTable(id, material) {
-  const container = el(id);
-  const title = document.createElement('h3'); title.textContent = material.title;
-  const table = document.createElement('table');
-  const head = document.createElement('thead'); const row = document.createElement('tr');
-  for (const column of material.columns) {
-    const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = column; row.append(cell);
-  }
-  head.append(row); table.append(head);
-  const body = document.createElement('tbody');
-  for (const values of material.rows) {
-    const row = document.createElement('tr');
-    for (const value of values) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }
-    body.append(row);
-  }
-  table.append(body); container.replaceChildren(title, table);
-}
-
 function renderWorkstation(feedback = '') {
   const station = taskStation;
-  const job = state.missionProgress.jobs[station.id] ?? {};
+  const job = state.missionProgress.jobs[station.id] ??= { status: 'idle' };
+  prepareQuiz(station, job);
   const view = workView(station, job);
-  const complete = view.phase === 'complete';
-  text('task-title', station.title);
-  text('task-product', view.task.product);
-  text('task-goal', view.task.goal);
-  text('task-context', view.task.context);
   icon('task-product-icon', view.task.icon);
-  text('work-phase', complete ? '2 / 2 - Complete' : view.phase === 'request' ? '1 / 2 - Question' : '2 / 2 - Question');
-  text('work-step-title', complete ? 'Trivia complete' : view.current.title);
-  text('work-step-prompt', complete ? `${view.output.title} earned. This checkpoint is complete.` : view.current.prompt);
-  renderTable('work-sources', view.task.sources);
-  el('work-output').hidden = view.phase === 'request';
-  if (view.phase !== 'request') renderTable('work-output', view.output);
-  el('task-dialog').dataset.phase = view.phase;
-  const controls = (view.current?.fields ?? []).map(item => {
-    const label = document.createElement('label'); label.textContent = item.label;
-    const select = document.createElement('select'); select.name = item.id; select.required = true;
-    const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose an option';
-    select.append(placeholder);
-    for (const [value, name] of item.options) {
-      const option = document.createElement('option'); option.value = value; option.textContent = name; select.append(option);
-    }
-    label.append(select); return label;
-  });
-  el('task-choices').replaceChildren(...controls);
-  text('task-feedback', feedback || job.feedback || '');
-  el('task-feedback').hidden = !el('task-feedback').textContent;
-  el('task-confirm').hidden = complete;
-  text('task-confirm-label', view.current?.command ?? 'Saved');
-  text('task-close-label', complete ? 'Return to level' : 'Continue later');
-  el('task-done').hidden = !complete;
-  el('task-cancel').hidden = complete;
+  renderQuiz(document, view, `Level ${currentMission().number}: ${currentMission().title}`, feedback || job.feedback || '');
 }
 
 function openTask(station) {
@@ -552,7 +520,22 @@ document.addEventListener('fullscreenchange', () => {
   resize();
 });
 el('settings-dialog').addEventListener('close', () => {
-  syncPanels(); (started && state.status === 'paused' ? el('resume-button') : el('settings-button')).focus({ preventScroll: true });
+  syncPanels();
+  if (!openDialog()) (started && state.status === 'paused' ? el('resume-button') : el('settings-button')).focus({ preventScroll: true });
+});
+const quizEditor = createQuizEditor(document, CAMPAIGN, () => campaign.quizOverrides, overrides => {
+  campaign.quizOverrides = validQuizOverrides(overrides);
+  if (!started) { selectLevel(campaign, campaign.levelIndex); activateRun(); }
+  return writeStorage(quizStorageKey, campaign.quizOverrides);
+});
+el('quiz-editor-button').addEventListener('click', () => {
+  quizEditor.selectLevel(currentMission().id);
+  el('settings-dialog').close(); showPanel('quiz-editor-dialog', 'quiz-editor-title');
+});
+el('close-quiz-editor').addEventListener('click', () => el('quiz-editor-dialog').close());
+el('quiz-editor-dialog').addEventListener('close', () => {
+  syncPanels();
+  (started && state.status === 'paused' ? el('resume-button') : el('settings-button')).focus({ preventScroll: true });
 });
 for (const [id, name] of [['reduced-motion', 'reducedMotion'], ['high-contrast', 'highContrast'], ['subtitles', 'subtitles']]) {
   el(id).checked = preferences[name];
@@ -599,36 +582,42 @@ el('level-dialog').addEventListener('close', () => {
 for (const id of ['task-cancel','task-done','close-workspace']) el(id).addEventListener('click', () => el('task-dialog').close());
 el('task-form').addEventListener('submit', event => {
   event.preventDefault();
-  if (!taskStation || orbitMode()) return;
-  if (interactionFor(state)?.id !== taskStation.id) {
-    text('task-feedback', 'This workstation is no longer in range. Return to the marked terminal.');
+  submitTask('check');
+});
+el('task-next').addEventListener('click', () => submitTask('next'));
+el('task-retry').addEventListener('click', () => submitTask('retry'));
+function submitTask(action) {
+  if (!taskStation) return;
+  if (interactionFor(state, taskStation.id)?.id !== taskStation.id) {
+    text('task-feedback', 'This quiz is not available here. Return to its checkpoint.');
     el('task-feedback').hidden = false; el('task-feedback').focus(); return;
   }
   const job = state.missionProgress.jobs[taskStation.id] ?? {};
-  const phase = workView(taskStation, job).phase;
-  const answers = Object.fromEntries(new FormData(el('task-form')));
+  const view = workView(taskStation, job);
+  const answer = new FormData(el('task-form')).get('answer');
   const events = [];
-  const accepted = interact(state, { phase, answers }, events);
+  const accepted = interact(state, { action, questionIndex: view.questionIndex, attempt: view.attempt,
+    answer, stationId: taskStation.id }, events);
   processEvents(events);
   if (accepted) {
     renderWorkstation();
-    el('work-phase').focus({ preventScroll: true });
     el('work-scroll').scrollTop = 0;
-    if (el('task-dialog').dataset.phase === 'complete') el('work-output').scrollIntoView({ block: 'start' });
+    (action === 'check' ? el('task-feedback') : el('work-step-title')).focus({ preventScroll: true });
+    if (action === 'check') el('task-feedback').scrollIntoView({ block: 'nearest' });
   } else {
-    text('task-feedback', events.at(-1)?.text ?? 'Review the required fields.');
+    text('task-feedback', events.at(-1)?.text ?? 'Choose an answer.');
     el('task-feedback').hidden = false;
     el('task-feedback').focus();
   }
   hud();
-});
+}
 el('task-dialog').addEventListener('close', () => {
   taskStation = null; clearInput(); previous = 0; syncPanels();
   (state.status === 'paused' ? el('resume-button') : canvas).focus({ preventScroll: true });
 });
 el('character-select').addEventListener('change', () => {
   if (started) return;
-  campaign = createCampaign(el('character-select').value, saveCampaign(campaign));
+  campaign = createCampaign(el('character-select').value, saveCampaign(campaign), campaign.quizOverrides);
   activateRun(); persistCampaign();
 });
 let pointerPauseIntent = null;
@@ -643,8 +632,8 @@ window.addEventListener('keydown', event => {
   if (dialog) {
     if (event.code === 'Escape') { event.preventDefault(); dialog.close(); }
     if (event.code === 'Tab') {
-      const focusable = [...dialog.querySelectorAll('button,select,input,[tabindex="0"]')]
-        .filter(node => !node.disabled && node.getClientRects().length);
+      const focusable = [...dialog.querySelectorAll('button,select,input,textarea,a[href],[tabindex="0"]')]
+        .filter(node => !node.matches(':disabled') && node.getClientRects().length);
       const first = focusable[0]; const last = focusable.at(-1);
       if (first && event.shiftKey && (document.activeElement === first || !focusable.includes(document.activeElement))) {
         event.preventDefault(); last.focus();
@@ -724,17 +713,18 @@ function processEvents(events) {
     if (event.type === 'missionTask') persistCampaign();
     if (event.type === 'checkpoint') { say(`${event.name} checkpoint online.`); persistCampaign(); }
     if (event.type === 'respawn') { clearInput(); say(`Back at ${event.name}. Your team and completed tasks are safe.`); }
-    if (event.type === 'bossEnter') { clearInput(); taskSignature = ''; say(`${currentMission().boss}. The reviewed deliverables await your final handoff at the marked desk.`); missionMessageUntil = state.time + 5; }
+    if (event.type === 'bossEnter') { clearInput(); taskSignature = ''; say(`Three quizzes complete. ${currentMission().boss} awaits.`); missionMessageUntil = state.time + 5; }
     if (event.type === 'damage') announce(`${event.health} health remaining.`);
     if (event.type === 'helperUnlocked') { say(`${event.name} has joined the team.`, 'TEAM'); persistCampaign(); }
     if (event.type === 'partyRecover') announce(`${CHARACTERS[event.character].name} regrouped.`);
-    if (event.type === 'bossExposed') announce(state.boss.objectivesLocked ? 'Save the reviewed handoff first.' : 'Core exposed.');
+    if (event.type === 'bossExposed') announce('Core exposed.');
     if (event.type === 'bossDefeated') { clearInput(); say(`${currentMission().boss} is stabilizing.`); }
     if (event.type === 'agent') say({ patch: 'Recovery net restored.', query: 'Priority targets marked.', aegis: 'Missile defense active.' }[event.name], 'TEAM');
     if (event.type === 'recovery') say('Recovery charge used. The core is back on your shield.');
     if (event.type === 'net') say('Core recovered. No recovery charge spent.');
     if (event.type === 'powerup') say(`${{ wide: 'Wide Shield', multi: 'Multiball', magnet: 'Magnetic Catch', laser: 'Debug Laser', net: 'Recovery Net', microsoft: 'Microsoft protection', blaster: 'Debug Blaster' }[event.kind]} online.`);
     if (event.type === 'wave') say(`${ORBIT.waves[event.wave]}. ${event.wave === 4 ? 'Recovery reserve restored. We are repairing the defense, not removing it.' : 'Sector checkpoint online.'}`);
+    if (event.type === 'quizRequired') openTask(event.station);
     if (event.type === 'finaleStart') {
       clearInput(); panels(); say('Board the saucer. Restore the Monolith command interface and return control to the team.');
     }

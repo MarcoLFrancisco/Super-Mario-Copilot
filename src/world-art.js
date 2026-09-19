@@ -251,12 +251,12 @@ export function drawMissionObjects(ctx, state, visible) {
     const status = stationStatus(state, station);
     const complete = status === 'Complete';
     if (station.workflow) {
-      const review = status === 'Question 2 ready';
+      const review = status.startsWith('Question');
       const accent = complete ? '#a2ffe1' : review ? '#ffe19e' : state.mission.color;
       panel(ctx, station.x - 17, station.y - 34, 34, 34, '#29475a', 3, '#7bafbd');
       panel(ctx, station.x - 44, station.y - 83, 88, 54, '#15332e', 5, accent);
       panel(ctx, station.x - 36, station.y - 75, 72, 32, complete ? '#23664d' : review ? '#664622' : '#254e62', 2);
-      label(ctx, complete ? 'EARNED' : review ? 'Q2' : 'PLAY', station.x, station.y - 55, 12, '#f3fff6', 'center');
+      label(ctx, complete ? 'DONE' : review ? `Q${(progress.jobs[station.id]?.questionIndex ?? 0) + 1}` : 'QUIZ', station.x, station.y - 55, 12, '#f3fff6', 'center');
       panel(ctx, station.x - 5, station.y - 38, 10, 3, accent, 1);
       panel(ctx, station.x - 142, station.y - 132, 284, 41, '#102a32ee', 3, '#a3c8ca66');
       label(ctx, station.workflow.product, station.x, station.y - 116, 10, '#bde9d8', 'center');

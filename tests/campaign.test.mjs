@@ -6,8 +6,9 @@ import { ARENA } from '../src/encounters.js';
 import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, saveCampaign, pauseCampaign, retryLevel } from '../src/campaign.js';
 import { createBoss } from '../src/boss.js';
 import { worldMusicStep } from '../src/music.js';
-import { interact, updateMission, missionReady, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
-import { WORK_TASKS, submitWork, workView } from '../src/trivia-tasks.js';
+import { interact, updateMission, missionReady, missionStations, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
+import { submitWork, workView, prepareQuiz, validateQuiz, validQuizOverrides } from '../src/trivia-tasks.js';
+import { WORK_TASKS } from '../src/quiz-catalog.js';
 
 test('the original engine accepts a mission without changing the selected character', () => {
   const world = { ...LEVEL, width: 2000, spawn: { x: 180, y: 564 }, sparks: [], hazards: [],
@@ -43,7 +44,8 @@ test('the campaign has eight distinct sequential worlds with original-party stat
 });
 
 function atStation(state, key) {
-  const station = (state.stage === 'boss' ? state.arena : state.world).stations.find(item => item.key === key);
+  const station = missionStations(state).find(item => item.key === key);
+  if (state.mode === 'orbit') return station;
   state.player.x = station.x - PHYSICS.playerWidth / 2;
   state.player.y = station.y - PHYSICS.playerHeight;
   state.player.vx = 0; state.player.vy = 0; state.player.grounded = true;
@@ -52,51 +54,177 @@ function atStation(state, key) {
 
 function finishWork(state, key, events = []) {
   const station = atStation(state, key);
-  for (const phase of ['request', 'review']) {
-    const answers = Object.fromEntries(station.workflow[phase].fields.map(item => [item.id, item.answer]));
-    assert.equal(interact(state, { phase, answers }, events), true);
+  for (const [questionIndex, question] of station.workflow.questions.entries()) {
+    const submission = { stationId: station.id, questionIndex, attempt: state.missionProgress.jobs[station.id]?.attempt ?? 0 };
+    if (!state.missionProgress.jobs[station.id]?.responses?.[questionIndex]) {
+      assert.equal(interact(state, { ...submission, action: 'check', answer: question.correctOption }, events), true);
+    }
+    if ((state.missionProgress.jobs[station.id]?.questionIndex ?? 0) === questionIndex) {
+      assert.equal(interact(state, { ...submission, action: 'next' }, events), true);
+    }
   }
   return station;
 }
 
-test('campus trivia teaches tokens and context with corrective feedback', () => {
-  const station = { workflow: WORK_TASKS.campus.find(task => task.key === 'workbook') };
+test('scored quizzes check each answer once and wait for Next before advancing', () => {
+  const questions = Array.from({ length: 3 }, (_, index) => ({ question: `Question ${index + 1}?`,
+    options: [{ id: 'correct', text: 'Correct choice' }, { id: 'other', text: 'Other choice' },
+      { id: 'another', text: 'Another choice' }], correctOption: 'correct',
+    explanation: 'This is the explanation.' }));
+  const station = { workflow: { title: 'Product quiz', questions } };
   const job = {};
-  assert.equal(submitWork(station, job, { phase: 'review', answers: {} }).accepted, false);
-  assert.equal(submitWork(station, job, { phase: 'request', answers: { answer: 'piece' } }).accepted, true);
-  assert.equal(workView(station, job).phase, 'review');
-  assert.equal(submitWork(station, job, { phase: 'review', answers: { answer: 'train' } }).accepted, false);
-  assert.equal(job.artifact, undefined);
-  const result = submitWork(station, job, { phase: 'review', answers: { answer: 'ground' } });
-  assert.equal(result.complete, true);
-  assert.equal(job.artifact.title, 'Tokens and context badge');
-  assert.deepEqual(job.artifact.rows.at(-1), ['2 / 2 correct', 'prompts and context windows']);
+  prepareQuiz(station, job, () => 0);
+  const order = structuredClone(job.optionOrder);
+  assert.deepEqual(workView(station, job).options.map(option => option.id), ['other', 'another', 'correct']);
+  assert.equal(submitWork(station, job, { action: 'next', questionIndex: 0, attempt: 0 }).accepted, false);
+  for (const [questionIndex, answer] of ['correct', 'other', 'correct'].entries()) {
+    const choice = { action: 'check', questionIndex, answer, attempt: 0 };
+    assert.equal(submitWork(station, job, { ...choice, answer: 'missing' }).accepted, false);
+    assert.equal(submitWork(station, job, { ...choice, questionIndex: questionIndex + 1 }).accepted, false);
+    assert.equal(submitWork(station, job, choice).accepted, true);
+    const view = workView(station, job);
+    assert.equal(view.phase, 'feedback');
+    assert.equal(view.questionIndex, questionIndex);
+    assert.equal(view.response.correct, answer === 'correct');
+    assert.match(job.feedback, /This is the explanation/);
+    assert.match(job.feedback, /Correct answer: Correct choice/);
+    assert.equal(submitWork(station, job, { ...choice, answer: 'correct' }).accepted, false);
+    assert.deepEqual(job.optionOrder, order);
+    assert.equal(job.responses.length, questionIndex + 1);
+    assert.equal(job.artifact, undefined);
+    const next = submitWork(station, job, { action: 'next', questionIndex, attempt: 0 });
+    assert.equal(next.accepted, true);
+    assert.equal(Boolean(next.complete), questionIndex === 2);
+  }
+  assert.equal(workView(station, job).phase, 'complete');
+  assert.deepEqual(job.artifact, { title: 'Product quiz badge', score: 2, total: 3 });
+  assert.equal(submitWork(station, job, { action: 'check', questionIndex: 2, answer: 'correct', attempt: 0 }).accepted, false);
+  assert.equal(workView(station, job).score, 2);
+  assert.equal(submitWork(station, job, { action: 'retry', attempt: 0 }).accepted, true);
+  assert.equal(job.completed, true);
+  assert.equal(workView(station, job).score, 0);
+  assert.equal(workView(station, job).phase, 'question');
+  assert.equal(submitWork(station, job, { action: 'check', questionIndex: 0, answer: 'correct', attempt: 0 }).accepted, false);
+  assert.equal(submitWork(station, job, { action: 'check', questionIndex: 0, answer: 'correct', attempt: 1 }).accepted, true);
 });
 
-test('Cowork trivia reinforces bounded agent delegation', () => {
-  const station = { workflow: WORK_TASKS.cowork[0] };
-  const job = {};
-  submitWork(station, job, { phase: 'request', answers: { answer: 'steps' } });
-  const rejected = submitWork(station, job, { phase: 'review', answers: { answer: 'unlimited' } });
-  assert.equal(rejected.accepted, false);
-  assert.match(rejected.message, /scope and approval/);
-  assert.equal(submitWork(station, job, { phase: 'review', answers: { answer: 'bounded' } }).complete, true);
-  assert.deepEqual(job.artifact.rows.at(-1), ['2 / 2 correct', 'AI agents']);
+test('scored quizzes only award a checkpoint after the final explanation', () => {
+  const station = { key: 'quiz', id: 'test-quiz', title: 'Product quiz', x: 510, y: 610,
+    workflow: { title: 'Product quiz', questions: [{ question: 'Which product?',
+      options: [{ id: 'copilot', text: 'Copilot' }, { id: 'other', text: 'Other' }, { id: 'another', text: 'Another' }],
+      correctOption: 'copilot', explanation: 'Copilot helps with work.' }] } };
+  const state = createState('marco', { ...CAMPAIGN[0], world: { ...CAMPAIGN[0].world, stations: [station] } });
+  atStation(state, 'quiz');
+  assert.equal(interact(state, { action: 'check', questionIndex: 0, answer: 'other', attempt: 0 }, []), true);
+  assert.equal(state.score, 0);
+  assert.equal(missionReady(state), false);
+  assert.equal(interact(state, { action: 'next', questionIndex: 0, attempt: 0 }, []), true);
+  assert.equal(missionReady(state), true);
+  assert.equal(state.score, 250);
+  assert.equal(state.missionProgress.jobs[station.id].artifact.score, 0);
+  assert.equal(interact(state, { action: 'next', questionIndex: 0, attempt: 0 }, []), false);
+  assert.equal(state.score, 250);
+  assert.equal(interact(state, { action: 'retry', attempt: 0 }, []), true);
+  assert.equal(missionReady(state), true);
+  assert.equal(interact(state, { action: 'check', questionIndex: 0, answer: 'copilot', attempt: 1 }, []), true);
+  assert.equal(interact(state, { action: 'next', questionIndex: 0, attempt: 1 }, []), true);
+  assert.equal(state.score, 250);
 });
 
-test('all trivia checkpoints provide clues, corrective feedback, and a badge', () => {
-  for (const tasks of Object.values(WORK_TASKS)) for (const task of tasks) {
-    const job = {};
-    assert.ok(task.product && task.goal && task.sources.rows.length && task.result.rows.length);
-    for (const phase of ['request','review']) {
-      const step = task[phase];
-      assert.ok(step.fields.length > 0);
-      for (const item of step.fields) assert.ok(item.options.some(([key]) => key === item.answer) && item.hint);
-      const result = submitWork({ workflow: task }, job, { phase,
-        answers: Object.fromEntries(step.fields.map(item => [item.id, item.answer])) });
-      assert.equal(result.accepted, true, `${task.key}: ${phase}`);
-      if (phase === 'review') assert.equal(result.complete, true);
+test('orbit trivia gates sectors one, three and five and survives a wave retry', () => {
+  const campaign = createCampaign('marco', { unlocked: 6, current: 6 });
+  const state = campaign.run;
+  assert.equal(missionStations(state).length, 3);
+  assert.match(missionObjective(state).summary, /0 \/ 3 quizzes complete/);
+  for (const [wave, key] of [[0, 'speech'], [2, 'documents'], [4, 'security']]) {
+    state.wave = wave; state.phase = 'ready';
+    for (const ball of state.balls) { ball.attached = true; ball.body.setActive(false); }
+    assert.equal(interact(state, { action: 'check', questionIndex: 0, attempt: 0, stationId: 'orbit-security', answer: 'vault' }, []), wave === 4);
+    const events = updateCampaign(campaign, { jumpPressed: true }, 1 / 60);
+    assert.equal(events[0].type, 'quizRequired');
+    assert.equal(state.phase, 'ready');
+    finishWork(state, key);
+    updateCampaign(campaign, { jumpPressed: true }, 1 / 60);
+    assert.equal(state.phase, 'playing');
+  }
+  assert.equal(missionReady(state), true);
+  assert.equal(state.score, 750);
+  state.status = 'failed';
+  retryLevel(campaign);
+  assert.equal(campaign.run.wave, 4);
+  assert.equal(missionReady(campaign.run), true);
+  assert.equal(campaign.run.score, 750);
+  assert.notEqual(campaign.run.missionProgress, state.missionProgress);
+});
+
+test('each level has exactly three product quizzes and bosses add no duplicate questions', () => {
+  let questions = 0;
+  for (const mission of CAMPAIGN) {
+    const stations = mission.type === 'orbit' ? mission.stations : mission.world.stations;
+    assert.equal(stations.length, 3);
+    for (const station of stations) {
+      assert.equal(station.workflow.level, mission.id);
+      assert.equal(station.workflow.questions.length, 3);
+      questions += station.workflow.questions.length;
     }
+    if (mission.arena) assert.equal(mission.arena.stations.length, 0);
+  }
+  assert.equal(questions, 72);
+});
+
+test('the product catalog preserves the supplied answers and editor metadata', () => {
+  const expected = [
+    'work,outlook,powerpoint,context,work,permissions,pages,references,history',
+    'development,completion,chat,tasks,pr,guidance,feedback,tests,secrets',
+    'tasks,briefing,actions,researcher,analyst,trends,researcher,pages,notebooks',
+    'catalog,prompts,multiple,search,sources,vectors,sources,question,examples',
+    'studio,information,flow,capability,service,automate,agents,interpreter,function',
+    'summary,actions,content,text,highlights,transcript,files,policies,permissions',
+    'speech,audio,translator,documents,language,text,vault,identity,endpoint',
+    'safety,injection,different,purview,protection,sharing,entra,actions,policy'
+  ];
+  const ids = new Set();
+  for (const [index, quizzes] of Object.values(WORK_TASKS).entries()) {
+    assert.deepEqual(quizzes.flatMap(quiz => quiz.questions.map(question => question.correctOption)), expected[index].split(','));
+    for (const quiz of quizzes) {
+      assert.equal(validateQuiz(quiz), null, quiz.title);
+      for (const question of quiz.questions) {
+        assert.equal(ids.has(question.id), false);
+        ids.add(question.id);
+        assert.ok(question.explanation);
+        assert.ok(Object.hasOwn(question, 'lastVerified'));
+      }
+    }
+  }
+  assert.equal(ids.size, 72);
+});
+
+test('Work IQ and Cowork questions retain verified official documentation', () => {
+  for (const quiz of [WORK_TASKS.campus[1], WORK_TASKS.cowork[0]]) {
+    for (const question of quiz.questions) {
+      assert.equal(new URL(question.referenceUrl).hostname, 'learn.microsoft.com');
+      assert.equal(question.lastVerified, '2026-09-19');
+    }
+  }
+  assert.equal(WORK_TASKS.campus[1].questions[2].correctOption, 'permissions');
+});
+
+test('every product quiz produces three explanations and an accurate score', () => {
+  for (const quizzes of Object.values(WORK_TASKS)) for (const quiz of quizzes) {
+    const job = {};
+    const station = { workflow: quiz };
+    for (const [questionIndex, question] of quiz.questions.entries()) {
+      const answer = questionIndex === 1 ? question.options.find(option => option.id !== question.correctOption).id : question.correctOption;
+      const submission = { questionIndex, attempt: 0 };
+      assert.equal(submitWork(station, job, { ...submission, action: 'check', answer }).accepted, true);
+      assert.ok(job.feedback.includes(question.explanation));
+      assert.equal(workView(station, job).phase, 'feedback');
+      const next = submitWork(station, job, { ...submission, action: 'next' });
+      assert.equal(next.accepted, true);
+      assert.equal(Boolean(next.complete), questionIndex === 2);
+    }
+    assert.equal(job.artifact.score, 2);
+    assert.equal(job.artifact.total, 3);
   }
 });
 
@@ -109,24 +237,23 @@ test('each workstation can be completed independently without an unrelated prere
       assert.equal(station.duration, undefined);
       finishWork(state, station.key);
       assert.equal(stationStatus(state, station), 'Complete');
-      assert.equal(state.missionProgress.jobs[station.id].artifact.title, station.workflow.result.title);
+      assert.equal(state.missionProgress.jobs[station.id].artifact.title, `${station.title} badge`);
     }
   }
 });
 
 test('level-two trivia, repeated submission, completion, and out-of-range inputs provide immediate feedback', () => {
   const state = createState('marco', CAMPAIGN[1]);
-  const station = atStation(state, 'fix');
+  const station = atStation(state, 'assistant');
   const events = [];
-  const request = { phase: 'request', answers: { answer: 'context' } };
+  const request = { action: 'check', questionIndex: 0, attempt: 0, answer: 'development' };
   assert.equal(interact(state, request, events), true);
-  assert.equal(stationStatus(state, station), 'Question 2 ready');
+  assert.equal(stationStatus(state, station), 'Question 1 of 3');
   assert.equal(interact(state, request, events), false);
-  assert.match(events.at(-1).text, /Current step: Question 2 of 2/);
-  assert.equal(interact(state, { phase: 'review', answers: { answer: 'developer' } }, events), true);
+  assert.match(events.at(-1).text, /Answer already checked/);
+  finishWork(state, station.key, events);
   const score = state.score;
   assert.equal(interact(state, null, events), false);
-  assert.match(events.at(-1).text, /Complete the code badge is already earned/);
   assert.equal(state.score, score);
   state.player.x = -500;
   assert.equal(interact(state, null, events), false);
@@ -137,44 +264,62 @@ test('one trivia answer does not count as a badge or open the end gate', () => {
   const state = createState('marco', CAMPAIGN[0]);
   state.player.x = state.world.goal.x;
   let objective = missionObjective(state);
-  assert.equal(objective.summary, '0 / 3 trivia badges earned. Next: AI or automation? (Campus Courtyard), left.');
-  atStation(state, 'brief');
-  interact(state, { phase: 'request', answers: { answer: 'spam' } }, []);
+  assert.equal(objective.summary, '0 / 3 trivia badges earned. Next: Meet Copilot (Campus Courtyard), left.');
+  atStation(state, 'copilot');
+  interact(state, { action: 'check', questionIndex: 0, attempt: 0, answer: 'work' }, []);
   assert.equal(missionObjective(state).completed, 0);
   assert.equal(missionReady(state), false);
-  interact(state, { phase: 'review', answers: { answer: 'generate' } }, []);
+  finishWork(state, 'copilot');
   state.player.x = state.world.goal.x;
   objective = missionObjective(state);
   assert.equal(objective.completed, 1);
-  assert.equal(objective.target.key, 'workbook');
+  assert.equal(objective.target.key, 'work-iq');
   assert.equal(objective.direction, 'left');
-  finishWork(state, 'workbook'); finishWork(state, 'deck');
+  finishWork(state, 'work-iq'); finishWork(state, 'beyond-chat');
   assert.equal(missionObjective(state).summary, '3 / 3 trivia badges earned. Boss gate open.');
 });
 
-test('the clue, checkpoint result, and badge remain distinct during trivia', () => {
+test('quiz responses survive closing the checkpoint and never mutate the catalog', () => {
   const state = createState('marco', CAMPAIGN[0]);
-  const station = atStation(state, 'workbook');
+  const station = atStation(state, 'work-iq');
   const source = JSON.stringify(station.workflow);
-  interact(state, { phase: 'request', answers: { answer: 'piece' } }, []);
+  interact(state, { action: 'check', questionIndex: 0, attempt: 0, answer: 'context' }, []);
   state.player.x = 0;
   updateMission(state, {}, 20, []);
-  assert.equal(stationStatus(state, station), 'Question 2 ready');
-  atStation(state, 'workbook');
-  interact(state, { phase: 'review', answers: { answer: 'ground' } }, []);
-  state.missionProgress.jobs[station.id].artifact.rows[0][1] = 'local-copy';
+  assert.equal(stationStatus(state, station), 'Question 1 of 3');
+  finishWork(state, 'work-iq');
+  state.missionProgress.jobs[station.id].responses[0].answer = 'local-copy';
   assert.equal(JSON.stringify(station.workflow), source);
-  assert.match(stationLabel(state, station), /Tokens and context/);
+  assert.match(stationLabel(state, station), /Discover Work IQ/);
 });
 
-test('Foundry rollout trivia teaches pilot containment', () => {
-  const state = createState('marco', CAMPAIGN[3]);
-  const station = atStation(state, 'rollout');
-  interact(state, { phase: 'request', answers: { answer: 'limit' } }, []);
-  assert.equal(interact(state, { phase: 'review', answers: { answer: 'scale' } }, []), false);
-  assert.equal(state.missionProgress.jobs[station.id].artifact, undefined);
-  assert.equal(interact(state, { phase: 'review', answers: { answer: 'rollback' } }, []), true);
-  assert.deepEqual(state.missionProgress.jobs[station.id].artifact.rows[0], ['2 / 2 correct', 'responsible deployment']);
+test('editor data rejects malformed quizzes and only affects newly started runs', () => {
+  const base = WORK_TASKS.campus[0];
+  const edited = structuredClone(base);
+  edited.title = 'Custom product quiz';
+  edited.questions[0].explanation = '';
+  edited.questions[0].lastVerified = null;
+  assert.equal(validateQuiz(edited), null);
+  for (const mutate of [
+    quiz => { quiz.level = '__proto__'; },
+    quiz => { quiz.questions.pop(); },
+    quiz => { quiz.questions[0].options.pop(); },
+    quiz => { quiz.questions[0].correctOption = 'unknown'; },
+    quiz => { quiz.questions[0].referenceUrl = 'javascript:alert(1)'; },
+    quiz => { quiz.questions[0].referenceUrl = 'https://microsoft.com.example.org/'; },
+    quiz => { quiz.questions[0].lastVerified = '2026-02-30'; }
+  ]) {
+    const invalid = structuredClone(base); mutate(invalid);
+    assert.ok(validateQuiz(invalid));
+    assert.deepEqual(validQuizOverrides({ 'campus-copilot': invalid }), {});
+  }
+  const campaign = createCampaign('marco', {}, { 'campus-copilot': edited });
+  assert.equal(missionStations(campaign.run)[0].title, 'Custom product quiz');
+  campaign.quizOverrides['campus-copilot'].title = 'Next run title';
+  assert.equal(missionStations(campaign.run)[0].title, 'Custom product quiz');
+  retryLevel(campaign);
+  assert.equal(missionStations(campaign.run)[0].title, 'Next run title');
+  assert.equal(CAMPAIGN[0].world.stations[0].title, 'Meet Copilot');
 });
 
 test('campaign progression carries the original leader, recruits, and equipment through all eight levels', () => {
@@ -240,19 +385,18 @@ test('the saucer mission is level seven and retries its current wave without cha
   assert.equal(campaign.run.charges, 3);
 });
 
-test('arena task retries restore progress fairly without farming score', () => {
+test('boss retries keep the three world quizzes and do not add a bonus quiz', () => {
   const state = createState('marco', CAMPAIGN[0]);
-  for (const station of state.world.stations) state.missionProgress.jobs[station.id] = { status: 'complete' };
+  for (const station of state.world.stations) finishWork(state, station.key);
   state.player.x = state.world.goal.x; state.player.y = state.world.goal.y + state.world.goal.h - PHYSICS.playerHeight;
   update(state, {}, 1 / 60);
   assert.equal(state.stage, 'boss');
-  const station = finishWork(state, 'handoff');
+  assert.deepEqual(missionStations(state), []);
   const score = state.score;
   state.player.y = 900;
   update(state, {}, 1 / 60);
-  assert.equal(state.missionProgress.jobs[station.id], undefined);
+  for (const station of state.world.stations) assert.equal(state.missionProgress.jobs[station.id].completed, true);
   assert.equal(state.boss.health, state.boss.maxHealth);
-  finishWork(state, 'handoff');
   assert.equal(state.score, score);
 });
 

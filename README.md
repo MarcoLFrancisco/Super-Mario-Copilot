@@ -8,94 +8,82 @@ There are no replacement protagonists or separate Campus/Team Quest/Orbit modes.
 The playfield uses the available page width, up to 1600 pixels, without a
 viewport-height width cap. A full-screen control is available. The original
 character art, attacks, recruitment, and independent companion AI are reused.
-All game controls, task workspaces, progress, captions, preferences, and the
+All game controls, quizzes, progress, captions, preferences, and the
 level map stay inside the game frame, including in full screen. The rendered
-playfield remains 16:9; portrait phones get a taller surrounding frame so task
-documents and controls remain usable without shrinking the scene's width.
+playfield remains 16:9; portrait phones get a taller surrounding frame so quiz
+answers and controls remain usable without shrinking the scene's width.
 
 ## The Campaign
 
 | Level | World | Playable Theme | Boss |
 | --- | --- | --- | --- |
-| 1 | Copilot Campus | A Word launch brief, an Excel workbook using Work IQ context, and a customer deck | The Setup Wizard |
-| 2 | GitHub Copilot | Fix an active-user counter, test a CSV exporter, and review a coding-agent PR | The Merge Monster |
-| 3 | Cowork Central | Triage six emails, protect calendar focus time, and prepare a meeting packet | The Scope Creep |
-| 4 | AI Foundry | Ground a policy answer, compare evaluations, and review a failed pilot rollout | The Unstable Deployment |
-| 5 | Agent City | Route an invoice for approval, enforce access boundaries, and coordinate a report | The Infinite Planner |
-| 6 | Teams Tower | Correct a meeting summary, assign agreed actions, and review a channel follow-up | The Meeting Overlord |
-| 7 | Azure Orbit | Five brick-breaking waves, portals, power-ups, resource-limited team support, selected character in the saucer | The Orbital Firewall |
-| 8 | The Intelligence Core | Reconcile conflicting evidence, align a briefing pack, approve its handoff, and complete the saucer finale | Doctor Null and the Legacy Monolith |
+| 1 | Copilot Campus | Microsoft 365 Copilot, Work IQ, and everyday AI features | The Setup Wizard |
+| 2 | GitHub Copilot | AI coding assistance, agents, and code review | The Merge Monster |
+| 3 | Cowork Central | Copilot Cowork, research, analysis, and workplace tasks | The Scope Creep |
+| 4 | AI Foundry | Models, playgrounds, grounding, and evaluation | The Unstable Deployment |
+| 5 | Agent City | Copilot Studio, agent tools, and connected actions | The Infinite Planner |
+| 6 | Teams Tower | Meeting Copilot, recap, transcription, and collaboration | The Meeting Overlord |
+| 7 | Azure Orbit | Speech, language, documents, and security alongside five brick-breaking waves | The Orbital Firewall |
+| 8 | The Intelligence Core | Responsible AI, information protection, enterprise controls, and the saucer finale | Doctor Null and the Legacy Monolith |
 
 Each platform world has its own route, four named chapter checkpoints, secret
 platforms, app collectibles, original combat encounters, mission terminals,
 boss objectives, artwork, dialogue, and musical arrangement. Main routes allow
 return visits without spending resources or relying on optional upgrades.
 
-Save all three deliverables to enter a platform world's boss arena. Review the
-final internal handoff at the arena desk, then attack during exposed windows.
+Complete all three quizzes to enter a platform world's boss arena, then attack
+during exposed windows. There are no additional boss questions.
 Finishing a level unlocks the next one and shows **Next: [world name]**.
 The **Level map** control opens the campaign map;
 unlocked worlds can be replayed. Azure Orbit is level seven, not a simulator.
 The final world transitions from the platform encounter into a saucer finale.
 
-### Completing A Workstation
+### Playing A Quiz
 
-Each platform world has **three independent workstations**. There are no hidden
-prerequisite switches, waiting timers, or required pickups for these tasks.
+The catalog has **8 levels x 3 quizzes x 3 questions = 72 questions**. These are
+unofficial product-awareness questions, not certification or exam questions.
 
-1. Approach a desk with a product label. Press **E**, click its monitor, or use
-	the **Open [product]** button floating above it.
-2. Read the goal and source evidence. Choose the request's context, scope, or
-	calculation, then use the product-specific command to generate a draft.
-3. Review the draft against the sources. Correct the discrepancy and save the
-	reviewed result. An incorrect or empty choice produces specific feedback
-	inside the workspace and does not award task credit.
+1. Approach a quiz terminal and press **E**, click its monitor, or select **Open quiz**.
+2. Choose one of three answer cards and select **Check answer**.
+3. Read the correct/incorrect feedback, correct answer, and short explanation.
+4. Select **Next question**, then **See score** after the third answer.
+5. Use **Retry** for another attempt or **Continue** to return to the level.
 
-The header shows **Request**, **Review**, or **Saved**. The world stays paused
-while a workspace is open. **Continue later** retains a generated draft for the
-current run; **View saved result** reopens a completed deliverable. On a small
-screen, the workspace scrolls internally while its header and action bar stay
-inside the game frame. Only **Saved** tasks count toward **3 / 3**.
+Answers are shuffled once per attempt and graded by stable option IDs, not their
+screen position. Each choice is scored once. Completing all three questions earns
+a checkpoint at any score; retries cannot farm the 250-point completion reward
+or remove an already earned checkpoint. Empty answers do not advance the quiz.
+The game freezes while the dialog is open. Closing it retains question progress
+within the current run. On small screens, the question area scrolls internally.
 
-### Clearing Copilot Campus
+Each platform world has three independent quiz terminals. In **Azure Orbit**,
+quizzes unlock launches at sectors **1, 3, and 5**. Use the quiz ribbon while the
+core is latched to revisit earlier quizzes. Flight physics, support actions,
+recovery charges, and the final Core saucer sequence are unchanged.
 
-Complete these in any order:
+### Editing Quizzes
 
-1. **Write the launch brief**: use the latest project plan and Teams decision.
-	The date is a target subject to legal approval, not a confirmed promise.
-2. **Create the sales workbook**: use the approved sales table and calculate
-	quantity times unit price minus discount. North is 600, South is 360, West is
-	400, and the corrected total is **1,360**, not the draft's 1,400.
-3. **Build the customer deck**: use approved customer-facing facts and remove
-	the unsupported savings claim.
+Open **Preferences > Quiz editor**. Select a level and quiz, then edit its title,
+product, three questions, three options per question, correct answer, optional
+explanation, official reference URL, and last-verified date.
 
-The objective names the next unfinished deliverable, its chapter, and its
-direction. At **3 / 3**, the far-right gate admits you to the Setup Wizard arena.
-Review the handoff at the desk on the right platform, using only the reviewed
-files and internal recipients, before fighting the boss.
+**Save locally** stores an override in this browser for new runs; an active run
+keeps its existing questions. **Restore default** resets the selected quiz.
+**Export saved quizzes** downloads the saved catalog as JSON. The editor does not
+change repository files or publish changes. Unsaved form drafts remain in memory
+while switching quizzes, but are not included in exports.
 
-### Product Context
+The shipped content is in [src/quiz-catalog.js](src/quiz-catalog.js). A null
+`lastVerified` means the content still needs editorial verification, not that
+the reference is broken. Work IQ and Cowork descriptions were checked against
+Microsoft Learn on **2026-09-19**. Changing question content or its reference in
+the editor clears the verification date. Link reachability alone is not treated
+as fact verification. The supplied Azure AI Foundry wording refers to the product
+now called Microsoft Foundry in current documentation.
 
-The exercises contain fictional emails, project decisions, orders, code, model
-evaluations, and policies. Copilot drafts deliberately include a reviewable
-mistake. Cowork's inbox example classifies all six emails, prioritizes the urgent
-invoice, and keeps two replies as drafts: **zero sent, zero deleted**.
-
-Work IQ supplies permitted work context; it is not presented as a standalone
-spreadsheet generator. The workbook example combines that context with Copilot
-in Excel. Named outputs such as **Regional-sales.xlsx** and **Launch-brief.docx**
-are tables and records in the game's memory, not downloaded Office files or real
-Microsoft actions. No email is accessed, sent, or deleted. No cloud resource or
-repository is changed by completing a task.
-
-Product references:
-
-- [Copilot Cowork: a new way of getting work done](https://www.microsoft.com/en-us/microsoft-365/blog/2026/03/09/copilot-cowork-a-new-way-of-getting-work-done/)
-- [Announcing the new Work IQ APIs](https://www.microsoft.com/en-us/microsoft-365/blog/2026/06/02/announcing-the-new-work-iq-apis/)
-- [Copilot's agentic capabilities in Word, Excel, and PowerPoint](https://www.microsoft.com/en-us/microsoft-365/blog/2026/04/22/copilots-agentic-capabilities-in-word-excel-and-powerpoint-are-generally-available/)
-
-Actual availability, licensing, permissions, and product behavior vary. Fictional
-evaluation results are not model benchmarks or product guarantees.
+Actual availability, naming, licensing, and permissions vary. Review unverified
+entries and current official sources before publishing. Gameplay does not call
+Microsoft services, access email, or change cloud resources or repositories.
 
 ## Run Locally
 
@@ -126,7 +114,7 @@ voice provided by your browser or operating system.
 | Melee attack | J or Attack; tap once per attack |
 | Debug Blaster | Hold F or Fire after collecting a blaster |
 | Command recruited companions | K or Helpers; companions also act automatically |
-| Workstation interaction | E, a nearby monitor, or its floating Open / Review / View saved result button |
+| Quiz interaction | E, a nearby monitor, or its floating Open quiz / Continue quiz / View score button |
 | Debug Pulse | Q after GitHub; reveals resource and task markers |
 | Focus Mode | Hold C after Teams to slow the game |
 | Pause/resume | Escape or the in-game toolbar control |
@@ -138,9 +126,9 @@ Primary bindings can be changed in Preferences. Duplicate assignments are
 rejected. Arrow/W/right-Shift aliases remain unless assigned elsewhere. Touch
 controls use pointer capture and clear held input on release or cancellation.
 
-Workstations open a contained workspace and freeze simulation while you choose.
+Quiz terminals open a contained dialog and freeze simulation while you choose.
 Opening Preferences or the level map, changing windows, or hiding the page pauses
-the game. Resume refocuses the canvas. Escape closes an open workspace before
+the game. Resume refocuses the canvas. Escape closes an open quiz before
 handling gameplay pause. Dialogue captions and mouse/touch controls remain
 inside the playfield.
 
@@ -153,15 +141,15 @@ levels. Companions retain the original independent navigation and combat rules.
 
 Falling or losing all three health points returns you to the current checkpoint.
 World retries retain collected items, used bricks, defeated enemies, completed
-tasks, and recruits. Boss retries restore health and the blaster and reset the
-arena handoff. Repeating it does not award its points again. Drafts and saved
-world deliverables survive checkpoint recovery. Incorrect requests or reviews
-leave the task unfinished and preserve the source evidence.
+quizzes, and recruits. Boss retries restore health and the blaster without adding
+extra quizzes. Quiz responses and earned badges survive checkpoint recovery.
+Incorrect answers receive explanations and contribute zero to the quiz score.
 
 Orbit provides three recovery charges. Only losing the last ball spends a charge;
 losing one ball during multiball does not. A recovery net saves a missed ball
 without spending a charge. A failed flight can retry its current wave with fresh
-resources. The boss wave restores reserves on entry.
+resources and retains its quiz progress and once-only quiz rewards. The boss
+wave restores reserves on entry.
 
 | Support Action | Compute | Cooldown |
 | --- | --- | --- |
@@ -174,9 +162,10 @@ services. Compute regenerates during active play and through brick hits.
 
 The campaign save records unlocked/completed levels, selected leader, recruits,
 equipment, and best scores at progression events. A reload restarts the current
-level; exact live checkpoints, drafts, artifacts, and wave state are not serialized.
+level; exact live checkpoints, quiz attempts, and wave state are not serialized.
 Older saves are left intact in their previous storage keys. Blocked storage falls
-back to session-only play. Preferences use their existing save key.
+back to session-only play. Preferences use their existing save key. Quiz editor
+overrides are stored separately under `cloud-quest-quizzes-v1`.
 
 ## Build And Test
 
@@ -193,22 +182,18 @@ and stylesheet URL in [index.html](index.html); commit that HTML with the source
 The version check prevents mixed cached releases. Startup errors or a 15-second
 stall show a message and **Retry loading**, without deleting saves.
 
-The 59 tests cover original movement, all 16 companion regressions,
-every platform world's forward and return route connections, required world and
-boss tasks, independent workstations, source/draft/artifact isolation, workbook
-totals, inbox scope, failed-pilot review, repeated-submission feedback, once-only
-task rewards, campaign continuity, saves, the final saucer transition, Orbit
-physics, and next-deliverable guidance.
+The tests cover original movement, all 16 companion regressions, every platform
+world's forward and return routes, all 72 answer mappings, scoring, shuffled
+answer IDs, check/next feedback, retries, once-only rewards, editor validation,
+catalog isolation, orbital quiz gates, campaign continuity, saves, the final
+saucer transition, Orbit physics, and quiz objective guidance. A mocked-DOM test
+checks the player form without opening a browser.
 See [tests/campaign.test.mjs](tests/campaign.test.mjs) and
 [tests/engine.test.mjs](tests/engine.test.mjs).
 
-Browser checks cover actual request/review/save submissions for the level-two
-patch, workbook, and inbox; incorrect-choice feedback; draft reopening; frozen
-gameplay during review; Preferences focus; the eight-level map; full screen;
-and a saucer launch and support action. Desktop and emulated 390x844 phone checks
-verify that controls and dialogs stay inside the game frame. Browser-only
-fixtures place the unchanged original player beside later workstations; these
-fixtures are removed and temporary save changes are restored after checking.
+Browser and on-screen tests were not run for this quiz replacement. Manually
+check answer selection, feedback, retries, editor saving, keyboard focus,
+desktop/mobile dialog containment, and Orbit's three quiz launch gates.
 
 This implementation still needs uninterrupted human campaign playthroughs,
 difficulty and duration tuning, real-device multitouch, broader browser and
@@ -221,7 +206,9 @@ recorded dialogue from the broader concept are not implemented.
 
 - [src/campaign.js](src/campaign.js): eight world definitions, progression, and saves.
 - [src/missions.js](src/missions.js): terminal interactions, dependencies, moving lifts, and objective gates.
-- [src/work-tasks.js](src/work-tasks.js): fictional workplace evidence, two-stage request/review validation, and saved artifacts.
+- [src/quiz-catalog.js](src/quiz-catalog.js): all 72 product questions, answer IDs, and editorial reference metadata.
+- [src/trivia-tasks.js](src/trivia-tasks.js): scored quiz attempts, shuffling, retries, and editor validation.
+- [src/quiz-ui.js](src/quiz-ui.js): player form and local quiz editor.
 - [src/engine.js](src/engine.js): original fixed-step platform/combat engine, parameterized per world.
 - [src/world-art.js](src/world-art.js): themed architecture, platforms, terminals, and boss silhouettes.
 - [src/party.js](src/party.js) and [src/party-art.js](src/party-art.js): the original team and character artwork.

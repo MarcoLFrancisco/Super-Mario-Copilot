@@ -5,6 +5,8 @@ import { assetManifest } from '../scripts/build-assets.mjs';
 import { createState as createOriginalState, setPaused, update } from '../src/engine.js';
 import { CAMPAIGN } from '../src/campaign.js';
 import { interactionFor } from '../src/missions.js';
+import { workView, prepareQuiz, submitWork } from '../src/trivia-tasks.js';
+import { renderQuiz } from '../src/quiz-ui.js';
 import { createOrbit, updateOrbit, setOrbitPaused, reboundVelocity, ballPosition } from '../src/orbit.js';
 import { runTests as runPartyTests } from './party-tests.js';
 
@@ -73,16 +75,19 @@ test('pausing discards pending actions and freezes simulation', () => {
   assert.equal(update(state, {}, step).some(event => event.type === 'jump'), false);
 });
 
-test('trivia submissions require proximity and two correct answers', () => {
+test('trivia submissions require proximity and checking all three questions', () => {
   const state = createState();
   const station = LEVEL.stations[0];
   update(state, { interactPressed: true }, step);
   assert.equal(state.missionProgress.jobs[station.id], undefined);
   state.player.x = station.x;
   assert.equal(interactionFor(state), station);
-  update(state, { choice: { phase: 'request', answers: { answer: 'spam' } } }, step);
-  assert.equal(state.missionProgress.jobs[station.id].status, 'review');
-  const events = update(state, { choice: { phase: 'review', answers: { answer: 'generate' } } }, step);
+  const events = [];
+  for (const [questionIndex, question] of station.workflow.questions.entries()) {
+    update(state, { choice: { action: 'check', questionIndex, attempt: 0, answer: question.correctOption } }, step);
+    assert.equal(state.missionProgress.jobs[station.id].status, 'feedback');
+    events.push(...update(state, { choice: { action: 'next', questionIndex, attempt: 0 } }, step));
+  }
   assert.equal(events.some(event => event.type === 'missionTask'), true);
   assert.equal(state.missionProgress.jobs[station.id].status, 'complete');
   const score = state.score;
@@ -94,8 +99,10 @@ test('earned trivia badges survive a fall with original character and health res
   const state = createState();
   const station = LEVEL.stations[0];
   state.player.x = station.x;
-  update(state, { choice: { phase: 'request', answers: { answer: 'spam' } } }, step);
-  update(state, { choice: { phase: 'review', answers: { answer: 'generate' } } }, step);
+  for (const [questionIndex, question] of station.workflow.questions.entries()) {
+    update(state, { choice: { action: 'check', questionIndex, attempt: 0, answer: question.correctOption } }, step);
+    update(state, { choice: { action: 'next', questionIndex, attempt: 0 } }, step);
+  }
   state.checkpointIndex = 3;
   state.combat.health = 1;
   state.player.y = LEVEL.deathY + 10;
@@ -105,7 +112,60 @@ test('earned trivia badges survive a fall with original character and health res
   assert.equal(state.combat.health, 3);
   assert.equal(state.party.leader, 'marco');
   assert.equal(state.missionProgress.jobs[station.id].status, 'complete');
-  assert.equal(state.missionProgress.jobs[station.id].artifact.title, 'AI or automation? badge');
+  assert.equal(state.missionProgress.jobs[station.id].artifact.title, 'Meet Copilot badge');
+});
+
+test('the quiz player renders single-select cards, feedback, Next and scored retry controls without a browser', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
+  const makeNode = tagName => ({ tagName, dataset: {}, children: [], listeners: {}, textContent: '',
+    append(...children) { this.children.push(...children); },
+    replaceChildren(...children) { this.children = children; },
+    addEventListener(name, listener) { this.listeners[name] = listener; } });
+  const nodes = new Map();
+  const document = { createElement: makeNode, getElementById(id) {
+    assert.ok(ids.has(id), `Missing HTML element: ${id}`);
+    if (!nodes.has(id)) nodes.set(id, makeNode('div'));
+    return nodes.get(id);
+  } };
+  const station = LEVEL.stations[0];
+  const job = {};
+  prepareQuiz(station, job, () => 0);
+  const render = () => renderQuiz(document, workView(station, job), 'Copilot Campus', job.feedback);
+  render();
+  const choices = nodes.get('task-choices');
+  assert.equal(choices.children.length, 3);
+  assert.equal(choices.disabled, false);
+  assert.equal(nodes.get('work-phase').textContent, 'Question 1 of 3');
+  assert.equal(nodes.get('task-confirm').disabled, true);
+  const inputs = choices.children.map(label => label.children[0]);
+  for (const input of inputs) {
+    assert.equal(input.type, 'radio'); assert.equal(input.name, 'answer'); assert.equal(input.required, true);
+  }
+  assert.deepEqual(inputs.map(input => input.value), job.optionOrder[0]);
+  inputs[0].listeners.change();
+  assert.equal(nodes.get('task-confirm').disabled, false);
+  for (const [questionIndex, question] of station.workflow.questions.entries()) {
+    const answer = questionIndex === 0 ? 'hardware' : question.correctOption;
+    submitWork(station, job, { action: 'check', questionIndex, attempt: 0, answer }); render();
+    assert.equal(choices.disabled, true);
+    assert.equal(nodes.get('task-confirm').hidden, true);
+    assert.equal(nodes.get('task-next').hidden, false);
+    assert.equal(nodes.get('task-feedback').hidden, false);
+    assert.equal(choices.children.filter(label => label.dataset.result === 'correct').length, 1);
+    assert.equal(choices.children.filter(label => label.children[0].checked).length, 1);
+    assert.equal(nodes.get('task-next-label').textContent, questionIndex === 2 ? 'See score' : 'Next question');
+    submitWork(station, job, { action: 'next', questionIndex, attempt: 0 }); render();
+  }
+  assert.equal(nodes.get('quiz-score').textContent, '2 / 3');
+  assert.equal(nodes.get('quiz-result').hidden, false);
+  assert.equal(nodes.get('task-retry').hidden, false);
+  assert.equal(nodes.get('task-done').hidden, false);
+  assert.equal(nodes.get('task-next').hidden, true);
+  submitWork(station, job, { action: 'retry', attempt: 0 }); render();
+  assert.equal(nodes.get('work-phase').textContent, 'Question 1 of 3');
+  assert.equal(nodes.get('task-choices').disabled, false);
+  assert.equal(nodes.get('task-feedback').hidden, true);
 });
 
 test('Orbit rebounds follow shield contact position without horizontal trajectories', () => {
