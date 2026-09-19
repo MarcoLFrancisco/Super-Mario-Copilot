@@ -4,46 +4,49 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c151e">
-  <meta name="description" content="An eight-level Microsoft AI-themed platform adventure with Marco, Mario, and Donkey. Explore the campus, repository forest, workspace, factory, city, tower, orbit, and Intelligence Core.">
+  <meta name="description" content="Eight Microsoft AI-themed worlds and six arcade interludes with Marco, Mario, and Donkey. Jump, climb, race, clear AI Invaders, and split data bubbles with your team.">
   <title>Copilot Cloud Quest</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="./styles.css?v=ccfb19ebb415688a">
+  <link rel="stylesheet" href="./styles.css?v=bb5a1d111f5df39b">
   <script type="importmap">
 {
   "imports": {
-    "./src/actor-physics.js": "./src/actor-physics.js?v=ccfb19ebb415688a",
-    "./src/art.js": "./src/art.js?v=ccfb19ebb415688a",
-    "./src/audio.js": "./src/audio.js?v=ccfb19ebb415688a",
-    "./src/blocks.js": "./src/blocks.js?v=ccfb19ebb415688a",
-    "./src/boss-art.js": "./src/boss-art.js?v=ccfb19ebb415688a",
-    "./src/boss-dialogue.js": "./src/boss-dialogue.js?v=ccfb19ebb415688a",
-    "./src/boss.js": "./src/boss.js?v=ccfb19ebb415688a",
-    "./src/campaign.js": "./src/campaign.js?v=ccfb19ebb415688a",
-    "./src/character.js": "./src/character.js?v=ccfb19ebb415688a",
-    "./src/collectibles.js": "./src/collectibles.js?v=ccfb19ebb415688a",
-    "./src/combat.js": "./src/combat.js?v=ccfb19ebb415688a",
-    "./src/encounters.js": "./src/encounters.js?v=ccfb19ebb415688a",
-    "./src/enemy-art.js": "./src/enemy-art.js?v=ccfb19ebb415688a",
-    "./src/engine.js": "./src/engine.js?v=ccfb19ebb415688a",
-    "./src/level.js": "./src/level.js?v=ccfb19ebb415688a",
-    "./src/main.js": "./src/main.js?v=ccfb19ebb415688a",
-    "./src/missions.js": "./src/missions.js?v=ccfb19ebb415688a",
-    "./src/music.js": "./src/music.js?v=ccfb19ebb415688a",
-    "./src/orbit-art.js": "./src/orbit-art.js?v=ccfb19ebb415688a",
-    "./src/orbit.js": "./src/orbit.js?v=ccfb19ebb415688a",
-    "./src/party-ai.js": "./src/party-ai.js?v=ccfb19ebb415688a",
-    "./src/party-art.js": "./src/party-art.js?v=ccfb19ebb415688a",
-    "./src/party-bubbles.js": "./src/party-bubbles.js?v=ccfb19ebb415688a",
-    "./src/party-dialogue.js": "./src/party-dialogue.js?v=ccfb19ebb415688a",
-    "./src/party-navigation.js": "./src/party-navigation.js?v=ccfb19ebb415688a",
-    "./src/party.js": "./src/party.js?v=ccfb19ebb415688a",
-    "./src/quiz-catalog.js": "./src/quiz-catalog.js?v=ccfb19ebb415688a",
-    "./src/quiz-ui.js": "./src/quiz-ui.js?v=ccfb19ebb415688a",
-    "./src/scenery.js": "./src/scenery.js?v=ccfb19ebb415688a",
-    "./src/trivia-tasks.js": "./src/trivia-tasks.js?v=ccfb19ebb415688a",
-    "./src/world-art.js": "./src/world-art.js?v=ccfb19ebb415688a",
-    "./vendor/lucide.min.js": "./vendor/lucide.min.js?v=ccfb19ebb415688a",
-    "./vendor/planck.mjs": "./vendor/planck.mjs?v=ccfb19ebb415688a"
+    "./src/actor-physics.js": "./src/actor-physics.js?v=bb5a1d111f5df39b",
+    "./src/arcade-art.js": "./src/arcade-art.js?v=bb5a1d111f5df39b",
+    "./src/arcade.js": "./src/arcade.js?v=bb5a1d111f5df39b",
+    "./src/art.js": "./src/art.js?v=bb5a1d111f5df39b",
+    "./src/audio.js": "./src/audio.js?v=bb5a1d111f5df39b",
+    "./src/blocks.js": "./src/blocks.js?v=bb5a1d111f5df39b",
+    "./src/boss-art.js": "./src/boss-art.js?v=bb5a1d111f5df39b",
+    "./src/boss-dialogue.js": "./src/boss-dialogue.js?v=bb5a1d111f5df39b",
+    "./src/boss.js": "./src/boss.js?v=bb5a1d111f5df39b",
+    "./src/campaign.js": "./src/campaign.js?v=bb5a1d111f5df39b",
+    "./src/character.js": "./src/character.js?v=bb5a1d111f5df39b",
+    "./src/collectibles.js": "./src/collectibles.js?v=bb5a1d111f5df39b",
+    "./src/combat.js": "./src/combat.js?v=bb5a1d111f5df39b",
+    "./src/encounters.js": "./src/encounters.js?v=bb5a1d111f5df39b",
+    "./src/enemy-art.js": "./src/enemy-art.js?v=bb5a1d111f5df39b",
+    "./src/engine.js": "./src/engine.js?v=bb5a1d111f5df39b",
+    "./src/level.js": "./src/level.js?v=bb5a1d111f5df39b",
+    "./src/main.js": "./src/main.js?v=bb5a1d111f5df39b",
+    "./src/missions.js": "./src/missions.js?v=bb5a1d111f5df39b",
+    "./src/music.js": "./src/music.js?v=bb5a1d111f5df39b",
+    "./src/orbit-art.js": "./src/orbit-art.js?v=bb5a1d111f5df39b",
+    "./src/orbit.js": "./src/orbit.js?v=bb5a1d111f5df39b",
+    "./src/party-ai.js": "./src/party-ai.js?v=bb5a1d111f5df39b",
+    "./src/party-art.js": "./src/party-art.js?v=bb5a1d111f5df39b",
+    "./src/party-bubbles.js": "./src/party-bubbles.js?v=bb5a1d111f5df39b",
+    "./src/party-dialogue.js": "./src/party-dialogue.js?v=bb5a1d111f5df39b",
+    "./src/party-navigation.js": "./src/party-navigation.js?v=bb5a1d111f5df39b",
+    "./src/party.js": "./src/party.js?v=bb5a1d111f5df39b",
+    "./src/quiz-catalog.js": "./src/quiz-catalog.js?v=bb5a1d111f5df39b",
+    "./src/quiz-ui.js": "./src/quiz-ui.js?v=bb5a1d111f5df39b",
+    "./src/scenery.js": "./src/scenery.js?v=bb5a1d111f5df39b",
+    "./src/trivia-tasks.js": "./src/trivia-tasks.js?v=bb5a1d111f5df39b",
+    "./src/world-art.js": "./src/world-art.js?v=bb5a1d111f5df39b",
+    "./src/world-routes.js": "./src/world-routes.js?v=bb5a1d111f5df39b",
+    "./vendor/lucide.min.js": "./vendor/lucide.min.js?v=bb5a1d111f5df39b",
+    "./vendor/planck.mjs": "./vendor/planck.mjs?v=bb5a1d111f5df39b"
   }
 }
   </script>
@@ -130,6 +133,8 @@
             <button id="focus-button" class="icon-button" type="button" data-action="focus" aria-label="Focus Mode" data-tooltip="Focus Mode"><i data-lucide="focus" aria-hidden="true"></i></button>
           </div>
           <div class="touch-controls" id="touch-controls" role="group" aria-label="Movement controls"><div class="direction-controls"><button type="button" class="icon-button" data-action="left" aria-label="Move left" data-tooltip="Move left" disabled><i data-lucide="arrow-left"></i></button><button type="button" class="icon-button" data-action="right" aria-label="Move right" data-tooltip="Move right" disabled><i data-lucide="arrow-right"></i></button></div><div class="action-controls"><button id="boost-button" type="button" class="icon-button" data-action="boost" aria-label="Copilot Dash" data-tooltip="Copilot Dash" disabled><i data-lucide="zap"></i></button><button id="jump-button" type="button" class="icon-button" data-action="jump" aria-label="Jump" data-tooltip="Jump" disabled><i data-lucide="arrow-up"></i></button></div></div>
+          <div id="climb-controls" class="climb-controls" role="group" aria-label="Climbing controls" hidden><button type="button" class="icon-button" data-action="climbUp" aria-label="Climb up" data-tooltip="Climb up"><i data-lucide="chevrons-up" aria-hidden="true"></i></button><button type="button" class="icon-button" data-action="climbDown" aria-label="Climb down" data-tooltip="Climb down"><i data-lucide="chevrons-down" aria-hidden="true"></i></button></div>
+          <div id="arcade-controls" class="arcade-controls" role="group" aria-label="Arcade controls" hidden><div class="direction-controls"><button type="button" class="icon-button" data-action="left" aria-label="Move left" data-tooltip="Move left"><i data-lucide="arrow-left" aria-hidden="true"></i></button><button type="button" class="icon-button" data-action="right" aria-label="Move right" data-tooltip="Move right"><i data-lucide="arrow-right" aria-hidden="true"></i></button></div><button class="arcade-action" type="button" data-action="jump"><span id="arcade-action-icon"><i data-lucide="crosshair" aria-hidden="true"></i></span><span id="arcade-action-label">Fire</span></button></div>
           <div id="agent-controls" class="agent-controls" role="group" aria-label="Team assignments" hidden><button id="agent-patch" type="button" data-action="patch"><i data-lucide="wrench" aria-hidden="true"></i><span>Repair net<small id="patch-status">Ready</small></span></button><button id="agent-query" type="button" data-action="query"><i data-lucide="search" aria-hidden="true"></i><span>Analyze targets<small id="query-status">Ready</small></span></button><button id="agent-aegis" type="button" data-action="aegis"><i data-lucide="shield" aria-hidden="true"></i><span>Defend shield<small id="aegis-status">Ready</small></span></button></div>
           <div class="dialogue-strip" id="dialogue-strip"><span id="speaker" class="speaker">MISSION</span><p id="subtitle">Three AI trivia checkpoints stand between you and the boss gate.</p></div>
         <section class="game-overlay" id="start-panel" aria-labelledby="start-title">

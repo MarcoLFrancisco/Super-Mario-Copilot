@@ -6,6 +6,7 @@ import { createBoss, updateBoss, hitBoss, bossSupportTarget } from './boss.js';
 import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty, companionIds, unlockHelper } from './party.js';
 import { createPartyDialogue, updatePartyDialogue, sayParty, reactPartyDialogue, clearPartyCaption } from './party-dialogue.js';
 import { createMissionProgress, updateMission, missionReady } from './missions.js';
+import { stepClimbing } from './actor-physics.js';
 
 // Public API: createState(leader = 'marco'), setPaused(state, boolean), update(state,input,dt).
 // Input: held left/right/fire; one-frame jumpPressed/boostPressed/attackPressed/helperPressed.
@@ -28,6 +29,8 @@ function makePlayer(spawn) {
 function partyContext(state) {
   return { world: state.stage === 'boss' ? state.arena : state.geometry,
     blocks: state.blocks.blocks, enemies: state.combat.enemies,
+    collectibles: state.stage === 'boss' ? [] : (state.world.sparks ?? []).filter(item => !state.collected.has(item.id)
+      && Math.abs(item.x - state.player.x) < 430),
     supportSlots: helperAllowance(state.combat),
     bossTarget: state.boss ? bossSupportTarget(state.boss) : null,
     geometryVersion: `${state.stage}:${state.blocks.blocks.filter(b => b.broken).length}:${state.missionProgress.geometryVersion}` };
@@ -138,11 +141,17 @@ function tick(state, input, events) {
   p.jumpBuffer = Math.max(0, p.jumpBuffer - STEP);
   p.coyote = p.grounded ? P.coyoteTime : Math.max(0, p.coyote - STEP);
   if (state.pendingJump) p.jumpBuffer = P.jumpBuffer;
+  const jump = state.pendingJump;
   const boost = state.pendingBoost;
   state.pendingJump = false;
   state.pendingBoost = false;
 
   const direction = Number(Boolean(input.right)) - Number(Boolean(input.left));
+  const oldX = p.x;
+  const oldY = p.y;
+  const oldBottom = p.y + P.playerHeight;
+  const climbing = stepClimbing(p, { up: input.up, down: input.down, jumpPressed: jump, move: direction }, world, STEP);
+  if (!climbing) {
   if (direction && p.boostTime <= 0) p.facing = direction;
   if (p.jumpBuffer > 0 && p.coyote > 0) {
     p.vy = -P.jumpSpeed;
@@ -164,9 +173,6 @@ function tick(state, input, events) {
       (direction ? P.acceleration : P.friction) * STEP);
   }
 
-  const oldX = p.x;
-  const oldY = p.y;
-  const oldBottom = p.y + P.playerHeight;
   p.x = clamp(p.x + p.vx * STEP, 0, world.width - P.playerWidth);
   resolveBlockX(state.blocks, p, oldX);
   const gravity = state.mission.id === 'core' && p.x > 6500 && !arena ? .72 : 1;
@@ -195,6 +201,7 @@ function tick(state, input, events) {
       p.coyote = P.coyoteTime;
     }
   }
+  }
 
   if (p.y > world.deathY) {
     respawn(state, events);
@@ -210,6 +217,11 @@ function tick(state, input, events) {
   state.pendingMelee = {};
   if (arena) updateBoss(state.boss, state.combat, p, STEP, combatEvents);
   updateCompanions(state.party, p, STEP, partyContext(state), combatEvents);
+  for (const actor of visibleParty(state.party).filter(actor => actor.id !== state.party.leader)) {
+    for (const reward of collectBlockRewards(state.blocks, actor)) {
+      if (!unlockHelper(state.party, reward, combatEvents, p, partyContext(state))) grantPower(state.combat, reward, combatEvents);
+    }
+  }
   updateCombat(state.combat, p, input, STEP, oldBottom, combatEvents, state.blocks.blocks, state.party);
   if (!arena) {
     const hazard = world.hazards.find(h => overlaps(body(p), h));
@@ -258,19 +270,22 @@ function tick(state, input, events) {
       events.push({ type: 'checkpoint', name: c.name });
     }
   }
+  const collectors = visibleParty(state.party).map(actor => ({ actor, box: body(actor) }));
   for (const spark of world.sparks) {
     if (state.collected.has(spark.id)) continue;
-    const dx = spark.x - clamp(spark.x, box.x, box.x + box.w);
-    const dy = spark.y - clamp(spark.y, box.y, box.y + box.h);
-    // Small pickup margin keeps low spark trails reachable while walking.
-    if (dx * dx + dy * dy > (spark.radius + 4) ** 2) continue;
+    const collector = collectors.find(({ box: bounds }) => {
+      const horizontal = spark.x - clamp(spark.x, bounds.x, bounds.x + bounds.w);
+      const vertical = spark.y - clamp(spark.y, bounds.y, bounds.y + bounds.h);
+      return horizontal * horizontal + vertical * vertical <= (spark.radius + 4) ** 2;
+    });
+    if (!collector) continue;
     state.collected.add(spark.id);
     state.combo = state.comboTimer > 0 ? Math.min(P.maxCombo, state.combo + 1) : 1;
     state.comboTimer = P.comboWindow;
     state.bestCombo = Math.max(state.bestCombo, state.combo);
     const points = P.sparkScore * state.combo * (spark.secret ? 2 : 1);
     state.score += points;
-    events.push({ type: 'spark', id: spark.id, points, combo: state.combo });
+    events.push({ type: 'spark', id: spark.id, points, combo: state.combo, actorId: collector.actor.id });
   }
   state.cameraX += (cameraTarget(p, world) - state.cameraX) * (1 - Math.exp(-8 * STEP));
   if (overlaps(box, world.goal) && missionReady(state)) {

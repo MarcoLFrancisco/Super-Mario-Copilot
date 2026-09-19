@@ -83,6 +83,13 @@ dd { margin: 5px 0 0; font-size: 1rem; font-weight: 750; font-variant-numeric: t
 #interact-button::after { content: ''; position: absolute; left: calc(50% - 6px); bottom: -8px; width: 12px; height: 12px; background: #153b36; border-right: 2px solid #faf5b6; border-bottom: 2px solid #faf5b6; transform: rotate(45deg); }
 .touch-controls { position: absolute; left: 16px; bottom: 14px; display: flex; gap: 16px; }
 .direction-controls, .action-controls { display: flex; gap: 6px; }
+.climb-controls { position: absolute; left: 16px; bottom: 68px; display: flex; gap: 6px; }
+.climb-controls button { touch-action: none; background: #245746; border-color: #d5ec7c; }
+.arcade-controls { position: absolute; bottom: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; }
+.arcade-controls button { touch-action: none; min-height: 46px; background: #143c43; border-color: #b1dfc0; }
+.arcade-controls .arcade-action { min-width: 145px; background: #f5cf72; color: #2b382d; border-color: #ffe8a3; }
+.arcade-option { border-left-color: #e4c26a; background: #233b39; margin-left: 18px; }
+.has-climb .dialogue-strip { bottom: 124px; }
 .touch-controls button { touch-action: none; user-select: none; -webkit-user-select: none; width: 48px; height: 46px; background: #132b3bef; }
 #jump-button { background: #24576a; border-color: #7bd0d2; }
 .agent-controls { position: absolute; bottom: 12px; left: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: min(490px, calc(100% - 32px)); }
@@ -261,6 +268,13 @@ select { width: 100%; min-height: 38px; padding: 5px 8px; color: var(--ink); bac
   .mission-heading h2 { font-size: .85rem; }
   .mission-number, .level-header .eyebrow, .hud, #party-status, .quest-stats > div:not(:first-child) { display: none; }
   .is-orbit .hud { display: flex; position: absolute; top: 84px; max-width: 100%; height: 30px; }
+  .is-arcade .hud { display: flex; position: absolute; top: 84px; max-width: 100%; height: 30px; }
+  .is-arcade .hud > div { padding-inline: 6px; gap: 4px; }
+  .is-arcade .hud dt { font-size: .55rem; }
+  .is-arcade .hud dd { font-size: .65rem; }
+  .arcade-controls { left: 8px; right: 8px; bottom: 8px; }
+  .arcade-controls .arcade-action { min-width: 120px; font-size: .75rem; }
+  .is-arcade .dialogue-strip { bottom: 64px; }
   .is-orbit .hud > div { padding-inline: 6px; gap: 4px; }
   .is-orbit .hud dt { font-size: .55rem; }
   .is-orbit .hud dd { font-size: .65rem; }
@@ -273,6 +287,9 @@ select { width: 100%; min-height: 38px; padding: 5px 8px; color: var(--ink); bac
   .objective { font-size: .65rem; gap: 5px; }
   .task-ribbon { display: none; }
   .touch-controls { left: 8px; bottom: 8px; gap: 8px; }
+  .climb-controls { left: 8px; bottom: 52px; gap: 3px; }
+  .climb-controls button { width: 36px; height: 38px; min-height: 38px; }
+  .has-climb .dialogue-strip { bottom: 98px; }
   .direction-controls, .action-controls { gap: 3px; }
   .touch-controls button, .combat-controls button { width: 36px; height: 38px; min-height: 38px; }
   .combat-controls { right: 8px; bottom: 8px; display: grid; grid-template-columns: repeat(3, 36px); gap: 4px; }

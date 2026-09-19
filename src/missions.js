@@ -7,6 +7,7 @@ export function createMissionProgress() {
 }
 
 export function missionStations(state) {
+  if (state.mode === 'arcade') return [];
   const stations = state.mode === 'orbit' ? state.quizStations ?? []
     : (state.stage === 'boss' ? state.arena : state.world).stations ?? [];
   return stations.map(station => {
@@ -39,6 +40,7 @@ export function missionReady(state) {
 
 export function interactionFor(state, stationId) {
   if (!state.missionProgress) return null;
+  if (state.mode === 'arcade') return null;
   if (state.mode === 'orbit') {
     if (state.phase !== 'ready') return null;
     return missionStations(state).find(station => station.wave <= state.wave
@@ -197,6 +199,11 @@ export function updateMission(state, input, dt, events) {
       }
     }
     for (const platform of state.geometry.platforms) {
+      if (platform.conveyor && state.player.grounded && !state.player.climbing
+        && Math.abs(state.player.y + PHYSICS.playerHeight - platform.y) < 1
+        && state.player.x + PHYSICS.playerWidth > platform.x && state.player.x < platform.x + platform.w) {
+        state.player.x += platform.conveyor * dt;
+      }
       if (!platform.motion) continue;
       const oldX = platform.x; const oldY = platform.y;
       const motion = platform.motion;

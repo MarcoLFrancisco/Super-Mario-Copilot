@@ -9,6 +9,7 @@ import { ARENA } from '../src/encounters.js';
 import { createCompanionAI, decideCompanion } from '../src/party-ai.js';
 import { resetActorBody, stepActor } from '../src/actor-physics.js';
 import { nextAttackKind, updateParty, updateCompanions } from '../src/party.js';
+import { planRoute } from '../src/party-navigation.js';
 
 const emptyCombat = () => createCombat({ enemies: [], pickups: [] });
 const context = s => ({ world: LEVEL, blocks: s.blocks.blocks, enemies: [] });
@@ -200,7 +201,7 @@ export async function runTests({ test, assert }) {
       'Only the ready teammate starts a new attack');
   });
 
-  await test('One helper swing cannot overspend defeat allowance or duplicate rewards', () => {
+  await test('Helpers continue defeating opponents without player kills or duplicate rewards', () => {
     const s = createState();
     const c = emptyCombat();
     s.party.unlocked.add('donkey');
@@ -213,15 +214,80 @@ export async function runTests({ test, assert }) {
     const events = [];
     const step = () => updateCombat(c, player, {}, 1 / 120, P.playerHeight, events, [], s.party);
     step(); step();
-    assert(c.contribution.helperKills === 1 && helperAllowance(c) === 0, 'Only one opening defeat');
-    assert(events.filter(e => e.type === 'enemyDefeated').length === 1, 'One reward per defeat');
+    assert(c.contribution.helperKills === 2 && helperAllowance(c) === 2, 'Both opponents defeated without disabling helpers');
+    assert(events.filter(e => e.type === 'enemyDefeated').length === 2, 'One reward per defeat');
     c.contribution.playerKills = 2;
     step();
-    assert(c.contribution.helperKills === 2, 'Two player defeats earn another helper slot');
+    assert(c.contribution.helperKills === 2, 'Repeated overlap must not duplicate defeats');
     assert(events.filter(e => e.type === 'enemyDefeated').every(e => e.helper && e.actorId === 'donkey'), 'Attribution');
     resetCombat(c);
     assert(c.contribution.helperKills === 2, 'Checkpoint retains accounting');
     assert(emptyCombat().contribution.helperKills === 0, 'New encounter resets accounting');
+  });
+
+  await test('Recruited companions seek and collect items away from the leader', () => {
+    const world = { ...LEVEL, width: 1600, hazards: [], spawn: { x: 650, y: 564 },
+      platforms: [{ id: 'floor', x: 0, y: 610, w: 1600, h: 30 }],
+      checkpoints: [{ name: 'Start', x: 650, y: 610, spawn: { x: 650, y: 564 } }],
+      goal: { x: 1500, y: 480, w: 50, h: 130 },
+      sparks: [{ id: 'team-item', x: 380, y: 552, radius: 11, app: 'copilot' }] };
+    const state = createState('marco', { world, encounters: { enemies: [], blocks: [], pickups: [] } });
+    state.party.unlocked.add('mario');
+    resetPartyMotion(state.party, state.player, world.width, { world, blocks: [], enemies: [] });
+    const events = [];
+    for (let frame = 0; frame < 360 && !state.collected.has('team-item'); frame += 1) events.push(...update(state, {}, 1 / 60));
+    assert(state.collected.has('team-item'), 'Companion should pursue and collect the item');
+    assert(state.player.x === 650, 'Leader does not have to move to the item');
+    assert(events.filter(event => event.type === 'spark').length === 1, 'Pickup scores exactly once');
+    assert(events.find(event => event.type === 'spark').actorId === 'mario', 'Pickup identifies the collecting helper');
+    assert(state.score > 0, 'Companion pickups credit the shared score');
+  });
+
+  await test('Recruited teammates defeat several nearby opponents autonomously', () => {
+    const world = { ...LEVEL, width: 1200, hazards: [], sparks: [], spawn: { x: 630, y: 564 },
+      platforms: [{ id: 'floor', x: 0, y: 610, w: 1200, h: 30 }],
+      checkpoints: [{ name: 'Start', x: 630, y: 610, spawn: { x: 630, y: 564 } }],
+      goal: { x: 1150, y: 480, w: 40, h: 130 } };
+    const enemies = [400,450,500].map((x, index) => ({ id: `opponent-${index}`, kind: 'robot',
+      x, y: 576, minX: x, maxX: x, speed: 0 }));
+    const state = createState('marco', { world, encounters: { enemies, pickups: [], blocks: [] } });
+    state.party.unlocked.add('mario'); state.party.unlocked.add('donkey');
+    resetPartyMotion(state.party, state.player, world.width, { world, blocks: [], enemies: state.combat.enemies });
+    for (let frame = 0; frame < 420 && state.combat.enemies.some(enemy => !enemy.dead); frame += 1) update(state, {}, 1 / 60);
+    assert(state.combat.enemies.every(enemy => enemy.dead), 'Teammates must keep engaging after the first opponent');
+    assert(state.combat.contribution.helperKills === 3, 'All three defeats attributed to companions');
+    assert(state.combat.contribution.playerKills === 0, 'Player kills are not a prerequisite for support');
+    assert(state.score === 600, 'Each opponent rewards the shared score once');
+  });
+
+  await test('Ladders and ropes support climbing, holding position, descending and jumping off', () => {
+    for (const kind of ['ladder', 'rope']) {
+      const world = { width: 800, hazards: [], platforms: [
+        { id: 'base', x: 0, y: 610, w: 800, h: 30 }, { id: 'upper', x: 200, y: 310, w: 240, h: 24 }
+      ], climbs: [{ id: 'climb', kind, x: 300, top: 310, bottom: 610 }] };
+      const actor = resetActorBody({ id: 'marco', facing: 1 }, { x: 283, y: 564 });
+      for (let frame = 0; frame < 50; frame += 1) stepActor(actor, { up: true }, world, [], 1 / 60);
+      const height = actor.y;
+      assert(height < 500 && actor.climbing === 'climb', 'Up input moves onto the climbing object');
+      stepActor(actor, {}, world, [], 1 / 60);
+      assert(actor.y === height, 'Releasing controls holds the rope or ladder');
+      for (let frame = 0; frame < 150; frame += 1) stepActor(actor, { up: true }, world, [], 1 / 60);
+      assert(actor.y === 310 - P.playerHeight && actor.grounded, 'Top exit lands on the upper floor');
+      stepActor(actor, { down: true }, world, [], 1 / 60);
+      assert(actor.climbing === 'climb', 'Can reenter from the upper floor');
+      stepActor(actor, { move: 1, jumpPressed: true }, world, [], 1 / 60);
+      assert(!actor.climbing && actor.vy < 0 && actor.x > 283, 'Jump detaches and moves away');
+      const plan = planRoute(resetActorBody({}, { x: 283, y: 564 }), { x: 283, y: 264 }, world);
+      assert(plan?.commands.some(command => command.up), 'Companion navigation plans real climb commands');
+      const state = createState('marco', { world: { ...LEVEL, ...world, sparks: [], spawn: { x: 283, y: 564 } },
+        encounters: { enemies: [], blocks: [], pickups: [] } });
+      const jumping = createState('marco', { world: { ...LEVEL, ...world, sparks: [], spawn: { x: 283, y: 564 } },
+        encounters: { enemies: [], blocks: [], pickups: [] } });
+      update(jumping, { jumpPressed: true, jumpHeld: true, up: true }, 1 / 60);
+      assert(jumping.player.vy < 0 && !jumping.player.climbing, 'Jump takes priority even when climb is also held');
+      for (let frame = 0; frame < 150; frame += 1) update(state, { up: true }, 1 / 60);
+      assert(state.player.y === 310 - P.playerHeight, 'Leader engine uses the same climbing movement');
+    }
   });
 
   await test('Boss rejects shields and walls; helper caps preserve the player finishing blow', () => {

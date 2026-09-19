@@ -1,6 +1,6 @@
 import { PHYSICS as P } from './level.js';
 import { COMBAT as C, ENCOUNTERS, ENEMY_TYPES } from './encounters.js';
-import { activePartyAttacks, claimPartyHit } from './party.js';
+import { activePartyAttacks, claimPartyHit, visibleParty } from './party.js';
 
 export const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x
   && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -42,11 +42,8 @@ export function spawnShot(combat, shot) {
   combat.shots.push({ w: 10, h: 8, life: C.projectileLifetime, damage: 1, ...shot });
   return true;
 }
-// One opening helper defeat, then one more per two player defeats.
-// Combat owns this budget; simultaneous swings and manual requests cannot bypass it.
 export function helperAllowance(combat) {
-  return Math.max(0, 1 + Math.floor(combat.contribution.playerKills / 2)
-    - combat.contribution.helperKills);
+  return combat.health > 0 ? 2 : 0;
 }
 
 function hitEnemy(combat, enemy, damage, events, actorId = 'player', helper = false) {
@@ -74,7 +71,8 @@ export function updateCombat(combat, player, input, dt, previousBottom, events, 
   const step = Math.min(dt, 1 / 60);
   for (const key of ['grace', 'protection', 'cooldown']) combat[key] = Math.max(0, combat[key] - step);
   for (const pickup of combat.pickups) {
-    if (!pickup.collected && overlaps(body(player), pickup)) {
+    const collectors = party ? visibleParty(party) : [player];
+    if (!pickup.collected && collectors.some(actor => overlaps(body(actor), pickup))) {
       pickup.collected = true; grantPower(combat, pickup, events);
     }
   }

@@ -1,5 +1,5 @@
 import { PHYSICS as P } from './level.js';
-import { actorBody, stepActor, supportingSurface } from './actor-physics.js';
+import { actorBody, stepActor, supportingSurface, climbFor } from './actor-physics.js';
 
 // Bounded local planner, not a per-frame operation. AI should retain its plan
 // and replan on target changes, geometry changes, or divergence from prediction.
@@ -13,7 +13,7 @@ function snapshot(actor) {
     x: actor.x, y: actor.y, vx: actor.vx || 0, vy: actor.vy || 0,
     facing: actor.facing || 1, grounded: Boolean(actor.grounded),
     coyote: actor.coyote || 0, jumpBuffer: 0, boostTime: 0,
-    attack: null, surfaceId: actor.surfaceId ?? null
+    attack: null, surfaceId: actor.surfaceId ?? null, climbing: actor.climbing ?? null, climbCooldown: actor.climbCooldown ?? 0
   };
 }
 
@@ -45,8 +45,11 @@ function heuristic(actor, target) {
     + Math.abs(actor.y - target.y) / P.jumpSpeed;
 }
 
-function actions(actor, supported) {
+function actions(actor, supported, world) {
   const result = [];
+  if (actor.climbing || climbFor(actor, world)) {
+    result.push({ move: 0, up: true, frames: 150 }, { move: 0, down: true, frames: 150 });
+  }
   for (const move of [-1, 0, 1]) {
     result.push({ move, jump: false, frames: supported ? 12 : 24 });
     if (supported) {
@@ -64,8 +67,9 @@ function simulate(start, action, target, world, blocks, settings) {
   for (let frame = 0; frame < action.frames; frame++) {
     const move = action.jump && frame >= action.coastAfter ? 0 : action.move;
     const jumpPressed = action.jump && frame === 0;
-    const contact = stepActor(actor, { move, jumpPressed }, world, blocks, DT);
-    commands.push({ move, jumpPressed });
+    const command = { move, jumpPressed, up: action.up, down: action.down };
+    const contact = stepActor(actor, command, world, blocks, DT);
+    commands.push(command);
     if (dangerous(actor, world) || actor.y > settings.floorLimit
         || Math.abs(actor.x - settings.originX) > settings.radius) return null;
     if (arrived(actor, target, settings.tolerance, world, blocks)) break;
@@ -103,7 +107,7 @@ export function planRoute(actor, target, world, blocks = [], options = {}) {
         target: { x: target.x, y: target.y }, duration: node.elapsed };
     }
     if (node.elapsed >= 5) continue;
-    for (const action of actions(node.actor, grounded(node.actor, world, blocks))) {
+    for (const action of actions(node.actor, grounded(node.actor, world, blocks), world)) {
       const next = simulate(node.actor, action, target, world, blocks, settings);
       if (!next) continue;
       const elapsed = node.elapsed + next.commands.length * DT;

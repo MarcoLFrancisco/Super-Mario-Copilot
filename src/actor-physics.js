@@ -14,6 +14,41 @@ export function actorBody(actor) {
   return { x: actor.x, y: actor.y, w: P.playerWidth, h: P.playerHeight };
 }
 
+export function climbFor(actor, world) {
+  const center = actor.x + P.playerWidth / 2;
+  const feet = actor.y + P.playerHeight;
+  return (world.climbs ?? []).find(climb => Math.abs(center - climb.x) <= (climb.width ?? 42) / 2 + 9
+    && feet >= climb.top - 6 && feet <= climb.bottom + 8) ?? null;
+}
+
+export function stepClimbing(actor, input, world, dt) {
+  actor.climbCooldown = Math.max(0, (actor.climbCooldown ?? 0) - dt);
+  if (actor.climbing && (input.jumpPressed || input.move)) {
+    actor.climbing = null; actor.climbCooldown = .3;
+    actor.vy = input.jumpPressed ? -P.jumpSpeed * .85 : 0;
+    actor.vx = (input.move ?? 0) * P.speed;
+    actor.grounded = false; actor.coyote = 0; actor.jumpBuffer = 0;
+    return false;
+  }
+  if (input.jumpPressed) { actor.climbCooldown = .25; return false; }
+  const direction = Number(Boolean(input.down)) - Number(Boolean(input.up));
+  const climb = actor.climbing ? (world.climbs ?? []).find(item => item.id === actor.climbing)
+    : direction && actor.climbCooldown === 0 ? climbFor(actor, world) : null;
+  if (!climb) { actor.climbing = null; return false; }
+  const feet = actor.y + P.playerHeight;
+  if (!actor.climbing && (direction < 0 && feet <= climb.top || direction > 0 && feet >= climb.bottom)) return false;
+  actor.climbing = climb.id;
+  actor.x = climb.x - P.playerWidth / 2;
+  actor.vx = 0; actor.vy = direction * (climb.kind === 'rope' ? 165 : 200);
+  actor.y = clamp(actor.y + actor.vy * dt, climb.top - P.playerHeight, climb.bottom - P.playerHeight);
+  actor.grounded = false; actor.coyote = 0; actor.jumpBuffer = 0; actor.boostTime = 0;
+  if (actor.y + P.playerHeight <= climb.top && direction < 0
+    || actor.y + P.playerHeight >= climb.bottom && direction > 0) {
+    actor.climbing = null; actor.vy = 0; actor.grounded = true; actor.coyote = P.coyoteTime;
+  }
+  return true;
+}
+
 export function landingSurfaces(world, blocks = []) {
   return [...world.platforms, ...blocks.filter(block => !block.broken)];
 }
@@ -29,7 +64,7 @@ export function resetActorBody(actor, position) {
   Object.assign(actor, {
     x: position.x, y: position.y, vx: 0, vy: 0,
     grounded: false, coyote: 0, jumpBuffer: 0, boostTime: 0,
-    boostCooldown: 0, surfaceId: null
+    boostCooldown: 0, surfaceId: null, climbing: null, climbCooldown: 0
   });
   // Attack/AI lifecycle state belongs to party.js, not this module.
   return actor;
@@ -41,8 +76,10 @@ export function stepActor(actor, intent, world, blocks, dt) {
   const result = { jumped: false, landed: false, wall: false, ceiling: false };
   if (!Number.isFinite(dt) || dt <= 0) return result;
   if (dt > 1 / 60 + EPS) throw new RangeError('stepActor requires a fixed tick <= 1/60 s');
+  if (stepClimbing(actor, intent, world, dt)) return { ...result, climbed: true, landed: actor.grounded };
   const solids = blocks.filter(block => !block.broken);
   const support = actor.vy >= 0 ? supportingSurface(actor, world, solids) : null;
+  if (support?.conveyor) actor.x = clamp(actor.x + support.conveyor * dt, 0, world.width - P.playerWidth);
   actor.grounded = Boolean(support);
   actor.coyote = support ? P.coyoteTime : Math.max(0, (actor.coyote || 0) - dt);
   actor.jumpBuffer = intent.jumpPressed ? P.jumpBuffer

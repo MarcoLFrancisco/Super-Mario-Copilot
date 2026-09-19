@@ -6,6 +6,8 @@ import { CHARACTERS, resetPartyMotion } from './party.js';
 import { WORK_TASKS, QUIZ_THEMES } from './quiz-catalog.js';
 import { createMissionProgress, interactionFor } from './missions.js';
 import { validQuizOverrides } from './trivia-tasks.js';
+import { addWorldRoutes } from './world-routes.js';
+import { INTERLUDES, createArcade, updateArcade, setArcadePaused } from './arcade.js';
 
 const definitions = [
   {
@@ -140,6 +142,7 @@ function buildMission(definition, index) {
     platforms.push({ ...moving, id: `${definition.id}-lift-${position}`, h: 24,
       app: definition.app, kind: 'lift', theme: definition.theme, motion: moving });
   }
+  const traversal = addWorldRoutes(definition, platforms, mainRoute);
   const stations = WORK_TASKS[definition.id].map((workflow, position) => {
     const floor = mainRoute[[0, 6, 12][position]];
     return { key: workflow.key, title: workflow.title, action: 'work', workflow,
@@ -196,7 +199,7 @@ function buildMission(definition, index) {
   const last = mainRoute.at(-1);
   const world = { title: definition.title, id: definition.id, theme: definition.theme,
     width: last.x + last.w + 100, height: 900, deathY: 810, spawn: checkpoints[0].spawn,
-    platforms, hazards, sparks, checkpoints, stations, resources, mainRoute,
+    platforms, hazards, sparks, checkpoints, stations, resources, mainRoute, ...traversal,
     signs: checkpoints.map(checkpoint => ({ x: checkpoint.x + 80, y: checkpoint.y - 190,
       text: checkpoint.name.toUpperCase(), app: definition.app })),
     zones: checkpoints.map((checkpoint, chapter) => ({ x: chapter ? mainRoute[chapter * 4].x - 60 : 0,
@@ -226,6 +229,7 @@ export function chapterAt(mission, x) {
 }
 
 function startLevel(campaign, index, wave = 0, finale = false) {
+  campaign.interlude = null;
   const mission = CAMPAIGN[index];
   const orbital = mission.type === 'orbit' || finale;
   const state = orbital ? createOrbit({ width: VIEW.width, wave }) : createState(campaign.leader, mission);
@@ -260,20 +264,59 @@ export function createCampaign(leader = 'marco', saved = {}, quizOverrides = {})
   const scores = Object.fromEntries(CAMPAIGN.map(mission => [mission.id,
     Number.isFinite(saved.scores?.[mission.id]) ? Math.max(0, saved.scores[mission.id]) : 0]));
   const campaign = { leader, unlocked, recruits, scores, quizOverrides: validQuizOverrides(quizOverrides), blaster: saved.blaster === true,
+    interlude: null, arcadeScores: Object.fromEntries(Object.values(INTERLUDES).map(item => [item.id,
+      Number.isFinite(saved.arcadeScores?.[item.id]) ? Math.max(0, saved.arcadeScores[item.id]) : 0])),
+    arcadeCompleted: new Set((Array.isArray(saved.arcadeCompleted) ? saved.arcadeCompleted : [])
+      .filter(id => Object.values(INTERLUDES).some(item => item.id === id))),
     completed: new Set((Array.isArray(saved.completed) ? saved.completed : []).filter(id => CAMPAIGN.some(mission => mission.id === id))),
     levelIndex: current, finalStage: false, segmentScore: 0, recorded: false, finished: false, run: null };
   startLevel(campaign, current);
+  if (current < unlocked && saved.interlude === INTERLUDES[CAMPAIGN[current].id]?.id) startInterlude(campaign);
   return campaign;
+}
+
+function startInterlude(campaign) {
+  const definition = INTERLUDES[CAMPAIGN[campaign.levelIndex].id];
+  if (!definition) return false;
+  const state = createArcade(definition.kind, { difficulty: definition.difficulty, pilot: campaign.leader });
+  state.mission = { ...definition, type: 'arcade', subtitle: 'Arcade interlude', index: campaign.levelIndex,
+    number: campaign.levelIndex + 1, theme: definition.kind === 'drive' ? 'campus' : definition.kind === 'pang' ? 'cowork' : 'orbit' };
+  state.missionProgress = createMissionProgress();
+  state.campaignLevel = campaign.levelIndex;
+  campaign.run = state; campaign.interlude = definition.id;
+  campaign.recorded = false; campaign.finished = false; campaign.finalStage = false;
+  return true;
+}
+
+export function selectInterlude(campaign, afterLevel) {
+  if (!Number.isInteger(afterLevel) || afterLevel < 0 || afterLevel >= campaign.unlocked
+    || !INTERLUDES[CAMPAIGN[afterLevel]?.id]) return false;
+  campaign.levelIndex = afterLevel;
+  campaign.segmentScore = 0;
+  return startInterlude(campaign);
+}
+
+export function nextDestination(campaign) {
+  if (campaign.finished || campaign.levelIndex >= LEVEL_COUNT - 1) return null;
+  return !campaign.interlude && INTERLUDES[CAMPAIGN[campaign.levelIndex].id]
+    || CAMPAIGN[campaign.levelIndex + 1];
 }
 
 export function saveCampaign(campaign) {
   return { leader: campaign.leader, current: campaign.levelIndex, unlocked: campaign.unlocked,
     recruits: [...campaign.recruits], blaster: campaign.blaster, scores: { ...campaign.scores },
-    completed: [...campaign.completed] };
+    completed: [...campaign.completed], interlude: campaign.interlude,
+    arcadeScores: { ...campaign.arcadeScores }, arcadeCompleted: [...campaign.arcadeCompleted] };
 }
 
 export function advanceCampaign(campaign) {
+  if (campaign.interlude) {
+    if (!['complete', 'failed'].includes(campaign.run.status)) return false;
+    startLevel(campaign, campaign.levelIndex + 1);
+    return true;
+  }
   if (campaign.run.status !== 'complete' || !campaign.recorded || campaign.levelIndex >= 7) return false;
+  if (INTERLUDES[CAMPAIGN[campaign.levelIndex].id]) return startInterlude(campaign);
   startLevel(campaign, campaign.levelIndex + 1);
   return true;
 }
@@ -286,6 +329,7 @@ export function selectLevel(campaign, index) {
 }
 
 export function retryLevel(campaign) {
+  if (campaign.interlude) { startInterlude(campaign); return; }
   const retryWave = campaign.run.mode === 'orbit' && campaign.run.status === 'failed';
   const wave = retryWave ? campaign.run.wave : 0;
   const progress = retryWave ? structuredClone(campaign.run.missionProgress) : null;
@@ -299,11 +343,19 @@ export function retryLevel(campaign) {
 }
 
 export function pauseCampaign(campaign, paused) {
-  (campaign.run.mode === 'orbit' ? setOrbitPaused : setPaused)(campaign.run, paused);
+  (campaign.run.mode === 'arcade' ? setArcadePaused : campaign.run.mode === 'orbit' ? setOrbitPaused : setPaused)(campaign.run, paused);
 }
 
 export function updateCampaign(campaign, input = {}, dt = 0) {
   const state = campaign.run;
+  if (state.mode === 'arcade') {
+    const events = updateArcade(state, input, dt);
+    if (state.status !== 'complete' || campaign.recorded) return events;
+    campaign.recorded = true;
+    campaign.arcadeCompleted.add(campaign.interlude);
+    campaign.arcadeScores[campaign.interlude] = Math.max(campaign.arcadeScores[campaign.interlude], state.score);
+    return [...events.filter(event => event.type !== 'complete'), { type: 'arcadeComplete', id: campaign.interlude }];
+  }
   if (state.mode === 'orbit' && state.status === 'playing') {
     const station = interactionFor(state);
     if (station) {

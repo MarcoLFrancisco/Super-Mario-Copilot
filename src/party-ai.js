@@ -99,9 +99,11 @@ export function decideCompanion(ai, actor, context, dt) {
   const enemy = boss || candidates.find(e => e.id === ai.targetId)
     || candidates.sort((a, b) => distance(a, actor) - distance(b, actor))[0];
   const targetId = enemy?.id ?? null;
-  if (ai.targetId !== targetId) ai.route = null;
+  const item = enemy ? null : context.assignedItem;
+  if (ai.targetId !== targetId || ai.itemId !== item?.id) ai.route = null;
   ai.targetId = targetId;
-  ai.mode = boss ? 'boss-support' : enemy ? 'defend' : 'follow';
+  ai.itemId = item?.id;
+  ai.mode = boss ? 'boss-support' : enemy ? 'defend' : item ? 'collect' : 'follow';
   if (enemy && spec && (!boss || boss.exposed)) {
     const attack = attackIntent(actor, enemy, spec, blocks);
     if (attack) { ai.route = null; return attack; }
@@ -115,7 +117,7 @@ export function decideCompanion(ai, actor, context, dt) {
       attackPressed: true };
   }
 
-  let desired = anchor;
+  let desired = item ? { x: item.x - P.playerWidth / 2, y: item.y - P.playerHeight / 2 } : anchor;
   if (enemy) {
     const left = boss || actor.x + P.playerWidth / 2 < enemy.x + enemy.w / 2;
     desired = { x: left ? enemy.x - P.playerWidth - 12 : enemy.x + enemy.w + 12,
@@ -129,7 +131,7 @@ export function decideCompanion(ai, actor, context, dt) {
   ai.geometryVersion = geometryVersion;
   // Combat destinations leave a 12px gap. Marco's punch extends only 26px
   // beyond his body, so follow-mode tolerance can stop him outside hit range.
-  const arrivalTolerance = enemy ? 4 : 20;
+  const arrivalTolerance = enemy || item ? 4 : 20;
   // Finish active route commands before applying the idle arrival shortcut.
   // Proximity alone does not mean a planned platform crossing is complete.
   if (!ai.route && distance(actor, goal) < arrivalTolerance && supportingSurface(actor, world, blocks)) {
@@ -144,11 +146,11 @@ export function decideCompanion(ai, actor, context, dt) {
   if (!ai.route && ai.cooldown === 0 && allowPlanning) {
     ai.goal = goal;
     ai.route = createRouteCursor(planRoute(actor, goal, world, blocks,
-      { maxNodes: 80, radius: 850, tolerance: enemy ? 4 : 16 }));
+      { maxNodes: 80, radius: 850, tolerance: enemy || item ? 4 : 16 }));
     ai.cooldown = .7 + ai.slot * .13;
   }
   if (!ai.route) return idle();
   const intent = nextRouteIntent(ai.route, actor, world, blocks);
   if (intent.status !== 'moving') { ai.route = null; return idle(); }
-  return { move: intent.move, jumpPressed: intent.jumpPressed, attackPressed: false };
+  return { move: intent.move, jumpPressed: intent.jumpPressed, up: intent.up, down: intent.down, attackPressed: false };
 }

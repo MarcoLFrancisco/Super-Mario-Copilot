@@ -159,6 +159,106 @@ function skyline(ctx, mission, camera, time, theme) {
   }
 }
 
+function worldLandmarks(ctx, mission, camera, time, theme) {
+  const spacing = 1500;
+  const start = Math.floor(camera * .55 / spacing) - 1;
+  for (let index = start; index <= start + 2; index += 1) {
+    const center = index * spacing + 640 - camera * .55;
+    if (theme === 'campus') {
+      panel(ctx, center - 260, 340, 520, 270, '#d6f4f0', 4, '#2a8a99');
+      panel(ctx, center - 205, 365, 410, 170, '#67bbc7', 4);
+      for (let column = 0; column < 6; column += 1) line(ctx,
+        [[center - 180 + column * 72, 365], [center - 180 + column * 72, 535]], '#d9fafa', 4);
+      line(ctx, [[center - 205, 448], [center + 205, 448]], '#e4ffed', 6);
+      panel(ctx, center - 275, 325, 550, 20, '#eafaf5', 3);
+      label(ctx, 'COPILOT CAMPUS', center, 357, 16, '#15485d', 'center');
+      for (const side of [-1, 1]) {
+        line(ctx, [[center + side * 315, 625], [center + side * 315, 400]], '#496e48', 16);
+        oval(ctx, center + side * 315, 388, 72, 95, '#358567');
+        oval(ctx, center + side * 294, 376, 44, 68, '#60b984');
+      }
+    } else if (theme === 'github') {
+      line(ctx, [[center - 320, 665], [center - 310, 275], [center - 210, 170]], '#345943', 70);
+      line(ctx, [[center + 320, 665], [center + 330, 205], [center + 250, 155]], '#2e624d', 60);
+      for (const side of [-1, 1]) {
+        oval(ctx, center + side * 300, 210, 175, 75, '#477f51');
+        oval(ctx, center + side * 330, 176, 120, 60, '#69a566');
+      }
+      line(ctx, [[center - 330, 310], [center - 100, 380], [center + 100, 380], [center + 330, 300]], '#e2be79', 3);
+      line(ctx, [[center - 330, 340], [center - 100, 410], [center + 100, 410], [center + 330, 330]], '#7f7353', 13);
+      for (let rung = -280; rung < 300; rung += 34) {
+        const height = 375 - Math.abs(rung) * .2;
+        line(ctx, [[center + rung, height - 35], [center + rung, height + 18]], '#dcc080', 2);
+      }
+      panel(ctx, center - 78, 285, 156, 52, '#113b32', 5, '#92d996');
+      label(ctx, 'main > feature', center, 317, 16, '#d6ffbf', 'center');
+    } else if (theme === 'cowork') {
+      panel(ctx, center - 320, 255, 640, 370, '#eee6d5', 4, '#a0cac1');
+      for (let floor = 0; floor < 3; floor += 1) {
+        const height = 285 + floor * 110;
+        panel(ctx, center - 280, height, 170, 76, '#87b8bd', 3);
+        panel(ctx, center - 70, height + 43, 150, 8, '#845f65', 2);
+        line(ctx, [[center - 54,height + 51],[center - 54,height + 77]], '#486976', 4);
+        line(ctx, [[center + 66,height + 51],[center + 66,height + 77]], '#486976', 4);
+        panel(ctx, center - 18, height + 8, 62, 35, '#214652', 4, '#74d6c0');
+        panel(ctx, center + 130, height + 8, 132, 66, '#fff7bc', 2);
+        for (let note = 0; note < 3; note += 1) panel(ctx, center + 140 + note * 38, height + 20, 27, 28,
+          ['#dc7978','#7caed0','#80bea5'][note], 1);
+      }
+      label(ctx, 'COWORK / SHARED SPACE', center, 279, 14, '#355e64', 'center');
+    } else if (theme === 'foundry') {
+      panel(ctx, center - 320, 250, 640, 390, '#273e46', 4, '#9ebdc2');
+      for (let vat = -1; vat <= 1; vat += 1) {
+        const position = center + vat * 190;
+        panel(ctx, position - 59, 355, 118, 192, '#647a7a', 6, '#cfe6db');
+        panel(ctx, position - 42, 378, 84, 140, '#203e45', 5);
+        for (let cell = 0; cell < 4; cell += 1) panel(ctx, position - 29, 400 + cell * 25, 58, 14,
+          cell % 2 ? '#67c8c0' : '#ffc663', 3);
+        gear(ctx, position, 317, 29, time * (vat === 0 ? -.3 : .3), '#d8b36c');
+      }
+      line(ctx, [[center - 330,580],[center + 335,580]], '#d6d4ac', 16);
+      label(ctx, 'MODEL ASSEMBLY / EVALUATION', center, 270, 15, '#b3e5dc', 'center');
+    } else if (theme === 'agents') {
+      for (const [offset, height, color] of [[-280,260,'#315f79'],[-90,355,'#3c7580'],[110,300,'#38766a']]) {
+        panel(ctx, center + offset, 610 - height, 165, height, color, 3, '#b7d5d0');
+        for (let row = 0; row < 6; row += 1) for (let col = 0; col < 4; col += 1) {
+          panel(ctx, center + offset + 18 + col * 35, 630 - height + row * 38, 18, 22,
+            (row + col) % 3 ? '#92d9d1' : '#f9d580', 2);
+        }
+      }
+      line(ctx, [[center - 300,330],[center - 70,250],[center + 160,320]], '#8effd3', 4);
+      for (const offset of [-300,-70,160]) oval(ctx, center + offset, offset === -70 ? 250 : 325, 12, 12, '#ffda8b');
+      panel(ctx, center - 95, 552, 230, 37, '#b6e5d6', 4);
+      label(ctx, 'AGENT TRANSIT', center + 20, 577, 16, '#245453', 'center');
+    } else if (theme === 'teams') {
+      panel(ctx, center - 290, 200, 580, 450, '#526581', 5, '#d2dcfa');
+      for (let floor = 0; floor < 4; floor += 1) {
+        const height = 236 + floor * 96;
+        panel(ctx, center - 264, height, 165, 73, '#b7d7e1', 3);
+        panel(ctx, center + 100, height, 165, 73, '#97cdc4', 3);
+        for (const side of [-1,1]) {
+          oval(ctx, center + side * 180, height + 24, 11, 13, '#d49477');
+          panel(ctx, center + side * 180 - 20, height + 39, 40, 23, side < 0 ? '#456fa8' : '#286f62', 7);
+        }
+        line(ctx, [[center - 280,height + 83],[center + 280,height + 83]], '#e6ebfa', 4);
+      }
+      panel(ctx, center - 56, 208, 112, 415, '#223b4d', 3);
+      const lift = 390 + Math.sin(time * .5) * 110;
+      panel(ctx, center - 45, lift, 90, 75, '#d6f1ea', 4, '#f7d183');
+      line(ctx, [[center, lift + 4],[center,lift + 70]], '#729fa5', 3);
+    } else {
+      for (const side of [-1, 1]) server(ctx, center + side * 220 - 55, 265, 110, 360, '#8bedc3');
+      ctx.strokeStyle = '#68d9c0'; ctx.lineWidth = 16;
+      ctx.beginPath(); ctx.ellipse(center, 445, 145, 190, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#eac271'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.ellipse(center, 445, 122, 167, 0, 0, Math.PI * 2); ctx.stroke();
+      panel(ctx, center - 64, 365, 128, 158, '#1a464e', 8, '#d0f5d8');
+      label(ctx, 'HUMAN', center, 425, 20, '#b8f7dc', 'center');
+      label(ctx, 'CONTROL', center, 452, 20, '#f5d887', 'center');
+    }
+  }
+}
+
 export function drawWorldBackground(ctx, mission, camera, time, reducedMotion, arena = false) {
   const sky = ctx.createLinearGradient(0, 0, 0, VIEW.height);
   sky.addColorStop(0, mission.sky[0]); sky.addColorStop(1, mission.sky[1]);
@@ -186,6 +286,7 @@ export function drawWorldBackground(ctx, mission, camera, time, reducedMotion, a
   }
   ctx.restore();
   skyline(ctx, mission, camera, clock, theme);
+  if (!arena) worldLandmarks(ctx, mission, camera, clock, theme);
   const haze = ctx.createLinearGradient(0, 565, 0, 720);
   haze.addColorStop(0, '#16394b00'); haze.addColorStop(1, theme === 'campus' ? '#e2f6edaa' : '#122936bb');
   ctx.fillStyle = haze; ctx.fillRect(0, 565, VIEW.width, 155);
@@ -200,6 +301,21 @@ export function drawWorldPlatform(ctx, platform, mission, time, reducedMotion, h
   const { x, y, w, h } = platform;
   const theme = platform.theme ?? mission.theme;
   ctx.save();
+  if (platform.structure) {
+    if (theme === 'github') {
+      line(ctx, [[x + 16,y + h],[x - 18,y + h + 85]], '#557452', 14);
+      for (let leaf = 0; leaf < w; leaf += 44) oval(ctx, x + leaf + 15, y + h + 12, 22, 8, '#7fba67');
+    } else if (theme === 'foundry') {
+      for (let support = 12; support < w; support += 65) line(ctx,
+        [[x + support,y + h],[x + support + 40,y + h + 42],[x + support + 55,y + h]], '#829998', 5);
+    } else if (theme === 'cowork') {
+      panel(ctx, x + 12, y + h, 10, 80, '#916d77', 2);
+      panel(ctx, x + w - 22, y + h, 10, 80, '#916d77', 2);
+    } else if (theme === 'teams' || theme === 'agents') {
+      panel(ctx, x + 8, y + h, w - 16, 60, '#2e646f', 3);
+      for (let window = 20; window < w - 28; window += 40) panel(ctx, x + window, y + h + 14, 23, 26, '#b9e5d4', 2);
+    }
+  }
   panel(ctx, x + 5, y + 8, w, h + 8, '#081c3c45', 2);
   const side = ctx.createLinearGradient(0, y, 0, y + h);
   side.addColorStop(0, mission.ground[0]); side.addColorStop(1, mission.ground[1]);
@@ -246,6 +362,23 @@ export function drawWorldPlatform(ctx, platform, mission, time, reducedMotion, h
 export function drawMissionObjects(ctx, state, visible) {
   const progress = state.missionProgress;
   if (!progress) return;
+  if (state.stage !== 'boss') for (const climb of state.world.climbs ?? []) {
+    if (!visible(climb.x - 30, 60)) continue;
+    if (climb.kind === 'rope') {
+      line(ctx, [[climb.x - 2, climb.top], [climb.x - 2, climb.bottom]], '#533e33', 8);
+      line(ctx, [[climb.x, climb.top], [climb.x, climb.bottom]], '#ffdc80', 5);
+      for (let height = climb.top + 12; height < climb.bottom; height += 18) {
+        line(ctx, [[climb.x - 3, height], [climb.x + 4, height + 5]], '#a37b42', 2);
+      }
+      oval(ctx, climb.x, climb.top + 5, 10, 7, '#edc264');
+    } else {
+      for (const side of [-1, 1]) line(ctx, [[climb.x + side * 18, climb.top - 20],
+        [climb.x + side * 18, climb.bottom]], '#c8eff3', 5);
+      for (let height = climb.top - 12; height < climb.bottom; height += 22) {
+        line(ctx, [[climb.x - 18, height], [climb.x + 18, height]], '#f7bd62', 5);
+      }
+    }
+  }
   for (const station of missionStations(state)) {
     if (!visible(station.x - 100, 260)) continue;
     const status = stationStatus(state, station);

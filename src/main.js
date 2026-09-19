@@ -11,6 +11,10 @@ import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel,
 import { interactionFor, missionStations, stationStatus, missionReady, missionObjective, interact } from './missions.js';
 import { workView, prepareQuiz, validQuizOverrides } from './trivia-tasks.js';
 import { renderQuiz, createQuizEditor } from './quiz-ui.js';
+import { climbFor } from './actor-physics.js';
+import { INTERLUDES, arcadeObjective } from './arcade.js';
+import { renderArcade } from './arcade-art.js';
+import { selectInterlude, nextDestination } from './campaign.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -28,9 +32,11 @@ const controls = [...document.querySelectorAll('[data-action]')];
 const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const audio = createAudio();
 const defaultBindings = { left: 'KeyA', right: 'KeyD', jump: 'Space', boost: 'ShiftLeft',
+  climbUp: 'KeyR', climbDown: 'KeyV',
   interact: 'KeyE', patch: 'Digit1', query: 'Digit2', aegis: 'Digit3',
   attack: 'KeyJ', helper: 'KeyK', fire: 'KeyF', pulse: 'KeyQ', focus: 'KeyC' };
 const bindingNames = { left: 'Move left', right: 'Move right', jump: 'Jump / Launch',
+  climbUp: 'Climb up', climbDown: 'Climb down',
   boost: 'Copilot boost', interact: 'Interact / Approve', patch: 'Repair net', query: 'Analyze targets', aegis: 'Defend shield',
   attack: 'Melee attack', helper: 'Command helpers', fire: 'Debug Blaster', pulse: 'Debug Pulse', focus: 'Focus Mode' };
 const allowedKeys = ['Space', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'ShiftLeft', 'ShiftRight', 'Enter',
@@ -94,7 +100,8 @@ const speechAvailable = Boolean(speech && window.SpeechSynthesisUtterance);
 const keys = new Map();
 const pointers = new Map();
 const orbitMode = () => state.mode === 'orbit';
-const currentMission = () => CAMPAIGN[campaign.levelIndex];
+const arcadeMode = () => state.mode === 'arcade';
+const currentMission = () => arcadeMode() ? state.mission : CAMPAIGN[campaign.levelIndex];
 const openDialog = () => ['task-dialog','settings-dialog','level-dialog','quiz-editor-dialog'].map(el).find(dialog => dialog.open);
 const playing = () => started && state.status === 'playing' && !openDialog();
 const finished = () => state.status === 'complete' || state.status === 'failed';
@@ -130,7 +137,7 @@ function speakCaption(caption) {
   }
 }
 function syncQuestDialogue() {
-  if (orbitMode() || !started || state.time < missionMessageUntil) return;
+  if (orbitMode() || arcadeMode() || !started || state.time < missionMessageUntil) return;
   const boss = state.stage === 'boss' ? state.boss : null;
   if (captionBoss !== boss) { cancelSpeech(); captionBoss = boss; bossCaptionId = 0; }
   const caption = boss?.dialogue.current;
@@ -152,6 +159,12 @@ function clearInput() {
 }
 function press(action) {
   if (!orbitMode() && state.boss?.defeated || el('task-dialog').open) return;
+  if (arcadeMode()) {
+    if (['jump', 'fire', 'attack', 'interact'].includes(action)) jumpPressed = true;
+    if (action === 'boost') boostPressed = true;
+    if (['left', 'right'].includes(action)) orbitPointer = null;
+    return;
+  }
   if (orbitMode() && ['jump', 'interact'].includes(action)) {
     const station = interactionFor(state);
     if (station) { openTask(station); return; }
@@ -206,7 +219,24 @@ function positionWorkstation(station) {
   const top = Math.max(minimum, Math.min(stage.height - 56, bounds.top - stage.top + y * bounds.scale));
   button.style.left = `${left}px`; button.style.top = `${top}px`;
 }
+function arcadeHud() {
+  const active = playing();
+  controls.forEach(button => { button.disabled = !active; });
+  text('score-value', state.score.toLocaleString());
+  text('items-label', 'Health'); text('sparks-value', state.health); text('sparks-total', 3);
+  text('combo-label', state.kind === 'drive' ? 'Speed' : 'Cleared');
+  text('combo-value', state.kind === 'drive' ? `${Math.round(state.speed)} km/h` : state.destroyed);
+  text('checkpoint-label', 'Stage'); text('checkpoint-value', 'Arcade');
+  text('boost-label', 'Time'); text('boost-value', `${Math.ceil(state.remaining)}s`);
+  text('mission-objective', arcadeObjective(state)); text('chapter-name', 'Arcade interlude');
+  text('arcade-action-label', state.kind === 'drive' ? state.boostCooldown > 0 ? `Boost ${Math.ceil(state.boostCooldown)}s` : 'Boost' : 'Fire');
+  el('interact-button').hidden = true;
+  el('climb-controls').hidden = true;
+  el('game-viewport').classList.remove('has-workstation', 'has-climb');
+}
+
 function hud() {
+  if (arcadeMode()) { arcadeHud(); return; }
   const orbit = orbitMode();
   const mission = currentMission();
   const active = playing() && !state.boss?.defeated;
@@ -235,6 +265,9 @@ function hud() {
     : state.stage === 'boss' ? mission.boss : chapterAt(mission, state.player.x).name);
   el('interact-button').hidden = !active || (orbit ? state.phase !== 'ready' : !request);
   el('game-viewport').classList.toggle('has-workstation', !el('interact-button').hidden);
+  const canClimb = !orbit && state.stage !== 'boss' && Boolean(state.player.climbing || climbFor(state.player, state.world));
+  el('climb-controls').hidden = !canClimb;
+  el('game-viewport').classList.toggle('has-climb', canClimb);
   el('interact-button').disabled = !active;
   text('interact-label', orbit && !request ? 'Launch core' : status === 'Complete' ? 'View score'
     : status === 'Ready' ? 'Open quiz' : 'Continue quiz');
@@ -246,7 +279,9 @@ function hud() {
     text('weapon-value', state.combat.blaster ? 'Debug Blaster' : 'Not equipped');
     text('protection-value', state.combat.protection > 0 ? `${state.combat.protection.toFixed(1)}s` : 'Inactive');
     text('party-status', [CHARACTERS[campaign.leader].name, ...helpers.map(name =>
-      `${CHARACTERS[name].name}: ${!state.party.unlocked.has(name) ? 'unrecruited' : state.party.actors[name].recovering ? 'regrouping' : 'active'}`)].join(' / '));
+      `${CHARACTERS[name].name}: ${!state.party.unlocked.has(name) ? 'unrecruited' : state.party.actors[name].recovering ? 'regrouping'
+        : state.party.actors[name].climbing ? 'climbing' : state.party.actors[name].ai?.mode === 'collect' ? 'collecting'
+        : ['defend','boss-support'].includes(state.party.actors[name].ai?.mode) ? 'attacking' : 'following'}`)].join(' / '));
     const counts = {};
     for (const item of state.world.sparks) {
       counts[item.app] ??= { total: 0, count: 0 }; counts[item.app].total += 1;
@@ -299,6 +334,7 @@ function hud() {
 function panels() {
   const mission = currentMission();
   const orbit = orbitMode();
+  const arcade = arcadeMode();
   el('start-panel').hidden = started;
   el('pause-panel').hidden = !started || state.status !== 'paused' || Boolean(openDialog());
   el('complete-panel').hidden = !started || !finished();
@@ -308,33 +344,39 @@ function panels() {
   icon('pause-icon', state.status === 'paused' ? 'play' : 'pause');
   canvas.tabIndex = playing() ? 0 : -1;
   audio.setStatus(started ? openDialog() || state.status === 'failed' ? 'paused' : state.status : 'idle');
-  audio.setStage(orbit ? 'world' : state.stage, state.boss?.phase ?? 0);
+  audio.setStage(orbit || arcade ? 'world' : state.stage, state.boss?.phase ?? 0);
   audio.setTheme(orbit ? 'orbit' : mission.theme);
   document.body.classList.toggle('is-orbit', orbit);
+  document.body.classList.toggle('is-arcade', arcade);
   document.body.style.setProperty('--world-accent', mission.color);
   el('agent-controls').hidden = !orbit;
   el('character-choice').hidden = started;
   el('character-select').disabled = started;
   el('character-select').value = campaign.leader;
-  el('quest-readout').hidden = orbit;
-  el('combat-controls').hidden = orbit;
-  el('touch-controls').hidden = orbit;
-  el('task-ribbon').hidden = orbit && state.finale;
-  text('build-label', `${CHARACTERS[campaign.leader].name.toUpperCase()} / TRIVIA / LEVEL ${mission.number} OF 8`);
+  el('quest-readout').hidden = orbit || arcade;
+  el('combat-controls').hidden = orbit || arcade;
+  el('touch-controls').hidden = orbit || arcade;
+  el('arcade-controls').hidden = !arcade;
+  el('task-ribbon').hidden = arcade || orbit && state.finale;
+  text('build-label', `${CHARACTERS[campaign.leader].name.toUpperCase()} / ${arcade ? 'ARCADE BREAK' : `TRIVIA / WORLD ${mission.number} OF 8`}`);
   text('mission-number', String(mission.number).padStart(2, '0'));
-  text('world-label', mission.subtitle);
+  text('world-label', mission.world ? `${mission.world.traversal} / ${mission.world.difficulty}` : mission.subtitle);
   text('level-title', mission.title);
-  text('level-counter', `${mission.number} / 8`);
-  text('start-eyebrow', `LEVEL ${mission.number} / ${mission.subtitle}`);
+  text('level-counter', arcade ? 'Arcade' : `${mission.number} / 8`);
+  text('start-eyebrow', arcade ? `ARCADE / AFTER WORLD ${mission.number}` : `WORLD ${mission.number} / ${mission.world?.traversal ?? mission.subtitle}`);
   text('start-title', mission.title);
   text('game-objective', mission.intro);
   text('start-label', 'Start level');
   icon('interact-icon', orbit && !interactionFor(state) ? 'play' : 'brain-circuit');
+  icon('arcade-action-icon', arcade && state.kind === 'drive' ? 'zap' : 'crosshair');
   canvas.setAttribute('aria-label', `${mission.title}, level ${mission.number}, ${CHARACTERS[campaign.leader].name}`);
   const bindings = Object.fromEntries(Object.entries(preferences.bindings).map(([action, code]) => [action, keyLabel(code)]));
-  text('keyboard-help', orbit
+  text('keyboard-help', arcade
+    ? `${bindings.left} and ${bindings.right} move; mouse or touch dragging also steers. ${state.kind === 'drive'
+      ? `${bindings.jump} or ${bindings.boost} boosts, ${bindings.climbDown} brakes.` : `Hold ${bindings.jump} or ${bindings.fire} to fire.`} Escape pauses.`
+    : orbit
     ? `${bindings.left} and ${bindings.right} move the saucer. Mouse or touch dragging also moves it. ${bindings.jump} launches. ${bindings.patch}, ${bindings.query}, ${bindings.aegis} activate repair, analysis, defense. Escape pauses.`
-    : `${bindings.left} and ${bindings.right} move. Hold ${bindings.jump} for a full jump. ${bindings.boost} boosts. ${bindings.attack} attacks, ${bindings.fire} fires, ${bindings.helper} commands your recruited team. ${bindings.interact} interacts with terminals. ${bindings.pulse} activates Debug Pulse. Escape pauses.`);
+    : `${bindings.left} and ${bindings.right} move. Hold ${bindings.jump}, W, or Up Arrow for a full jump. ${bindings.climbUp} and ${bindings.climbDown} climb ladders or ropes. Jump to dismount. ${bindings.boost} boosts. ${bindings.attack} attacks, ${bindings.fire} fires, ${bindings.helper} commands your recruited team. ${bindings.interact} interacts with terminals. ${bindings.pulse} activates Debug Pulse. Escape pauses.`);
   hud();
 }
 
@@ -377,18 +419,22 @@ function pause(value, focus = true) {
 function showResults() {
   const mission = currentMission();
   const orbit = orbitMode();
+  const arcade = arcadeMode();
   const won = state.status === 'complete';
   persistCampaign();
-  text('result-eyebrow', won ? campaign.finished ? 'Campaign complete' : `Level ${mission.number} complete` : 'Recovery reserve depleted');
+  text('result-eyebrow', arcade ? won ? 'Arcade complete' : 'Arcade round ended'
+    : won ? campaign.finished ? 'Campaign complete' : `Level ${mission.number} complete` : 'Recovery reserve depleted');
   text('complete-title', won ? campaign.finished ? 'Control restored.' : `${mission.title} restored.` : 'Signal lost.');
-  text('completion-summary', won ? mission.ending : 'The current wave is checkpointed. Retry with a fresh reserve.');
+  text('completion-summary', won ? mission.ending : arcade ? 'Your campaign progress is safe.' : 'The current wave is checkpointed. Retry with a fresh reserve.');
   text('final-score', (state.score + (state.finale ? campaign.segmentScore : 0)).toLocaleString());
-  text('final-items-label', orbit ? 'Wave' : 'Items');
-  text('final-sparks', orbit ? `${state.wave + 1} / 5` : `${state.collected.size} / ${state.world.sparks.length}`);
+  text('final-items-label', arcade ? state.kind === 'drive' ? 'Distance' : 'Cleared' : orbit ? 'Wave' : 'Items');
+  text('final-sparks', arcade ? state.kind === 'drive' ? `${Math.floor(state.distance)} m` : state.destroyed
+    : orbit ? `${state.wave + 1} / 5` : `${state.collected.size} / ${state.world.sparks.length}`);
   text('final-combo-label', 'Campaign best');
-  text('final-combo', Object.values(campaign.scores).reduce((total, score) => total + score, 0).toLocaleString());
-  el('mission-badges').hidden = orbit;
-  if (!orbit) {
+  text('final-combo', [...Object.values(campaign.scores), ...Object.values(campaign.arcadeScores)]
+    .reduce((total, score) => total + score, 0).toLocaleString());
+  el('mission-badges').hidden = orbit || arcade;
+  if (!orbit && !arcade) {
     const badges = { explorer: state.world.sparks.filter(item => item.secret && state.collected.has(item.id)).length >= 10,
       debugger: won, collaborator: missionReady(state) };
     for (const [name, earned] of Object.entries(badges)) {
@@ -396,12 +442,13 @@ function showResults() {
       el(`badge-${name}`).setAttribute('aria-label', `${name}: ${earned ? 'earned' : 'not earned'}`);
     }
   }
-  el('next-level-button').hidden = !won || campaign.finished;
-  text('next-level-label', campaign.levelIndex < 7 ? `Next: ${CAMPAIGN[campaign.levelIndex + 1].title}` : 'Campaign complete');
-  text('replay-label', won ? 'Replay level' : 'Retry wave');
+  const destination = nextDestination(campaign);
+  el('next-level-button').hidden = !destination || !won && !arcade;
+  text('next-level-label', destination ? `Next: ${destination.title}` : 'Campaign complete');
+  text('replay-label', won ? arcade ? 'Replay arcade' : 'Replay level' : arcade ? 'Retry arcade' : 'Retry wave');
   clearInput(); panels();
-  (won && !campaign.finished ? el('next-level-button') : el('replay-button')).focus({ preventScroll: true });
-  announce(won ? `${mission.title} complete.` : 'Flight ended. Retry the current wave.');
+  ((won || arcade) && destination ? el('next-level-button') : el('replay-button')).focus({ preventScroll: true });
+  announce(won ? `${mission.title} complete.` : arcade ? 'Arcade round ended.' : 'Flight ended. Retry the current wave.');
 }
 
 function renderWorkstation(feedback = '') {
@@ -422,7 +469,7 @@ function openTask(station) {
 function openMap() {
   if (playing()) pause(true, false);
   clearInput();
-  const rows = CAMPAIGN.map(mission => {
+  const rows = CAMPAIGN.flatMap(mission => {
     const button = document.createElement('button'); button.type = 'button';
     button.className = 'level-option'; button.style.setProperty('--level-accent', mission.color);
     button.disabled = mission.index > campaign.unlocked;
@@ -436,7 +483,19 @@ function openMap() {
       started = false; el('level-dialog').close(); activateRun(); persistCampaign();
       el('start-button').focus({ preventScroll: true });
     });
-    return button;
+    const bonus = INTERLUDES[mission.id];
+    if (!bonus) return [button];
+    const arcadeButton = document.createElement('button'); arcadeButton.type = 'button';
+    arcadeButton.className = 'level-option arcade-option'; arcadeButton.disabled = mission.index >= campaign.unlocked;
+    const badge = document.createElement('span'); badge.className = 'level-option-number'; badge.textContent = '+';
+    const title = document.createElement('span'); title.textContent = bonus.title;
+    const detail = document.createElement('small'); detail.textContent = campaign.arcadeCompleted.has(bonus.id) ? 'Arcade cleared' : 'Arcade interlude';
+    arcadeButton.append(badge, title, detail);
+    arcadeButton.addEventListener('click', () => {
+      if (!selectInterlude(campaign, mission.index)) return;
+      started = false; el('level-dialog').close(); activateRun(); persistCampaign(); el('start-button').focus({ preventScroll: true });
+    });
+    return [button, arcadeButton];
   });
   el('level-list').replaceChildren(...rows);
   showPanel('level-dialog', 'close-levels');
@@ -525,11 +584,11 @@ el('settings-dialog').addEventListener('close', () => {
 });
 const quizEditor = createQuizEditor(document, CAMPAIGN, () => campaign.quizOverrides, overrides => {
   campaign.quizOverrides = validQuizOverrides(overrides);
-  if (!started) { selectLevel(campaign, campaign.levelIndex); activateRun(); }
+  if (!started && !arcadeMode()) { selectLevel(campaign, campaign.levelIndex); activateRun(); }
   return writeStorage(quizStorageKey, campaign.quizOverrides);
 });
 el('quiz-editor-button').addEventListener('click', () => {
-  quizEditor.selectLevel(currentMission().id);
+  quizEditor.selectLevel(CAMPAIGN[campaign.levelIndex].id);
   el('settings-dialog').close(); showPanel('quiz-editor-dialog', 'quiz-editor-title');
 });
 el('close-quiz-editor').addEventListener('click', () => el('quiz-editor-dialog').close());
@@ -662,9 +721,9 @@ function pointSaucer(event) {
 canvas.addEventListener('pointerdown', event => {
   if (!playing() || event.button !== 0) return;
   event.preventDefault(); canvas.focus({ preventScroll: true });
-  if (orbitMode()) {
+  if (orbitMode() || arcadeMode()) {
     canvas.setPointerCapture(event.pointerId); pointSaucer(event);
-    if (state.phase === 'ready') jumpPressed = true;
+    if (orbitMode() && state.phase === 'ready') jumpPressed = true;
   } else {
     const bounds = playfieldBounds();
     const x = (event.clientX - bounds.left) / bounds.scale + (state.stage === 'boss' ? 0 : state.cameraX);
@@ -677,7 +736,7 @@ canvas.addEventListener('pointerdown', event => {
   }
 });
 canvas.addEventListener('pointermove', event => {
-  if (playing() && orbitMode() && (event.pointerType === 'mouse' || canvas.hasPointerCapture(event.pointerId))) pointSaucer(event);
+  if (playing() && (orbitMode() || arcadeMode()) && (event.pointerType === 'mouse' || canvas.hasPointerCapture(event.pointerId))) pointSaucer(event);
 });
 controls.forEach(button => {
   button.addEventListener('pointerdown', event => {
@@ -705,9 +764,9 @@ function processEvents(events) {
   if (finished()) audio.setStatus(state.status === 'complete' ? 'complete' : 'paused');
   const played = new Set();
   for (const event of events) {
-    const app = orbitMode() ? undefined : state.world.sparks.find(item => item.id === event.id)?.app;
+    const app = orbitMode() || arcadeMode() ? undefined : state.world.sparks.find(item => item.id === event.id)?.app;
     const soundKey = event.type === 'spark' ? `spark:${app}` : event.type;
-    const completion = ['levelComplete','campaignComplete'].includes(event.type);
+    const completion = ['levelComplete','campaignComplete','arcadeComplete'].includes(event.type);
     if (!played.has(soundKey)) { audio.effect(completion ? { type: 'complete' } : event, app); played.add(soundKey); }
     if (event.type === 'missionMessage') { say(event.text); missionMessageUntil = state.time + 6; }
     if (event.type === 'missionTask') persistCampaign();
@@ -725,6 +784,7 @@ function processEvents(events) {
     if (event.type === 'powerup') say(`${{ wide: 'Wide Shield', multi: 'Multiball', magnet: 'Magnetic Catch', laser: 'Debug Laser', net: 'Recovery Net', microsoft: 'Microsoft protection', blaster: 'Debug Blaster' }[event.kind]} online.`);
     if (event.type === 'wave') say(`${ORBIT.waves[event.wave]}. ${event.wave === 4 ? 'Recovery reserve restored. We are repairing the defense, not removing it.' : 'Sector checkpoint online.'}`);
     if (event.type === 'quizRequired') openTask(event.station);
+    if (event.type === 'arcadeWave') say(`AI Invaders / Wave ${event.wave}.`);
     if (event.type === 'finaleStart') {
       clearInput(); panels(); say('Board the saucer. Restore the Monolith command interface and return control to the team.');
     }
@@ -736,18 +796,19 @@ function frame(now) {
   if (playing()) {
     const held = new Set([...keys.values(), ...pointers.values()]);
     const input = { left: held.has('left'), right: held.has('right'), jumpHeld: held.has('jump'),
+      up: held.has('climbUp'), down: held.has('climbDown'),
       jumpPressed, boostPressed, interactPressed, agentPressed, pointerX: orbitPointer,
       fire: held.has('fire') || now < fireUntil, attackPressed, helperPressed, pulsePressed };
-    const slow = held.has('focus') && campaign.unlocked >= 6 ? .5 : 1;
+    const slow = !arcadeMode() && held.has('focus') && campaign.unlocked >= 6 ? .5 : 1;
     const events = updateCampaign(campaign, input, dt * slow);
     state = campaign.run;
-    audio.setStage(orbitMode() ? 'world' : state.stage, state.boss?.phase ?? 0);
+    audio.setStage(orbitMode() || arcadeMode() ? 'world' : state.stage, state.boss?.phase ?? 0);
     jumpPressed = false; boostPressed = false; interactPressed = false; agentPressed = null;
     attackPressed = false; helperPressed = false; pulsePressed = false; processEvents(events);
   }
   const reduced = preferences.reducedMotion || motion.matches;
   syncQuestDialogue();
-  (orbitMode() ? renderOrbit : render)(ctx, state, reduced,
+  (arcadeMode() ? renderArcade : orbitMode() ? renderOrbit : render)(ctx, state, reduced,
     { highContrast: preferences.highContrast, shake: preferences.shake / 100 });
   hud(); requestAnimationFrame(frame);
 }

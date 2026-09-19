@@ -7,6 +7,8 @@ import { CAMPAIGN } from '../src/campaign.js';
 import { interactionFor } from '../src/missions.js';
 import { workView, prepareQuiz, submitWork } from '../src/trivia-tasks.js';
 import { renderQuiz } from '../src/quiz-ui.js';
+import { createArcade, updateArcade, setArcadePaused } from '../src/arcade.js';
+import { renderArcade } from '../src/arcade-art.js';
 import { createOrbit, updateOrbit, setOrbitPaused, reboundVelocity, ballPosition } from '../src/orbit.js';
 import { runTests as runPartyTests } from './party-tests.js';
 
@@ -180,6 +182,102 @@ test('Orbit rebounds follow shield contact position without horizontal trajector
     assert.ok(velocity.y <= -224);
     assert.ok(Math.abs(Math.hypot(velocity.x, velocity.y) - 450) < .01);
   }
+});
+
+test('arcade interludes move, pause, fail, retry and finish without advancing after completion', () => {
+  for (const kind of ['drive', 'invaders', 'pang']) {
+    const state = createArcade(kind, { pilot: 'donkey' });
+    const startX = state.player.x;
+    updateArcade(state, { right: true, fire: true }, .1);
+    assert.ok(state.player.x > startX);
+    assert.equal(state.pilot, 'donkey');
+    setArcadePaused(state, true);
+    const time = state.time;
+    assert.deepEqual(updateArcade(state, { left: true }, .1), []);
+    assert.equal(state.time, time);
+    setArcadePaused(state, false);
+    state.remaining = .001;
+    assert.ok(updateArcade(state, {}, .1).some(event => event.type === 'failed'));
+    assert.equal(state.status, 'failed');
+    assert.equal(createArcade(kind).health, 3);
+    const won = createArcade(kind);
+    if (kind === 'drive') won.distance = won.goal;
+    if (kind === 'invaders') { won.wave = 2; won.invaders.forEach(enemy => { enemy.dead = true; }); }
+    if (kind === 'pang') won.bubbles = [];
+    assert.ok(updateArcade(won, {}, step).some(event => event.type === 'complete'));
+    const score = won.score;
+    assert.deepEqual(updateArcade(won, { fire: true }, .1), []);
+    assert.equal(won.score, score);
+  }
+});
+
+test('AI Invaders uses physics contacts for projectiles and counts each opponent once', () => {
+  const state = createArcade('invaders');
+  updateArcade(state, { fire: true }, step);
+  const projectile = state.shots[0]; const enemy = state.invaders[0];
+  projectile.body.setTransform({ x: enemy.x / 50, y: enemy.y / 50 }, 0);
+  const events = updateArcade(state, {}, 1 / 60);
+  assert.equal(enemy.dead, true);
+  assert.equal(state.destroyed, 1);
+  assert.equal(events.filter(event => event.type === 'enemyDefeated').length, 1);
+  updateArcade(state, {}, .1);
+  assert.equal(state.destroyed, 1);
+});
+
+test('Bubble Firewall splits a hit bubble into two smaller physical bubbles', () => {
+  const state = createArcade('pang');
+  const bubble = state.bubbles[0];
+  const count = state.bubbles.length;
+  bubble.body.setTransform({ x: state.player.x / 50, y: 470 / 50 }, 0);
+  bubble.body.setLinearVelocity({ x: 0, y: 0 });
+  for (let frame = 0; frame < 40 && !bubble.dead; frame += 1) updateArcade(state, { fire: true }, step);
+  assert.equal(bubble.dead, true);
+  assert.equal(state.bubbles.length, count + 1);
+  assert.equal(state.bubbles.filter(item => item.tier === 1).length, 2);
+  assert.equal(state.score, 100);
+});
+
+test('coastal racing boosts temporarily and conserves the damage grace window', () => {
+  const state = createArcade('drive');
+  updateArcade(state, { jumpPressed: true }, .1);
+  assert.ok(state.boostTime > 0 && state.boostCooldown > 0);
+  const initial = state.boostCooldown;
+  updateArcade(state, { jumpPressed: true }, .1);
+  assert.ok(state.boostCooldown < initial);
+  assert.ok(state.distance > 0);
+  assert.equal(state.kind, 'drive');
+  for (let collision = 0; collision < 2; collision += 1) {
+    state.spawnTimer = 0;
+    updateArcade(state, {}, 1 / 60);
+    const traffic = state.traffic.find(item => !item.token && !item.dead);
+    traffic.z = 44; traffic.lane = 0; state.steering = 0;
+    updateArcade(state, {}, .05);
+    assert.equal(state.health, 2);
+  }
+  assert.ok(state.grace > 0);
+});
+
+test('arcade renderers produce distinct scenes without mutating simulation state', () => {
+  const signatures = new Set();
+  for (const kind of ['drive', 'invaders', 'pang']) {
+    const state = createArcade(kind);
+    const calls = [];
+    const context = new Proxy({ canvas: { width: 1280, height: 720 } }, {
+      get(target, key) {
+        if (key in target) return target[key];
+        return (...args) => {
+          assert.ok(args.filter(value => typeof value === 'number').every(Number.isFinite));
+          calls.push([key, ...args]);
+          if (String(key).includes('Gradient')) return { addColorStop() {} };
+        };
+      }
+    });
+    renderArcade(context, state, true);
+    assert.equal(state.time, 0);
+    assert.ok(calls.length > 100);
+    signatures.add(JSON.stringify(calls));
+  }
+  assert.equal(signatures.size, 3);
 });
 
 test('Orbit follows pointer input precisely, clamps at walls, and launches on demand', () => {

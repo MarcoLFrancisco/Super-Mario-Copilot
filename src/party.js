@@ -80,6 +80,7 @@ export function syncParty(party, player, worldWidth = Infinity) {
     actor.vy = player.vy;
     actor.grounded = player.grounded;
     actor.boostTime = player.boostTime;
+    actor.climbing = player.climbing;
     actor.facing = actorFacing;
   }
 }
@@ -256,11 +257,21 @@ export function updateCompanions(party, player, dt, context, events = []) {
   while (party.companionTime + 1e-9 >= step) {
     party.companionTime = Math.max(0, party.companionTime - step);
     const assignments = assignSupportTargets(party, player, context);
+    const claimedItems = new Set();
     ids.forEach((id, slot) => {
       if (!party.unlocked.has(id)) return;
       const actor = party.actors[id];
+      const item = !assignments.has(id) && !actor.recovering && !actor.attack
+        ? (context.collectibles ?? []).filter(candidate => !claimedItems.has(candidate.id)
+          && Math.hypot(candidate.x - actor.x, candidate.y - actor.y) < 420
+          && findSafeLanding({ x: candidate.x - P.playerWidth / 2, y: candidate.y - P.playerHeight / 2 },
+            context.world, context.blocks ?? [], { maxDistance: 85, avoid: context.enemies ?? [] }))
+          .sort((first, second) => Math.hypot(first.x - actor.x, first.y - actor.y)
+            - Math.hypot(second.x - actor.x, second.y - actor.y))[0] : null;
+      if (item) claimedItems.add(item.id);
       const intent = decideCompanion(actor.ai, actor, {
         ...context, leader: player, spec: ATTACKS[nextAttackKind(actor)],
+        assignedItem: item,
         assignedTargetId: assignments.get(id) ?? null,
         manualAttack: party.manualAttack, allowPlanning: slot === party.planningTurn
       }, step);

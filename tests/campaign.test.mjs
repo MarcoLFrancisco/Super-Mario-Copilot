@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createState, update } from '../src/engine.js';
 import { LEVEL, PHYSICS } from '../src/level.js';
 import { ARENA } from '../src/encounters.js';
-import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, saveCampaign, pauseCampaign, retryLevel } from '../src/campaign.js';
+import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, selectInterlude, nextDestination, saveCampaign, pauseCampaign, retryLevel } from '../src/campaign.js';
+import { INTERLUDES } from '../src/arcade.js';
 import { createBoss } from '../src/boss.js';
 import { worldMusicStep } from '../src/music.js';
 import { interact, updateMission, missionReady, missionStations, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
@@ -41,6 +42,25 @@ test('the campaign has eight distinct sequential worlds with original-party stat
     assert.ok(state.combat.enemies.length >= 8);
     assert.equal(missionReady(state), false);
   }
+});
+
+test('themed upper paths add climbing without replacing original jumping platforms', () => {
+  const routes = new Set();
+  for (const mission of CAMPAIGN.filter(item => item.type === 'platform')) {
+    assert.deepEqual(mission.world.mainRoute.map(platform => [platform.x, platform.y, platform.w]), mission.route);
+    assert.equal(mission.world.platforms.filter(platform => platform.id.startsWith(`${mission.id}-upper-`)).length, mission.upper.length);
+    assert.ok(mission.world.climbs.length >= 3);
+    assert.ok(mission.world.platforms.some(platform => platform.structure));
+    routes.add(mission.world.traversal);
+    for (const climb of mission.world.climbs) {
+      assert.ok(climb.bottom > climb.top);
+      for (const height of [climb.top, climb.bottom]) {
+        assert.ok(mission.world.platforms.some(platform => platform.y === height
+          && climb.x > platform.x && climb.x < platform.x + platform.w), `${mission.id}: climb endpoint must meet a platform`);
+      }
+    }
+  }
+  assert.equal(routes.size, 7);
 });
 
 function atStation(state, key) {
@@ -352,10 +372,46 @@ test('campaign progression carries the original leader, recruits, and equipment 
       assert.equal(campaign.unlocked, index + 1);
       assert.equal(updateCampaign(campaign, {}, 1 / 60).length, 0);
       assert.equal(advanceCampaign(campaign), true);
+      if (INTERLUDES[CAMPAIGN[index].id]) {
+        assert.equal(campaign.run.mode, 'arcade');
+        assert.equal(campaign.run.pilot, 'mario');
+        assert.equal(campaign.levelIndex, index);
+        campaign.run.status = 'complete';
+        assert.ok(updateCampaign(campaign, {}, 1 / 60).some(event => event.type === 'arcadeComplete'));
+        assert.equal(advanceCampaign(campaign), true);
+      }
     }
   }
   assert.equal(campaign.completed.size, 8);
   assert.equal(advanceCampaign(campaign), false);
+});
+
+test('arcade interludes save independently, replay safely, and allow continuing after a failed round', () => {
+  const campaign = createCampaign('donkey', { unlocked: 4, current: 1, blaster: true, recruits: ['marco'] });
+  assert.equal(selectInterlude(campaign, 5), false);
+  assert.equal(selectInterlude(campaign, 1), true);
+  assert.equal(campaign.run.mission.title, 'AI Invaders');
+  assert.equal(nextDestination(campaign).id, 'cowork');
+  const restored = createCampaign('donkey', saveCampaign(campaign));
+  assert.equal(restored.interlude, 'ai-invaders');
+  assert.equal(restored.run.mode, 'arcade');
+  pauseCampaign(restored, true);
+  updateCampaign(restored, { fire: true }, .1);
+  assert.equal(restored.run.time, 0);
+  pauseCampaign(restored, false);
+  restored.run.health = 0;
+  assert.ok(updateCampaign(restored, {}, 1 / 60).some(event => event.type === 'failed'));
+  retryLevel(restored);
+  assert.equal(restored.run.health, 3);
+  assert.equal(restored.run.pilot, 'donkey');
+  restored.run.status = 'failed';
+  assert.equal(advanceCampaign(restored), true);
+  assert.equal(restored.levelIndex, 2);
+  assert.equal(restored.run.party.leader, 'donkey');
+  assert.equal(restored.run.combat.blaster, true);
+  assert.ok(restored.run.party.unlocked.has('marco'));
+  assert.equal(restored.completed.has('github'), false);
+  assert.equal(restored.arcadeCompleted.size, 0);
 });
 
 test('campaign saves progress without sharing mission runtime state', () => {
