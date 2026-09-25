@@ -2,6 +2,7 @@ import { ARENA } from './encounters.js';
 import { PHYSICS } from './level.js';
 import { SHOWMAN_MOVES } from './boss.js';
 import { wizardCrownY } from './wizard-rig.js';
+import { BOSS_DESIGNS, themedBossBounds } from './boss-collection.js';
 
 // Arena coordinates; caller sets canvas scale. Background goes before solid
 // platforms; telegraphs and boss go afterward, before player/projectiles.
@@ -180,10 +181,12 @@ export function drawBossWarnings(c, boss) {
   if (boss.mode === 'warning') {
     const tips = { tokens: 'PROJECTILE BURST INCOMING', agents: 'MARKED COLUMN ACTIVATING', waves: 'FLOOR WAVES INCOMING' };
     const attack = boss.attackType ?? (boss.arena ?? ARENA).phases[boss.phase].attack;
-    rect(c, 240, 106, 800, 35, '#35223eee');
-    label(c, tips[attack], 640, 129, 16, '#ffdb95');
+    const top = BOSS_DESIGNS[boss.arena?.bossStyle] ? 8 : 106;
+    rect(c, 240, top, 800, 35, '#35223eee');
+    label(c, tips[attack], 640, top + 23, 16, '#ffdb95');
   } else if (boss.mode === 'exposed') {
-    label(c, boss.objectivesLocked ? 'CONTROL SYSTEMS STILL LOCKED' : 'CORE EXPOSED', 640, 128, 16, '#98ffe1');
+    label(c, boss.objectivesLocked ? 'CONTROL SYSTEMS STILL LOCKED' : 'CORE EXPOSED', 640,
+      BOSS_DESIGNS[boss.arena?.bossStyle] ? 31 : 128, 16, '#98ffe1');
   }
   c.restore();
 }
@@ -210,6 +213,23 @@ export function bossDialogueLayout(c, boss, player = null) {
   } while (rows.length > 2 && fontSize > 13);
   c.restore();
   const height = 35 + rows.length * 22;
+  if (BOSS_DESIGNS[boss.arena?.bossStyle]) {
+    const bounds = themedBossBounds(boss);
+    const centered = boss.x + boss.w / 2 - width / 2;
+    const positions = [
+      { x: centered, y: bounds.y - height - 22, tail: true },
+      { x: bounds.x - width - 18, y: Math.max(151, bounds.y + 10), tail: false },
+      { x: bounds.x + bounds.w + 18, y: Math.max(151, bounds.y + 10), tail: false },
+      { x: centered, y: bounds.y + bounds.h + 20, tail: false }
+    ].map(position => ({ ...position, x: Math.max(16, Math.min(arena.width - width - 16, position.x)) }));
+    const overlapsBox = (position, box) => position.x < box.x + box.w && position.x + width > box.x
+      && position.y < box.y + box.h && position.y + height + (position.tail ? 12 : 0) > box.y;
+    const playerBox = player ? { ...player, w: PHYSICS.playerWidth, h: PHYSICS.playerHeight } : null;
+    const position = positions.find(candidate => candidate.y >= 151 && candidate.y + height <= arena.height - 20
+      && !overlapsBox(candidate, bounds) && (!playerBox || !overlapsBox(candidate, playerBox)));
+    if (!position) return null;
+    return { ...position, w: width, h: height, rows, fontSize };
+  }
   const top = boss.arena?.behavior === 'showman' ? wizardCrownY(boss) : boss.y - 26;
   const y = Math.max(151, top - height - 18);
   const centered = boss.x + boss.w / 2 - width / 2;
@@ -231,8 +251,8 @@ export function drawBossDialogue(c, boss, player = null) {
   rect(c, x, y, width, height, '#eff8ff');
   c.shadowBlur = 0;
   c.strokeStyle = '#8be6ec'; c.lineWidth = 2; c.strokeRect(x, y, width, height);
-  if (!player || anchor + 9 < player.x || anchor - 9 > player.x + PHYSICS.playerWidth
-      || y + height + 12 < player.y || y + height > player.y + PHYSICS.playerHeight) {
+    if (layout.tail !== false && (!player || anchor + 9 < player.x || anchor - 9 > player.x + PHYSICS.playerWidth
+      || y + height + 12 < player.y || y + height > player.y + PHYSICS.playerHeight)) {
     c.beginPath(); c.moveTo(anchor - 9, y + height);
     c.lineTo(anchor, y + height + 12); c.lineTo(anchor + 9, y + height);
     c.closePath(); c.fillStyle = '#eff8ff'; c.fill();

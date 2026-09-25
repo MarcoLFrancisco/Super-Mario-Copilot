@@ -147,13 +147,13 @@ function buildMission(definition, index) {
     platforms.push({ ...moving, id: `${definition.id}-lift-${position}`, h: 24,
       app: definition.app, kind: 'lift', theme: definition.theme, motion: moving });
   }
-  const traversal = addWorldRoutes(definition, platforms, mainRoute);
   const stations = WORK_TASKS[definition.id].map((workflow, position) => {
     const floor = mainRoute[[0, 6, 12][position]];
     return { key: workflow.key, title: workflow.title, action: 'work', workflow,
       label: 'Open quiz', id: `${definition.id}-${workflow.key}`,
       x: floor.x + (position === 0 ? 510 : floor.w / 2), y: floor.y };
   });
+  const traversal = addWorldRoutes(definition, platforms, mainRoute, stations);
   const checkpoints = [0, 4, 8, 12].map((routeIndex, chapter) => {
     const floor = mainRoute[routeIndex];
     return { id: `${definition.id}-checkpoint-${chapter}`, name: definition.chapters[chapter],

@@ -6,7 +6,7 @@ import { assetManifest } from '../scripts/build-assets.mjs';
 import { createState as createOriginalState, setPaused, update } from '../src/engine.js';
 import { CAMPAIGN } from '../src/campaign.js';
 import { createBoss, SHOWMAN_MOVES } from '../src/boss.js';
-import { drawCampaignBoss, drawClimb } from '../src/world-art.js';
+import { drawCampaignBoss, drawClimb, drawMissionObjects, drawWorldPlatform, quizTerminalBounds } from '../src/world-art.js';
 import { actionForKey } from '../src/input.js';
 import { drawPartyActor } from '../src/party-art.js';
 import { characterMotion } from '../src/character.js';
@@ -14,6 +14,8 @@ import { bossDialogueLayout, drawBossDialogue, drawBossWarnings } from '../src/b
 import { drawProjectile } from '../src/enemy-art.js';
 import { loadWizardRig, wizardMatrices, wizardPose, wizardCrownY } from '../src/wizard-rig.js';
 import { WIZARD_RIG } from '../images/Boss1-rig.js';
+import { BOSS_COLLECTION } from '../images/Boss-collection.js';
+import { BOSS_DESIGNS, loadBossCollection, themedBossPose, themedBossBounds, drawThemedBoss, drawArmoredCore } from '../src/boss-collection.js';
 import { interactionFor } from '../src/missions.js';
 import { workView, prepareQuiz, submitWork } from '../src/trivia-tasks.js';
 import { renderQuiz } from '../src/quiz-ui.js';
@@ -33,6 +35,13 @@ await loadWizardRig(() => robotAtlas);
 const interceptorImage = { naturalWidth: 1024, naturalHeight: 1024,
   set src(value) { this.url = value; queueMicrotask(() => this.onload()); } };
 await loadArcadeArt(() => interceptorImage);
+const bossImages = new Map();
+await loadBossCollection(key => {
+  const image = { naturalWidth: BOSS_COLLECTION.atlasSize[0], naturalHeight: BOSS_COLLECTION.atlasSize[1],
+    set src(value) { this.url = value; queueMicrotask(() => this.onload()); } };
+  bossImages.set(key, image);
+  return image;
+});
 
 function canvasRecorder(width = 1280) {
   const calls = [];
@@ -54,6 +63,125 @@ function canvasRecorder(width = 1280) {
   });
   return { context, calls };
 }
+
+test('the boss collection has distinct textured transparent atlases built from the original robot', () => {
+  const source = readFileSync(new URL('../images/Boss1-rig.png', import.meta.url));
+  assert.equal(createHash('sha256').update(source).digest('hex'), BOSS_COLLECTION.sourceHash);
+  const hashes = new Set();
+  assert.deepEqual(Object.keys(BOSS_DESIGNS).sort(), ['firewall','foundry','meeting','merge','monolith','orchestrator','planner','scope']);
+  for (const [key, design] of Object.entries(BOSS_DESIGNS)) {
+    const data = readFileSync(new URL(`../images/${design.file}`, import.meta.url));
+    assert.deepEqual([data.readUInt32BE(16), data.readUInt32BE(20)], WIZARD_RIG.atlasSize);
+    assert.equal(data[25], 6);
+    assert.ok(data.length > 200000);
+    hashes.add(createHash('sha256').update(data).digest('hex'));
+    assert.ok(bossImages.get(key).url.endsWith(design.file));
+  }
+  assert.equal(hashes.size, 8);
+});
+
+test('remaining boss art uses independent textured joints and never mutates combat bounds', () => {
+  for (const style of Object.keys(BOSS_DESIGNS)) {
+    const boss = createBoss(CAMPAIGN[1].arena);
+    Object.assign(boss, { age: 2, phase: 1, windup: .8 });
+    const signatures = new Set();
+    for (const mode of ['intro', 'warning', 'attack', 'exposed', 'defeated']) for (const reduced of [false, true]) {
+      Object.assign(boss, { mode, defeated: mode === 'defeated', defeatTime: 1.1, recoil: mode === 'attack' ? .15 : 0, attackPulse: .2 });
+      const before = JSON.stringify(boss);
+      const { context, calls } = canvasRecorder();
+      drawThemedBoss(context, boss, style, reduced);
+      assert.equal(calls.filter(([name, image]) => name === 'drawImage' && image === bossImages.get(style)).length, 13);
+      assert.equal(JSON.stringify(boss), before);
+      signatures.add(JSON.stringify(calls));
+    }
+    assert.ok(signatures.size >= 6);
+    const pose = themedBossPose({ ...boss, defeated: false, mode: 'warning' }, style);
+    assert.notDeepEqual(pose.leftArm, pose.rightArm);
+    assert.notDeepEqual(pose.head, pose.body);
+  }
+});
+
+test('orbital boss portraits are clipped to their unchanged target rectangles', () => {
+  for (const style of ['firewall', 'monolith', 'orchestrator']) {
+    const core = { x: 640, y: 240, w: 120, h: 72 };
+    const before = JSON.stringify(core);
+    const { context, calls } = canvasRecorder();
+    drawArmoredCore(context, core, style, 4, false, true, false);
+    assert.ok(calls.some(([name, image]) => name === 'drawImage' && image === bossImages.get(style)));
+    assert.ok(calls.some(([name, x, y, width, height]) => name === 'roundRect' && x === -60 && y === -36 && width === 120 && height === 72));
+    assert.ok(calls.some(([name]) => name === 'clip'));
+    assert.equal(JSON.stringify(core), before);
+  }
+});
+
+test('every later campaign boss uses its own textured rig and keeps captions outside its animated artwork', () => {
+  for (const mission of CAMPAIGN.filter(item => item.type === 'platform' && item.id !== 'campus')) {
+    const boss = createBoss(mission.arena);
+    const expectedImage = bossImages.get(mission.bossStyle);
+    for (const mode of ['warning', 'attack', 'exposed', 'defeated']) {
+      Object.assign(boss, { age: 2.8, mode, windup: 1, attackPulse: .35, recoil: .15,
+        defeated: mode === 'defeated', defeatTime: 1.2 });
+      const before = JSON.stringify(boss);
+      const { context, calls } = canvasRecorder();
+      drawCampaignBoss(context, boss, mission, false);
+      assert.equal(calls.filter(([name, image]) => name === 'drawImage' && image === expectedImage).length, 13, mission.id);
+      assert.equal(JSON.stringify(boss), before);
+      const bounds = themedBossBounds(boss);
+      const matrices = wizardMatrices(boss, false, themedBossPose(boss, mission.bossStyle));
+      for (const layer of WIZARD_RIG.layers) {
+        const [left, top, width, height] = layer.source;
+        for (const horizontal of [left, left + width]) for (const vertical of [top, top + height]) {
+          const matrix = matrices[layer.name];
+          const x = bounds.centerX + (matrix[0] * horizontal + matrix[2] * vertical + matrix[4] - WIZARD_RIG.origin[0]) * bounds.scale;
+          const y = bounds.baseY + (matrix[1] * horizontal + matrix[3] * vertical + matrix[5] - WIZARD_RIG.origin[1]) * bounds.scale;
+          assert.ok(x >= bounds.x && x <= bounds.x + bounds.w && y >= bounds.y && y <= bounds.y + bounds.h,
+            `${mission.id}: ${layer.name} exceeds the caption avoidance bounds in ${mode}`);
+        }
+      }
+    }
+    boss.defeated = false; boss.mode = 'warning';
+    boss.dialogue.current = { text: mission.arena.dialogue.entrance[0] };
+    const overlaps = (first, second) => first.x < second.x + second.w && first.x + first.w > second.x
+      && first.y < second.y + second.h && first.y + first.h > second.y;
+    for (const x of [120, 560, 1030]) for (const y of [130, 385]) {
+      Object.assign(boss, { x, y });
+      const player = { x: 460, y: 390, w: 34, h: 46 };
+      const { context, calls } = canvasRecorder();
+      const caption = bossDialogueLayout(context, boss, player);
+      assert.ok(caption, `${mission.id}: room for a caption must remain`);
+      assert.equal(overlaps(caption, themedBossBounds(boss)), false);
+      assert.equal(overlaps(caption, player), false);
+      assert.ok(caption.x >= 16 && caption.x + caption.w <= 1264 && caption.y >= 151);
+      drawBossWarnings(context, boss);
+      assert.ok(calls.some(([name, , top, , height]) => name === 'fillRect' && top === 8 && height === 35));
+    }
+    const reduced = themedBossPose(boss, mission.bossStyle, true);
+    boss.age += 1;
+    assert.deepEqual(themedBossPose(boss, mission.bossStyle, true), reduced);
+  }
+});
+
+test('orbital and arcade finales select the matching boss texture without altering their targets', () => {
+  for (const finale of [false, true]) {
+    const state = createOrbit({ width: 1280, wave: 4 });
+    state.finale = finale;
+    const targets = state.bricks.map(brick => [brick.id, brick.x, brick.y, brick.w, brick.h, brick.hp]);
+    const { context, calls } = canvasRecorder();
+    renderOrbit(context, state, true);
+    assert.ok(calls.some(([name, image]) => name === 'drawImage' && image === bossImages.get(finale ? 'monolith' : 'firewall')));
+    assert.deepEqual(state.bricks.map(brick => [brick.id, brick.x, brick.y, brick.w, brick.h, brick.hp]), targets);
+  }
+  const arcade = createArcade('invaders');
+  for (let wave = 0; wave < 3; wave += 1) nextInvaderWave(arcade);
+  const target = arcade.coreWeakPoint;
+  const before = [target.x, target.y, target.w, target.h, arcade.core.health];
+  arcade.core.mode = 'exposed';
+  const { context, calls } = canvasRecorder();
+  renderArcade(context, arcade, true);
+  assert.ok(calls.some(([name, image]) => name === 'drawImage' && image === bossImages.get('orchestrator')));
+  assert.deepEqual([target.x, target.y, target.w, target.h, arcade.core.health], before);
+  assert.ok(calls.some(([name, x, y]) => name === 'lineTo' && x === target.x - target.w / 2 && y === target.y - target.h / 2));
+});
 
 test('the Setup Wizard is a smaller grounded robot without the generic core overlay', () => {
   const mission = CAMPAIGN[0];
@@ -195,6 +323,72 @@ function jumpHeight(held) {
   }
   return startY - highestY;
 }
+
+test('keyboard climbing does not add on-screen climb buttons or move captions over characters', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.equal(/id="climb-controls"|data-action="climbUp"|data-action="climbDown"/.test(html), false);
+  assert.equal(/el\('climb-controls'\)|'has-climb'/.test(main), false);
+  assert.equal(/\.has-climb\s+\.dialogue-strip/.test(css), false);
+});
+
+test('platform captions and controls occupy separate rows outside the 16:9 canvas', () => {
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  const rules = new Map();
+  for (const [, selector, body] of css.matchAll(/(\.is-platform #[a-z-]+)\s*\{([^{}]*)\}/g)) {
+    rules.set(selector, `${rules.get(selector) ?? ''} ${body}`);
+  }
+  assert.match(rules.get('.is-platform #game-canvas'), /grid-row:\s*6;/);
+  assert.match(rules.get('.is-platform #game-canvas'), /aspect-ratio:\s*16\s*\/\s*9;/);
+  assert.match(rules.get('.is-platform #dialogue-strip'), /position:\s*static;/);
+  for (const id of ['dialogue-strip', 'touch-controls', 'combat-controls', 'interact-button']) {
+    const declarations = [...css.matchAll(new RegExp(`\\.is-platform #${id}\\s*\\{([^{}]*)\\}`, 'g'))];
+    assert.ok(declarations.length);
+    for (const [, body] of declarations) {
+      const row = body.match(/grid-row:\s*(\d+)/)?.[1];
+      if (row) assert.ok(Number(row) > 6, `${id} must remain below the scene`);
+    }
+  }
+  assert.match(main, /classList\.toggle\('is-platform', !orbit && !arcade\)/);
+  assert.match(main, /if \(!orbitMode\(\)\)\s*\{\s*button\.style\.removeProperty\('left'\); button\.style\.removeProperty\('top'\);\s*return;/);
+});
+
+test('quiz terminals do not paint wide signboards over blocks and platforms', () => {
+  for (const mission of CAMPAIGN.filter(item => item.type === 'platform')) {
+    const state = createOriginalState('marco', mission);
+    const { context, calls } = canvasRecorder();
+    drawMissionObjects(context, state, () => true);
+    assert.equal(calls.some(([name, , , width, height]) => name === 'roundRect' && width === 284 && height === 41), false);
+    for (const station of mission.world.stations) {
+      const monitor = quizTerminalBounds(station);
+      assert.ok(calls.some(([name, x, y, width, height]) => name === 'roundRect'
+        && x === monitor.x && y === monitor.y && width === monitor.w && height === monitor.h));
+      assert.equal(calls.some(([name, text]) => name === 'fillText' && [station.title, station.workflow.product].includes(text)), false);
+      for (const platform of mission.world.platforms.filter(platform => !platform.motion)) {
+        const overlap = monitor.x < platform.x + platform.w && monitor.x + monitor.w > platform.x
+          && monitor.y < platform.y + platform.h && monitor.y + monitor.h > platform.y;
+        assert.equal(overlap, false, `${station.id} monitor intersects ${platform.id}`);
+      }
+      for (const block of mission.encounters.blocks) {
+        assert.ok(monitor.x + monitor.w <= block.x || monitor.x >= block.x + block.w
+          || monitor.y + monitor.h <= block.y || monitor.y >= block.y + block.h, `${station.id} monitor intersects ${block.id}`);
+      }
+    }
+  }
+});
+
+test('decorative platform supports stay within a shallow clipped area below their own deck', () => {
+  for (const mission of CAMPAIGN.filter(item => item.type === 'platform')) {
+    const platform = mission.world.platforms.find(item => item.structure);
+    const { context, calls } = canvasRecorder();
+    drawWorldPlatform(context, platform, mission, 0, true);
+    assert.ok(calls.some(([name, x, y, width, height]) => name === 'rect'
+      && x === platform.x && y === platform.y + platform.h && width === platform.w && height === 32));
+    assert.ok(calls.some(([name]) => name === 'clip'));
+  }
+});
 
 test('Up and Down arrows climb nearby ladders and ropes without replacing normal jumping', () => {
   const bindings = { jump: 'Space', climbUp: 'KeyR', climbDown: 'KeyV' };

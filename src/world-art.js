@@ -1,6 +1,7 @@
 import { VIEW } from './level.js';
 import { missionStations, stationStatus } from './missions.js';
 import { drawWizardRig } from './wizard-rig.js';
+import { drawThemedBoss } from './boss-collection.js';
 
 function panel(ctx, x, y, width, height, color, radius = 3, border = null) {
   ctx.beginPath(); ctx.roundRect(x, y, width, height, radius);
@@ -303,19 +304,21 @@ export function drawWorldPlatform(ctx, platform, mission, time, reducedMotion, h
   const theme = platform.theme ?? mission.theme;
   ctx.save();
   if (platform.structure) {
+    ctx.save(); ctx.beginPath(); ctx.rect(x, y + h, w, 32); ctx.clip();
     if (theme === 'github') {
-      line(ctx, [[x + 16,y + h],[x - 18,y + h + 85]], '#557452', 14);
-      for (let leaf = 0; leaf < w; leaf += 44) oval(ctx, x + leaf + 15, y + h + 12, 22, 8, '#7fba67');
+      line(ctx, [[x + 22,y + h],[x + 10,y + h + 26]], '#557452', 9);
+      for (let leaf = 14; leaf < w - 12; leaf += 40) oval(ctx, x + leaf, y + h + 10, 15, 5, '#7fba67');
     } else if (theme === 'foundry') {
       for (let support = 12; support < w; support += 65) line(ctx,
-        [[x + support,y + h],[x + support + 40,y + h + 42],[x + support + 55,y + h]], '#829998', 5);
+        [[x + support,y + h],[x + support + 30,y + h + 25],[x + support + 55,y + h]], '#829998', 4);
     } else if (theme === 'cowork') {
-      panel(ctx, x + 12, y + h, 10, 80, '#916d77', 2);
-      panel(ctx, x + w - 22, y + h, 10, 80, '#916d77', 2);
+      panel(ctx, x + 12, y + h, 8, 28, '#916d77', 2);
+      panel(ctx, x + w - 20, y + h, 8, 28, '#916d77', 2);
     } else if (theme === 'teams' || theme === 'agents') {
-      panel(ctx, x + 8, y + h, w - 16, 60, '#2e646f', 3);
-      for (let window = 20; window < w - 28; window += 40) panel(ctx, x + window, y + h + 14, 23, 26, '#b9e5d4', 2);
+      panel(ctx, x + 8, y + h, w - 16, 28, '#2e646f', 3);
+      for (let window = 20; window < w - 28; window += 40) panel(ctx, x + window, y + h + 8, 23, 13, '#b9e5d4', 2);
     }
+    ctx.restore();
   }
   panel(ctx, x + 5, y + 8, w, h + 8, '#081c3c45', 2);
   const side = ctx.createLinearGradient(0, y, 0, y + h);
@@ -397,6 +400,10 @@ export function drawClimb(ctx, climb) {
   ctx.restore();
 }
 
+export function quizTerminalBounds(station) {
+  return { x: station.x - 44, y: station.y - 83, w: 88, h: 54 };
+}
+
 export function drawMissionObjects(ctx, state, visible) {
   const progress = state.missionProgress;
   if (!progress) return;
@@ -411,14 +418,12 @@ export function drawMissionObjects(ctx, state, visible) {
     if (station.workflow) {
       const review = status.startsWith('Question');
       const accent = complete ? '#a2ffe1' : review ? '#ffe19e' : state.mission.color;
+      const monitor = quizTerminalBounds(station);
       panel(ctx, station.x - 17, station.y - 34, 34, 34, '#29475a', 3, '#7bafbd');
-      panel(ctx, station.x - 44, station.y - 83, 88, 54, '#15332e', 5, accent);
+      panel(ctx, monitor.x, monitor.y, monitor.w, monitor.h, '#15332e', 5, accent);
       panel(ctx, station.x - 36, station.y - 75, 72, 32, complete ? '#23664d' : review ? '#664622' : '#254e62', 2);
       label(ctx, complete ? 'DONE' : review ? `Q${(progress.jobs[station.id]?.questionIndex ?? 0) + 1}` : 'QUIZ', station.x, station.y - 55, 12, '#f3fff6', 'center');
       panel(ctx, station.x - 5, station.y - 38, 10, 3, accent, 1);
-      panel(ctx, station.x - 142, station.y - 132, 284, 41, '#102a32ee', 3, '#a3c8ca66');
-      label(ctx, station.workflow.product, station.x, station.y - 116, 10, '#bde9d8', 'center');
-      label(ctx, station.title, station.x, station.y - 100, 12, '#f4fcff', 'center');
       continue;
     }
     if (station.bridge && !complete) {
@@ -457,86 +462,5 @@ export function drawCampaignBoss(ctx, boss, mission, reducedMotion) {
     drawWizardRig(ctx, boss, reducedMotion);
     return;
   }
-  const time = reducedMotion ? 0 : boss.age;
-  const exposed = boss.mode === 'exposed' && !boss.objectivesLocked;
-  const color = exposed || boss.defeated ? '#9afbd0' : mission.color;
-  const { x, y, w, h } = boss;
-  ctx.save();
-  if (boss.defeated) ctx.globalAlpha = Math.max(.25, 1 - (boss.defeatTime ?? 0) / 2.5);
-  const metal = ctx.createLinearGradient(x, y, x + w, y + h);
-  metal.addColorStop(0, '#d9eafa'); metal.addColorStop(.4, '#7593a8'); metal.addColorStop(1, '#253d52');
-  const center = x + w / 2;
-  if (mission.bossStyle === 'merge') {
-    for (const side of [-1, 1]) {
-      const gap = exposed ? 13 : 2;
-      panel(ctx, center + (side < 0 ? -70 - gap : gap), y, 68, h, side < 0 ? '#528f75' : '#5876a6', 8, color);
-      line(ctx, [[center + side * 52,y + 22],[center + side * 95,y - 16],[center + side * 116,y + 10]], color, 12);
-      oval(ctx, center + side * 116, y + 10, 12, 12, '#def5d5');
-    }
-    line(ctx, [[center,y + 45],[center,y + 120]], exposed ? '#d0ffe7' : '#ddaf74', 8);
-  } else if (mission.bossStyle === 'scope') {
-    const expansion = 12 + Math.sin(time) * 7;
-    for (const side of [-1, 1]) {
-      panel(ctx, x + (side < 0 ? -expansion - 45 : w + expansion), y + 35, 44, 105, '#b28e7d', 3, '#f2d6a9');
-      for (let floor = 0; floor < 4; floor += 1) panel(ctx, x + (side < 0 ? -expansion - 37 : w + expansion + 8), y + 44 + floor * 22, 28, 10, '#f2dec5', 2);
-    }
-    panel(ctx, x, y, w, h, '#c5a794', 5, '#ffe1af');
-    panel(ctx, x + 12, y + 90, w - 24, 48, '#f1e3cf', 2);
-    for (let note = 0; note < 3; note += 1) panel(ctx, x + 22 + note * 30, y + 103, 22, 25, ['#efbe77','#dc9cac','#9fd3c7'][note], 1);
-  } else if (mission.bossStyle === 'foundry') {
-    gear(ctx, x - 25, y + 110, 44, -time, '#c4b28c');
-    gear(ctx, x + w + 23, y + 105, 39, time * 1.2, '#94bfc4');
-    panel(ctx, x, y, w, h, metal, 5, color);
-    for (let vent = 0; vent < 6; vent += 1) panel(ctx, x + 20, y + 86 + vent * 9, w - 40, 4, '#162e3f', 1);
-    panel(ctx, x + 35, y - 36, 25, 36, '#b4c6cf', 2);
-    panel(ctx, x + 85, y - 24, 20, 24, '#b4c6cf', 2);
-  } else if (mission.bossStyle === 'planner') {
-    panel(ctx, x, y, w, h, '#345d66', 9, color);
-    for (let task = 0; task < 4; task += 1) {
-      const position = time * .3 + task * Math.PI / 2;
-      const taskX = center + Math.cos(position) * 122;
-      const taskY = y + h / 2 + Math.sin(position) * 88;
-      line(ctx, [[center,y + 85],[taskX,taskY]], '#86cfc588', 2);
-      panel(ctx, taskX - 22, taskY - 14, 44, 28, '#d8e7cd', 3, '#7bbbb5');
-      line(ctx, [[taskX - 13,taskY - 3],[taskX + 13,taskY - 3]], '#43767a', 2);
-    }
-  } else if (mission.bossStyle === 'meeting') {
-    for (const side of [-1, 1]) {
-      panel(ctx, center + side * 105 - 28, y + 35, 56, 120, '#394362', 5, '#b7b3e7');
-      for (const height of [65,118]) {
-        oval(ctx, center + side * 105, y + height, 21, 21, '#182d44');
-        oval(ctx, center + side * 105, y + height, 12, 12, '#a3a8c8');
-        oval(ctx, center + side * 105, y + height, 5, 5, '#375276');
-      }
-    }
-    panel(ctx, x, y, w, h, metal, 8, color);
-    panel(ctx, x + 18, y + 90, w - 36, 42, '#3b466b', 4);
-    for (let sound = 0; sound < 9; sound += 1) {
-      const height = 6 + Math.abs(Math.sin(time * 4 + sound)) * 22;
-      panel(ctx, x + 26 + sound * 10, y + 112 - height / 2, 5, height, color, 1);
-    }
-  } else {
-    panel(ctx, x - 9, y - 32, w + 18, h + 45, '#122a3c', 2, color);
-    for (let plate = 0; plate < 7; plate += 1) {
-      panel(ctx, x + 8, y + 64 + plate * 12, w - 16, 8, '#587e89', 1);
-      panel(ctx, x + 18, y + 66 + plate * 12, 4, 3, plate % 2 ? '#ffcc6c' : '#8ee9cf', 0);
-    }
-    for (const side of [-1, 1]) line(ctx, [[center + side * 70,y + 75],[center + side * 135,y + 115],[center + side * 135,y + 165]], '#97b8c0', 14);
-  }
-  panel(ctx, x + 15, y + 14, w - 30, 48, '#11283a', 8, color);
-  for (const side of [-1, 1]) {
-    const eyeX = center + side * 24;
-    if (boss.defeated) line(ctx, [[eyeX - 8,y + 34],[eyeX,y + 41],[eyeX + 10,y + 28]], '#bcffdc', 3);
-    else {
-      oval(ctx, eyeX, y + 36, exposed ? 10 : 12, boss.mode === 'warning' ? 5 : 10, color);
-      oval(ctx, eyeX + boss.lookX * 3, y + 37, 3, 5, '#17324b');
-    }
-  }
-  if (!boss.defeated) {
-    ctx.strokeStyle = exposed ? '#caffdc' : '#99bbd0'; ctx.lineWidth = exposed ? 3 : 1;
-    ctx.strokeRect(x, y, w, h);
-  }
-  label(ctx, boss.defeated ? 'RESTORED' : boss.objectivesLocked ? 'SYSTEMS LOCKED' : exposed ? 'EXPOSED' : 'SHIELDED',
-    center, y + h + 24, 12, color, 'center');
-  ctx.restore();
+  drawThemedBoss(ctx, boss, mission.bossStyle ?? 'monolith', reducedMotion);
 }

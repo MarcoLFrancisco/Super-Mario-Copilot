@@ -83,8 +83,6 @@ dd { margin: 5px 0 0; font-size: 1rem; font-weight: 750; font-variant-numeric: t
 #interact-button::after { content: ''; position: absolute; left: calc(50% - 6px); bottom: -8px; width: 12px; height: 12px; background: #153b36; border-right: 2px solid #faf5b6; border-bottom: 2px solid #faf5b6; transform: rotate(45deg); }
 .touch-controls { position: absolute; left: 16px; bottom: 14px; display: flex; gap: 16px; }
 .direction-controls, .action-controls { display: flex; gap: 6px; }
-.climb-controls { position: absolute; left: 16px; bottom: 68px; display: flex; gap: 6px; }
-.climb-controls button { touch-action: none; background: #245746; border-color: #d5ec7c; }
 .arcade-controls { position: absolute; bottom: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; }
 .arcade-controls button { touch-action: none; min-height: 46px; background: #143c43; border-color: #b1dfc0; }
 .arcade-controls .arcade-action { min-width: 145px; background: #f5cf72; color: #2b382d; border-color: #ffe8a3; }
@@ -131,7 +129,6 @@ dd { margin: 5px 0 0; font-size: 1rem; font-weight: 750; font-variant-numeric: t
   .is-invaders #chapter-name { display: none; }
   .is-invaders .dialogue-strip { font-size: .65rem; }
 }
-.has-climb .dialogue-strip { bottom: 124px; }
 .touch-controls button { touch-action: none; user-select: none; -webkit-user-select: none; width: 48px; height: 46px; background: #132b3bef; }
 #jump-button { background: #24576a; border-color: #7bd0d2; }
 .agent-controls { position: absolute; bottom: 12px; left: 16px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: min(490px, calc(100% - 32px)); }
@@ -329,9 +326,6 @@ select { width: 100%; min-height: 38px; padding: 5px 8px; color: var(--ink); bac
   .objective { font-size: .65rem; gap: 5px; }
   .task-ribbon { display: none; }
   .touch-controls { left: 8px; bottom: 8px; gap: 8px; }
-  .climb-controls { left: 8px; bottom: 52px; gap: 3px; }
-  .climb-controls button { width: 36px; height: 38px; min-height: 38px; }
-  .has-climb .dialogue-strip { bottom: 98px; }
   .direction-controls, .action-controls { gap: 3px; }
   .touch-controls button, .combat-controls button { width: 36px; height: 38px; min-height: 38px; }
   .combat-controls { right: 8px; bottom: 8px; display: grid; grid-template-columns: repeat(3, 36px); gap: 4px; }
@@ -401,6 +395,64 @@ select { width: 100%; min-height: 38px; padding: 5px 8px; color: var(--ink); bac
   .product-icon { display: none; }
   .work-header h2 { font-size: .85rem; }
   .work-actions svg { width: 15px; height: 15px; }
+}
+.is-platform .game-viewport { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto auto minmax(0, 1fr) minmax(36px, auto) 62px; height: auto; aspect-ratio: auto; }
+.is-platform .game-ui { display: contents; }
+.is-platform :is(.level-header, .hud, .mission-strip, #task-ribbon, #quest-readout, #game-canvas, #dialogue-strip, #interact-button, #touch-controls, #combat-controls) { grid-column: 1; min-width: 0; }
+.is-platform .level-header { grid-row: 1; height: auto; min-height: 56px; }
+.is-platform .game-ui > .hud { grid-row: 2; position: static; display: flex; width: 100%; max-width: 100%; height: auto; flex-wrap: wrap; }
+.is-platform .hud > div { flex: 1; padding-block: 6px; }
+.is-platform #quest-readout { grid-row: 3; position: static; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; width: 100%; padding: 6px 12px; border-bottom: 1px solid var(--line); }
+.is-platform .quest-stats { justify-content: flex-start; flex-wrap: wrap; gap: 6px 14px; }
+.is-platform #party-status { position: static; margin: 0; padding: 0; max-width: 100%; background: transparent; }
+.is-platform #quest-boss-status { position: static; width: 100%; padding: 4px 0; background: transparent; }
+.is-platform .mission-strip { grid-row: 4; position: static; margin: 0; padding: 6px 12px; }
+.is-platform #task-ribbon { grid-row: 5; position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; max-width: 100%; padding: 4px 12px 7px; gap: 8px; background: #10202d; }
+.is-platform #task-ribbon li { padding: 4px 8px; border-left-color: #6a8d92; background: transparent; overflow-wrap: anywhere; }
+.is-platform #task-ribbon li[data-active='true'] { border-left-color: #f6db8d; background: #29433e; }
+.is-platform #task-ribbon li.complete { border-left-color: #8cdec0; }
+.is-platform #game-canvas { grid-row: 6; display: block; width: 100%; height: auto; min-height: 0; align-self: center; aspect-ratio: 16 / 9; }
+.is-platform #dialogue-strip { grid-row: 7; position: static; visibility: visible; margin: 0; align-self: stretch; align-items: center; padding: 8px 12px; border-top: 1px solid #557a7255; background: #11252d; }
+.is-platform #dialogue-strip p { overflow-wrap: anywhere; }
+.is-platform #touch-controls { grid-row: 8; position: static; align-self: center; justify-self: start; margin: 7px 12px; }
+.is-platform #combat-controls { grid-row: 8; position: static; display: flex; align-self: center; justify-self: end; margin: 7px 12px; }
+.is-platform #interact-button { grid-row: 8; position: static; align-self: center; justify-self: center; transform: none; margin: 7px 0; width: max-content; min-width: 138px; max-width: 230px; box-shadow: none; border-width: 1px; }
+.is-platform #interact-button::after { display: none; }
+.is-platform #mission-panel:fullscreen #game-canvas { height: 100%; object-fit: contain; }
+.is-platform #mission-panel:fullscreen .game-viewport { height: 100%; }
+@media (max-width: 760px) {
+  .is-platform .game-viewport { grid-template-rows: auto auto auto auto auto minmax(0, 1fr) minmax(34px, auto) 48px 44px; }
+  .is-platform .level-header { flex-wrap: wrap; gap: 6px; padding: 6px 8px; min-height: 44px; }
+  .is-platform .header-actions { margin-left: auto; }
+  .is-platform .hud > div { padding: 4px 6px; gap: 4px; }
+  .is-platform .hud dt { font-size: .54rem; }
+  .is-platform .hud dd { font-size: .7rem; }
+  .is-platform #quest-readout { padding: 4px 8px; }
+  .is-platform #quest-boss-status { font-size: .65rem; }
+  .is-platform .mission-strip { padding: 4px 8px; }
+  .is-platform #task-ribbon { gap: 4px; padding: 3px 8px 5px; }
+  .is-platform #task-ribbon li { padding: 3px 5px; }
+  .is-platform #task-ribbon span { font-size: .62rem; }
+  .is-platform #task-ribbon small { font-size: .55rem; }
+  .is-platform #dialogue-strip { padding: 5px 8px; }
+  .is-platform #touch-controls { grid-row: 8; margin: 4px 8px; gap: 5px; }
+  .is-platform #combat-controls { grid-row: 8; margin: 4px 8px; gap: 3px; }
+  .is-platform #combat-controls button { width: 36px; height: 38px; min-height: 38px; }
+  .is-platform #interact-button { grid-row: 9; margin: 4px 8px; min-height: 36px; }
+}
+@media (max-width: 600px) {
+  .is-platform .game-viewport { grid-template-rows: auto auto auto auto auto minmax(0, 1fr) minmax(34px, auto) 48px 48px 44px; }
+  .is-platform #touch-controls { grid-row: 8; justify-self: center; }
+  .is-platform #combat-controls { grid-row: 9; justify-self: center; }
+  .is-platform #interact-button { grid-row: 10; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .is-platform #mission-panel:fullscreen .level-header { min-height: 38px; }
+  .is-platform #mission-panel:fullscreen #quest-readout, .is-platform #mission-panel:fullscreen #task-ribbon { display: none; }
+  .is-platform #mission-panel:fullscreen .game-viewport { grid-template-rows: auto auto 0 auto 0 minmax(0, 1fr) minmax(28px, auto) 44px 38px; }
+  .is-platform #mission-panel:fullscreen #touch-controls { grid-row: 8; justify-self: start; }
+  .is-platform #mission-panel:fullscreen #combat-controls { grid-row: 8; justify-self: end; }
+  .is-platform #mission-panel:fullscreen #interact-button { grid-row: 9; }
 }
 @media (prefers-reduced-motion: no-preference) { .masthead { animation: arrive .35s ease-out; } @keyframes arrive { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } } }
 .reduced-motion *, .reduced-motion *::before, .reduced-motion *::after { animation: none !important; transition: none !important; }

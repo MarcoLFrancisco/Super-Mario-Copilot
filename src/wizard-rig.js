@@ -202,6 +202,19 @@ export function wizardCrownY(boss) {
   return boss.y + boss.h + (layers.head.source[1] - WIZARD_RIG.origin[1]) * WIZARD_RIG.scale * boss.w / 250;
 }
 
+export function drawRobotLayers(ctx, image, matrices, centerX, baseY, scale, order = WIZARD_RIG.drawOrder) {
+  ctx.save(); ctx.translate(centerX, baseY);
+  ctx.scale(scale, scale); ctx.translate(-WIZARD_RIG.origin[0], -WIZARD_RIG.origin[1]);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  for (const name of order) {
+    const layer = layers[name];
+    ctx.save(); ctx.transform(...matrices[name]);
+    ctx.drawImage(image, ...layer.frame, ...layer.source);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 export function drawWizardRig(ctx, boss, reducedMotion = false) {
   if (!atlas) throw new Error('Setup Wizard artwork must load before rendering the encounter.');
   const matrices = wizardMatrices(boss, reducedMotion);
@@ -211,17 +224,8 @@ export function drawWizardRig(ctx, boss, reducedMotion = false) {
   ctx.save();
   ctx.beginPath(); ctx.ellipse(boss.x + boss.w / 2, floor + 2, 187 * shadowScale, 12 * shadowScale, 0, 0, Math.PI * 2);
   ctx.fillStyle = '#07142666'; ctx.fill();
-  ctx.translate(boss.x + boss.w / 2, boss.y + boss.h);
-  ctx.scale(scale, scale); ctx.translate(-WIZARD_RIG.origin[0], -WIZARD_RIG.origin[1]);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  for (const name of WIZARD_RIG.drawOrder) {
-    const layer = layers[name];
-    ctx.save(); ctx.transform(...matrices[name]);
-    ctx.drawImage(atlas, ...layer.frame, ...layer.source);
-    ctx.restore();
-  }
   ctx.restore();
+  drawRobotLayers(ctx, atlas, matrices, boss.x + boss.w / 2, boss.y + boss.h, scale);
   if ((boss.interruptible || boss.mode === 'exposed') && !boss.defeated) {
     const chest = wizardChestBounds(boss);
     const accent = boss.interruptible ? '#ffe68c' : '#93ffe3';

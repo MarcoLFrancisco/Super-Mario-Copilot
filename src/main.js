@@ -11,12 +11,13 @@ import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel,
 import { interactionFor, missionStations, stationStatus, missionReady, missionObjective, interact } from './missions.js';
 import { workView, prepareQuiz, validQuizOverrides } from './trivia-tasks.js';
 import { renderQuiz, createQuizEditor } from './quiz-ui.js';
-import { climbFor } from './actor-physics.js';
 import { INTERLUDES, arcadeObjective, INVADER_TOOLS, INVADER_UPGRADES, chooseArcadeUpgrade } from './arcade.js';
 import { renderArcade, loadArcadeArt } from './arcade-art.js';
 import { selectInterlude, nextDestination } from './campaign.js';
 import { loadWizardRig } from './wizard-rig.js';
+import { loadBossCollection } from './boss-collection.js';
 import { actionForKey } from './input.js';
+import { quizTerminalBounds } from './world-art.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -214,6 +215,10 @@ function playfieldBounds() {
 
 function positionWorkstation(station) {
   const button = el('interact-button');
+  if (!orbitMode()) {
+    button.style.removeProperty('left'); button.style.removeProperty('top');
+    return;
+  }
   const stage = el('game-viewport').getBoundingClientRect();
   const bounds = playfieldBounds();
   const x = orbitMode() ? state.paddle.x : station.x - (state.stage === 'boss' ? 0 : state.cameraX);
@@ -239,8 +244,7 @@ function arcadeHud() {
   text('mission-objective', arcadeObjective(state)); text('chapter-name', defense ? 'Azure orbital network' : 'Arcade interlude');
   text('arcade-action-label', 'Fire');
   el('interact-button').hidden = true;
-  el('climb-controls').hidden = true;
-  el('game-viewport').classList.remove('has-workstation', 'has-climb');
+  el('game-viewport').classList.remove('has-workstation');
   el('invader-core-status').hidden = !defense || !state.core || state.core.dead;
   if (defense) {
     for (const [key, spec] of Object.entries(INVADER_TOOLS)) {
@@ -292,12 +296,11 @@ function hud() {
     : state.stage === 'boss' ? mission.boss : chapterAt(mission, state.player.x).name);
   el('interact-button').hidden = !active || (orbit ? state.phase !== 'ready' : !request);
   el('game-viewport').classList.toggle('has-workstation', !el('interact-button').hidden);
-  const canClimb = !orbit && state.stage !== 'boss' && Boolean(state.player.climbing || climbFor(state.player, state.world));
-  el('climb-controls').hidden = !canClimb;
-  el('game-viewport').classList.toggle('has-climb', canClimb);
   el('interact-button').disabled = !active;
   text('interact-label', orbit && !request ? 'Launch core' : status === 'Complete' ? 'View score'
     : status === 'Ready' ? 'Open quiz' : 'Continue quiz');
+  el('interact-button').setAttribute('aria-label', request
+    ? `${el('interact-label').textContent}: ${request.title}` : 'Launch core');
   if (!el('interact-button').hidden) positionWorkstation(request);
   controls.forEach(button => { if (!['interact','patch','query','aegis'].includes(button.dataset.action)) button.disabled = !active; });
   if (!orbit) {
@@ -334,13 +337,14 @@ function hud() {
     }
   }
   const signature = stations.map(station => `${station.id}:${stationStatus(state, station)}`).join('|')
-    + (orbit ? `:${active}:${state.phase}` : '');
+    + `:${request?.id ?? ''}` + (orbit ? `:${active}:${state.phase}` : '');
   if (signature !== taskSignature) {
     taskSignature = signature;
     let requiredNumber = 0;
     el('task-ribbon').replaceChildren(...stations.map(station => {
       const item = document.createElement('li');
       item.className = stationStatus(state, station) === 'Complete' ? 'complete' : '';
+      item.dataset.active = String(station.id === request?.id);
       const name = document.createElement('span');
       name.textContent = station.optional ? `${station.title} (optional)` : `${++requiredNumber}. ${station.title}`;
       const detail = document.createElement('small'); detail.textContent = stationStatus(state, station);
@@ -376,6 +380,7 @@ function panels() {
   document.body.classList.toggle('is-orbit', orbit);
   document.body.classList.toggle('is-arcade', arcade);
   document.body.classList.toggle('is-invaders', arcade && state.kind === 'invaders');
+  document.body.classList.toggle('is-platform', !orbit && !arcade);
   document.body.style.setProperty('--world-accent', mission.color);
   el('agent-controls').hidden = !orbit;
   el('character-choice').hidden = started;
@@ -767,7 +772,10 @@ canvas.addEventListener('pointerdown', event => {
     const bounds = playfieldBounds();
     const x = (event.clientX - bounds.left) / bounds.scale + (state.stage === 'boss' ? 0 : state.cameraX);
     const y = (event.clientY - bounds.top) / bounds.scale;
-    const station = missionStations(state).find(item => Math.abs(item.x - x) < 70 && y > item.y - 130 && y < item.y + 20);
+    const station = missionStations(state).find(item => {
+      const monitor = quizTerminalBounds(item);
+      return x >= monitor.x && x <= monitor.x + monitor.w && y >= monitor.y && y <= monitor.y + monitor.h;
+    });
     if (station) {
       if (interactionFor(state)?.id === station.id) openTask(station);
       else { say(`${station.title}: workstation out of reach. ${missionObjective(state).summary}`); missionMessageUntil = state.time + 6; }
@@ -863,7 +871,7 @@ function frame(now) {
   hud(); requestAnimationFrame(frame);
 }
 if (ctx) {
-  await Promise.all([loadWizardRig(), loadArcadeArt()]);
+  await Promise.all([loadWizardRig(), loadArcadeArt(), loadBossCollection()]);
   icons(); applyAccessibility(); resize(); panels(); audioControls();
   el('start-button').disabled = false; el('sound-button').disabled = false;
   text('load-status', ''); text('storage-status', storageAvailable ? 'Local progress' : 'Session-only progress');

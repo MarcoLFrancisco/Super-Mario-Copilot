@@ -2,6 +2,7 @@ import { ORBIT, ballPosition, reboundVelocity } from './orbit.js';
 import { drawPartyActor } from './party-art.js';
 import { APPS } from './level.js';
 import { drawAppIcon } from './collectibles.js';
+import { drawArmoredCore } from './boss-collection.js';
 
 function rectangle(ctx, x, y, width, height, color, radius = 3) {
   ctx.beginPath(); ctx.roundRect(x, y, width, height, radius);
@@ -78,13 +79,18 @@ export function renderOrbit(ctx, state, reducedMotion = false, options = {}) {
     const app = APPS[brick.app] ?? APPS.copilot;
     const core = brick.kind === 'core';
     const color = core ? armorRemaining ? '#415c65' : '#277954' : app.dark;
-    rectangle(ctx, brick.x - brick.w / 2, brick.y - brick.h / 2 + 4, brick.w, brick.h, '#081c23');
-    rectangle(ctx, brick.x - brick.w / 2, brick.y - brick.h / 2, brick.w, brick.h, color);
-    ctx.fillStyle = app.color; ctx.fillRect(brick.x - brick.w / 2 + 3, brick.y - brick.h / 2 + 2, brick.w - 6, 2);
+    if (core) {
+      drawArmoredCore(ctx, brick, state.finale ? 'monolith' : 'firewall', state.time, reducedMotion,
+        !armorRemaining, state.missiles.some(missile => missile.warning > 0));
+    } else {
+      rectangle(ctx, brick.x - brick.w / 2, brick.y - brick.h / 2 + 4, brick.w, brick.h, '#081c23');
+      rectangle(ctx, brick.x - brick.w / 2, brick.y - brick.h / 2, brick.w, brick.h, color);
+      ctx.fillStyle = app.color; ctx.fillRect(brick.x - brick.w / 2 + 3, brick.y - brick.h / 2 + 2, brick.w - 6, 2);
+    }
     const named = !core && brick.w >= 95;
-    const size = core ? 30 : Math.min(23, brick.h - 7, brick.w - 8);
-    const iconX = named ? brick.x - brick.w / 2 + size / 2 + 6 : brick.x;
-    const iconY = brick.y - (core ? 9 : 1);
+    const size = core ? 16 : Math.min(23, brick.h - 7, brick.w - 8);
+    const iconX = core ? brick.x - brick.w / 2 + 16 : named ? brick.x - brick.w / 2 + size / 2 + 6 : brick.x;
+    const iconY = core ? brick.y - brick.h / 2 + 16 : brick.y - 1;
     rectangle(ctx, iconX - size / 2 - 1, iconY - size / 2 - 1, size + 2, size + 2, '#f5fafa');
     drawAppIcon(ctx, brick.app, iconX, iconY, size);
     if (named) {

@@ -27,7 +27,7 @@ function routeClearance(deck, platforms) {
   });
 }
 
-function placeDeck(deck, anchor, first, platforms) {
+function placeDeck(deck, anchor, first, platforms, stations) {
   const candidates = [];
   for (let horizontal = -360; horizontal <= 360; horizontal += 20) {
     const position = deck.x + horizontal;
@@ -39,7 +39,9 @@ function placeDeck(deck, anchor, first, platforms) {
     }
   }
   const placed = candidates.sort((left, right) => left.distance - right.distance)
-    .find(candidate => routeClearance(candidate, platforms));
+    .find(candidate => routeClearance(candidate, platforms) && stations.every(station =>
+      candidate.x >= station.x + 64 || candidate.x + candidate.w <= station.x - 64
+        || candidate.y + candidate.h + 32 <= station.y - 91 || candidate.y >= station.y + 20));
   if (!placed) throw new Error(`No clear traversal placement for ${deck.id}`);
   return { ...deck, x: placed.x, y: placed.y };
 }
@@ -76,7 +78,7 @@ export function placeRewardBlocks(blocks, mainRoute, platforms, climbs, stations
   }
 }
 
-export function addWorldRoutes(definition, platforms, mainRoute) {
+export function addWorldRoutes(definition, platforms, mainRoute, stations = []) {
   const layout = layouts[definition.id];
   const climbs = [];
   const landmarks = [];
@@ -86,7 +88,7 @@ export function addWorldRoutes(definition, platforms, mainRoute) {
       const platform = placeDeck({ id: `${definition.id}-route-${section}-${position}`, x: anchor.x + offset,
         y: Math.max(235, anchor.y - rise), w: width, h: 24, app: definition.app,
         theme: definition.theme, kind: 'secret', structure: definition.id,
-        conveyor: layout.conveyor && position % 2 === 0 ? layout.conveyor : 0 }, anchor, position === 0, platforms);
+        conveyor: layout.conveyor && position % 2 === 0 ? layout.conveyor : 0 }, anchor, position === 0, platforms, stations);
       platforms.push(platform);
       return platform;
     });

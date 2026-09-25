@@ -13,6 +13,13 @@ level map stay inside the game frame, including in full screen. The rendered
 playfield remains 16:9; portrait phones get a taller surrounding frame so quiz
 answers and controls remain usable without shrinking the scene's width.
 
+Platform levels keep the HUD and quiz ribbon above the canvas, with captions,
+movement/combat controls, and the quiz action in separate rows below it. These
+stay inside the game frame but do not cover characters, platforms, or rewards.
+Narrow screens separate the control groups into their own rows. Quiz terminals
+show a compact monitor; their full titles remain in the ribbon, which highlights
+the nearby quiz. Large floating terminal signboards are not drawn.
+
 ## The Campaign
 
 | Level | World | Playable Theme | Boss |
@@ -49,7 +56,8 @@ There are no shoulder cubes. The artwork comes directly from the supplied
 13-layer sprite rig moves the upper arms, fists, thighs, boots, head/cables,
 eyes, and grin separately. Alternating steps, raised fists, recoil, charge
 lean, jumps, panic, and the final retreat follow combat state; it is not a static
-picture sliding around. Later bosses retain their existing designs.
+picture sliding around. The other bosses now share its detailed, textured
+robotic art style, with their own material treatments and AI-themed equipment.
 
 The neutral pose preserves the source's retained robot pixels and proportions.
 Animation uses 2D joints and overlapping cutouts, not newly generated 3D views.
@@ -101,6 +109,56 @@ real-engine jump counters, chest access, countdown escape, companion attacks,
 caption placement, and victory cleanup. The visual likeness, readability at
 phone scale, sound balance, and encounter feel still need human playtesting.
 
+### Boss Collection
+
+All campaign bosses and arcade finales now use high-resolution, transparent
+artwork with reflective armor, glass faces, cable detail, and illuminated
+components. The variants preserve the surface detail of the supplied robot
+and add distinct chest mechanisms, markings, proportions, and animated poses.
+These are textured 2D sprites, not new 3D models or live Microsoft services.
+The original Setup Wizard image and its own articulated rig remain unchanged.
+
+| Boss | Microsoft / AI Design |
+| --- | --- |
+| The Merge Monster | Graphite and silver split armor, mint/blue branch circuitry, merge-node reactor, and asymmetric gauntlets |
+| The Scope Creep | Pearl/titanium document vault with stacked work trays and Word/Excel-like document indicators |
+| The Unstable Deployment | Foundry thermal reactor, amber plasma vents, brushed-steel armor, and instrumented power fists |
+| The Infinite Planner | Teal multi-agent network core with connected processing nodes and independently moving arms |
+| The Meeting Overlord | Platinum broadcast armor, Teams-colored speaker arrays, and an illuminated audio waveform |
+| Doctor Null and the Legacy Monolith | Dark-metal server armor, gold status lights, protected racks, and pale green circuit energy |
+| The Orbital Firewall | Azure-blue security armor with a shield-shaped circuit emblem and plated core shutters |
+| Rogue Orchestration Core | Graphite processor casing, copper-lit connections, and an exposed central compute module |
+
+Later platform bosses use independent head, arm, fist, and leg joints for idle
+motion, attack windups, impacts, exposure, and defeat. Their original health,
+attacks, collision rectangles, and progression rules are unchanged. Animated
+artwork bounds keep captions away from the robot and player. Warning banners
+use a separate upper band. Reduced motion retains essential attack poses while
+stopping decorative oscillation.
+
+Azure Orbit and the final saucer sequence use matching textured core panels
+clipped to their original brick targets. Both Invaders finales use the processor
+design and mark the actual exposed weak point, not the whole armored shell.
+No shoulder cubes are added to these designs.
+
+The prebuilt atlases and [images/Boss-collection.js](images/Boss-collection.js)
+metadata ship with the game. Startup loads them before enabling play; the
+existing build versions the complete image/module set together. To regenerate
+the collection on macOS with Swift after rebuilding the source robot rig:
+
+```sh
+node --input-type=module -e "import { WIZARD_RIG } from './images/Boss1-rig.js'; console.log(JSON.stringify(WIZARD_RIG));" | swift scripts/build-boss-collection.swift
+npm run build
+npm test
+```
+
+Add `--preview` to the Swift command for an offline artwork contact sheet in
+the system temporary directory. Swift is only needed to regenerate artwork,
+not to build or play the game. Tests cover asset identity, alpha channels,
+pose transforms, caption separation, encounter mapping, and unchanged target
+geometry. Static artwork was inspected; browser motion and readability still
+need human playtesting.
+
 ### Jumping And Climbing
 
 **Jumping and all original jump platforms remain.** Space and W jump everywhere;
@@ -111,11 +169,13 @@ time, buffered jumps, gaps, and optional upper jump areas remain available.
 Ladders and ropes add routes rather than replacing jumps. Hold **Up Arrow** to
 climb up or **Down Arrow** to descend a nearby ladder or rope. **R/V** also work;
 release to hold your position. Space or W leaves the climb with a jump.
-On-screen climbing buttons appear near a ladder or rope. Companions use the same
-climbing physics and can include climbs in their route planning.
+Climbing uses the keyboard; there are no separate on-screen climb buttons.
+The original touch movement, jump, and combat controls remain. Companions use
+the same climbing physics and can include climbs in their route planning.
 
-Added decks now reserve character headroom around existing platforms and the
-full travel of moving lifts. Reward bricks and recruitment boxes are distributed
+Added decks reserve character headroom around existing platforms, terminal
+clearance, and the full travel of moving lifts. Decorative supports are kept
+within a shallow area beneath their own deck. Reward bricks and recruitment boxes are distributed
 into reachable spaces away from climb lanes and terminals instead of intersecting
 the upper decks. All original jump platforms remain in their original positions.
 Ropes have braided strands and anchors; ladders have shaded rails, rung grips,
@@ -302,12 +362,12 @@ voice provided by your browser or operating system.
 | --- | --- |
 | Move | A/D or Left/Right arrows |
 | Jump | Hold Space or W for a full jump; Up also jumps away from ladders/ropes; release for a shorter jump |
-| Climb | Up/Down arrows near a ladder or rope; R/V and on-screen climb buttons also work; Space/W dismounts |
+| Climb | Keyboard Up/Down arrows near a ladder or rope; R/V also work; Space/W dismounts |
 | Copilot boost | Shift; the original boost remains available |
 | Melee attack | J or Attack; tap once per attack |
 | Debug Blaster | Hold F or Fire after collecting a blaster |
 | Command recruited companions | K or Helpers; companions also act automatically |
-| Quiz interaction | E, a nearby monitor, or its floating Open quiz / Continue quiz / View score button |
+| Quiz interaction | E, a nearby monitor, or the docked Open quiz / Continue quiz / View score button |
 | Debug Pulse | Q after GitHub; reveals resource and task markers |
 | Focus Mode | Hold C after Teams to slow the game |
 | Pause/resume | Escape or the in-game toolbar control |
@@ -422,6 +482,8 @@ recorded dialogue from the broader concept are not implemented.
 - [src/world-routes.js](src/world-routes.js): additive upper paths, ladders, ropes, conveyors, and complexity labels.
 - [src/input.js](src/input.js): customizable key resolution and contextual arrow climbing.
 - [src/wizard-rig.js](src/wizard-rig.js): image-based robot joints, jumps, and defeat/escape poses.
+- [src/boss-collection.js](src/boss-collection.js): themed textured boss rigs, material-specific animation, and orbital core artwork.
+- [scripts/build-boss-collection.swift](scripts/build-boss-collection.swift): reproducible boss atlas generation from the supplied robot textures.
 - [src/arcade.js](src/arcade.js) and [src/arcade-art.js](src/arcade-art.js): orbital Invaders waves, abilities, upgrades, defense nodes, the core encounter, and Copilot-bubble interludes.
 - [src/party.js](src/party.js) and [src/party-art.js](src/party-art.js): the original team and character artwork.
 - [src/orbit.js](src/orbit.js) and [src/orbit-art.js](src/orbit-art.js): saucer physics and the selected original pilot.
@@ -430,7 +492,8 @@ recorded dialogue from the broader concept are not implemented.
 
 Nintendo, Microsoft, and GitHub names remain their owners' trademarks. This
 unofficial fan project is not affiliated with or endorsed by those companies.
-Character and app illustrations are procedural fan artwork, not official assets.
+Character and app illustrations combine procedural fan artwork and the supplied
+robot image with themed derivatives; they are not official assets.
 No official soundtrack recordings are used. Preserve all third-party licenses.
 
 <details>

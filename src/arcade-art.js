@@ -2,6 +2,7 @@ import { VIEW } from './level.js';
 import { drawPartyActor } from './party-art.js';
 import { drawAppIcon } from './collectibles.js';
 import { INVADER_TOOLS } from './arcade.js';
+import { drawArmoredCore } from './boss-collection.js';
 
 let interceptor = null;
 let loadingInterceptor = null;
@@ -246,31 +247,8 @@ function orchestrationCore(ctx, state, reducedMotion) {
     line(ctx, [[beam.x,beam.y-beam.h/2],[beam.x,beam.y+beam.h/2]], '#ff866bbb', 12);
     line(ctx, [[beam.x,beam.y-beam.h/2],[beam.x,beam.y+beam.h/2]], '#fff0bf', 3);
   }
-  ctx.save(); ctx.translate(core.x, core.y);
-  const angle = reducedMotion ? 0 : state.time * .13;
-  ctx.save(); ctx.rotate(angle);
-  for (let plate = 0; plate < 6; plate += 1) {
-    ctx.save(); ctx.rotate(plate*Math.PI/3);
-    polygon(ctx, [[-22,-78],[22,-78],[29,-62],[0,-51],[-29,-62]], '#455b66');
-    line(ctx, [[-17,-72],[17,-72]], exposed ? '#a1ffe0' : '#d4a276', 3); ctx.restore();
-  }
-  ctx.restore();
-  polygon(ctx, [[-65,-48],[-28,-62],[28,-62],[65,-48],[80,0],[58,46],[0,57],[-58,46],[-80,0]], core.hitFlash > 0 ? '#ffffff' : '#d1dedf');
-  polygon(ctx, [[-57,-35],[-24,-48],[24,-48],[57,-35],[65,0],[47,32],[0,42],[-47,32],[-65,0]], '#18353d');
-  const gap = exposed ? 15 : 0;
-  polygon(ctx, [[-52-gap,-32],[-9-gap,-27],[-9-gap,27],[-47-gap,22],[-58-gap,0]], '#688d98');
-  polygon(ctx, [[52+gap,-32],[9+gap,-27],[9+gap,27],[47+gap,22],[58+gap,0]], '#688d98');
-  panel(ctx, -20, -24, 40, 47, exposed ? '#8ffff0' : '#faad75', 6);
-  panel(ctx, -12, -16, 24, 30, exposed ? '#e4fff7' : '#692c2e', 3);
-  for (const side of [-1, 1]) {
-    line(ctx, [[side*38,-36],[side*73,-62],[side*91,-57]], '#7797a2', 4);
-    circle(ctx, side*91, -57, 4, '#ffc385');
-  }
-  if (core.mode === 'warning') {
-    ctx.beginPath(); ctx.arc(0, 0, 88, 0, Math.PI*2); ctx.strokeStyle = '#f9bd87'; ctx.lineWidth = 2; ctx.stroke();
-  }
-  label(ctx, exposed ? 'CORE OPEN' : core.mode === 'warning' ? 'CHARGING' : 'SHIELDED', 0, 104, 12, exposed ? '#aaffe0' : '#eac098');
-  ctx.restore();
+  drawArmoredCore(ctx, core, 'orchestrator', state.time, reducedMotion, exposed, core.mode === 'warning', state.coreWeakPoint ?? core);
+  label(ctx, exposed ? 'CORE OPEN' : core.mode === 'warning' ? 'CHARGING' : 'SHIELDED', core.x, core.y + 82, 12, exposed ? '#aaffe0' : '#eac098');
 }
 
 function combatEffects(ctx, state, reducedMotion) {
