@@ -14,6 +14,11 @@ export function actorBody(actor) {
   return { x: actor.x, y: actor.y, w: P.playerWidth, h: P.playerHeight };
 }
 
+export function advanceActorGait(actor, previousX, previousY) {
+  if (actor.climbing) actor.climbDistance = (actor.climbDistance ?? 0) + Math.abs(actor.y - previousY);
+  else if (actor.grounded) actor.walkDistance = (actor.walkDistance ?? 0) + Math.abs(actor.x - previousX);
+}
+
 export function climbFor(actor, world) {
   const center = actor.x + P.playerWidth / 2;
   const feet = actor.y + P.playerHeight;
@@ -64,7 +69,8 @@ export function resetActorBody(actor, position) {
   Object.assign(actor, {
     x: position.x, y: position.y, vx: 0, vy: 0,
     grounded: false, coyote: 0, jumpBuffer: 0, boostTime: 0,
-    boostCooldown: 0, surfaceId: null, climbing: null, climbCooldown: 0
+    boostCooldown: 0, surfaceId: null, climbing: null, climbCooldown: 0,
+    walkDistance: 0, climbDistance: 0
   });
   // Attack/AI lifecycle state belongs to party.js, not this module.
   return actor;
@@ -76,7 +82,11 @@ export function stepActor(actor, intent, world, blocks, dt) {
   const result = { jumped: false, landed: false, wall: false, ceiling: false };
   if (!Number.isFinite(dt) || dt <= 0) return result;
   if (dt > 1 / 60 + EPS) throw new RangeError('stepActor requires a fixed tick <= 1/60 s');
-  if (stepClimbing(actor, intent, world, dt)) return { ...result, climbed: true, landed: actor.grounded };
+  const previousX = actor.x, previousY = actor.y;
+  if (stepClimbing(actor, intent, world, dt)) {
+    advanceActorGait(actor, previousX, previousY);
+    return { ...result, climbed: true, landed: actor.grounded };
+  }
   const solids = blocks.filter(block => !block.broken);
   const support = actor.vy >= 0 ? supportingSurface(actor, world, solids) : null;
   if (support?.conveyor) actor.x = clamp(actor.x + support.conveyor * dt, 0, world.width - P.playerWidth);
@@ -154,6 +164,7 @@ export function stepActor(actor, intent, world, blocks, dt) {
     }
   }
   actor.y = nextY;
+  advanceActorGait(actor, previousX, previousY);
   return result;
 }
 

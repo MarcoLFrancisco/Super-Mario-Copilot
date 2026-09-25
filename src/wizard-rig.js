@@ -58,7 +58,8 @@ function jointMatrix(pivot, joint = {}) {
 export function wizardPose(boss, reducedMotion = false) {
   const time = reducedMotion ? 0 : boss.age;
   const direction = boss.facing ?? -1;
-  const moving = Math.abs(boss.vx ?? 0) > 1;
+  const jumping = boss.mode === 'leaping';
+  const moving = Math.abs(boss.vx ?? 0) > 1 && !jumping;
   const stride = moving ? Math.sin((boss.walkDistance ?? 0) * .08) : 0;
   const pace = boss.phase === 2 ? 1.2 : 1;
   const warning = boss.mode === 'warning';
@@ -124,23 +125,55 @@ export function wizardPose(boss, reducedMotion = false) {
     joints.head.angle += direction * .035;
     joints.leftFist.angle -= .12; joints.rightFist.angle += .12;
   }
+  if (boss.mode === 'jumpWarning' || jumping || boss.mode === 'landing') {
+    const crouch = boss.mode === 'jumpWarning' ? smooth(boss.windup ?? 0)
+      : boss.mode === 'landing' ? smooth(boss.timer / .55) : 0;
+    const tuck = jumping ? Math.sin(Math.PI * boss.leap.elapsed / boss.leap.duration) : 0;
+    joints.body = { y: crouch * 36, angle: jumping ? direction * .045 : 0 };
+    joints.leftLeg = { y: -tuck * 38 + crouch * 8, angle: -.16 * tuck };
+    joints.rightLeg = { y: -tuck * 30 + crouch * 8, angle: .16 * tuck };
+    joints.leftBoot = { angle: .16 * tuck };
+    joints.rightBoot = { angle: -.16 * tuck };
+    joints.leftArm = { angle: .15 * tuck + crouch * .1 };
+    joints.rightArm = { angle: -.15 * tuck - crouch * .1 };
+    joints.leftFist = { angle: .3 * tuck };
+    joints.rightFist = { angle: -.3 * tuck };
+  }
   if (boss.defeated) {
-    const defeat = reducedMotion ? 1.8 : boss.defeatTime ?? 0;
-    const pose = Math.sin(smooth(defeat / .55) * Math.PI);
-    const collapse = smooth((defeat - .5) / 1.3);
-    joints.body = { y: collapse * 112, angle: direction * collapse * .07 };
-    joints.head = { angle: collapse * .18, y: collapse * 13 };
-    joints.rightArm = { angle: -.2 * pose + collapse * .08, y: collapse * 12 };
-    joints.rightFist = { angle: -.45 * pose + collapse * .14 };
-    joints.leftArm = { angle: -collapse * .13, y: collapse * 9 };
-    joints.leftFist = { angle: -collapse * .18 };
-    joints.leftLeg = { angle: -.075 * collapse, y: collapse * 10 };
-    joints.rightLeg = { angle: .075 * collapse, y: collapse * 10 };
-    joints.leftBoot = { angle: .075 * collapse };
-    joints.rightBoot = { angle: -.075 * collapse };
-    joints.leftEye = { scaleY: 1 - collapse * .93 };
-    joints.rightEye = { scaleY: 1 - collapse * .93 };
-    joints.mouth = { scaleY: 1 - collapse * .8 };
+    const defeat = boss.defeatTime ?? 0;
+    const fall = smooth(defeat / 1.15);
+    const rise = smooth((defeat - 1.55) / .75);
+    const crouch = fall * (1 - rise);
+    const defiant = Math.sin(rise * Math.PI);
+    if (boss.mode === 'fleeing' || boss.mode === 'escaped') {
+      joints.body = { y: -Math.abs(stride) * 9, angle: direction * .12 };
+      joints.head = { angle: -direction * .1, y: -4 };
+      joints.leftArm = { angle: -.28 * stride };
+      joints.rightArm = { angle: .28 * stride };
+      joints.leftFist = { angle: .25 + stride * .16 };
+      joints.rightFist = { angle: -.25 - stride * .16 };
+      joints.leftLeg = { angle: -stride * .16, x: stride * 34, y: -Math.max(0, stride) * 40 };
+      joints.rightLeg = { angle: stride * .16, x: -stride * 34, y: -Math.max(0, -stride) * 40 };
+      joints.leftBoot = { angle: stride * .13 };
+      joints.rightBoot = { angle: -stride * .13 };
+      joints.leftEye = { scaleY: 1.12 };
+      joints.rightEye = { scaleY: 1.12 };
+      joints.mouth = { scaleY: .7 };
+    } else {
+      joints.body = { y: crouch * 105, angle: direction * crouch * .075 };
+      joints.head = { angle: crouch * .18 - defiant * .12, y: crouch * 13 };
+      joints.rightArm = { angle: -.3 * defiant + crouch * .08, y: crouch * 12 };
+      joints.rightFist = { angle: -.5 * defiant + crouch * .14 };
+      joints.leftArm = { angle: -crouch * .13, y: crouch * 9 };
+      joints.leftFist = { angle: -crouch * .18 };
+      joints.leftLeg = { angle: -.075 * crouch, y: crouch * 10 };
+      joints.rightLeg = { angle: .075 * crouch, y: crouch * 10 };
+      joints.leftBoot = { angle: .075 * crouch };
+      joints.rightBoot = { angle: -.075 * crouch };
+      joints.leftEye = { scaleY: 1 - crouch * .88 };
+      joints.rightEye = { scaleY: 1 - crouch * .88 };
+      joints.mouth = { scaleY: 1 - crouch * .7 };
+    }
   }
   return joints;
 }
@@ -173,9 +206,12 @@ export function drawWizardRig(ctx, boss, reducedMotion = false) {
   if (!atlas) throw new Error('Setup Wizard artwork must load before rendering the encounter.');
   const matrices = wizardMatrices(boss, reducedMotion);
   const scale = WIZARD_RIG.scale * boss.w / 250;
-  ctx.save(); ctx.translate(boss.x + boss.w / 2, boss.y + boss.h);
-  ctx.beginPath(); ctx.ellipse(0, 2, 187, 12, 0, 0, Math.PI * 2);
+  const floor = boss.arena?.platforms.find(platform => platform.id === 'arena-floor')?.y ?? boss.y + boss.h;
+  const shadowScale = boss.w / 250 * Math.max(.6, 1 - (floor - boss.y - boss.h) / 400);
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(boss.x + boss.w / 2, floor + 2, 187 * shadowScale, 12 * shadowScale, 0, 0, Math.PI * 2);
   ctx.fillStyle = '#07142666'; ctx.fill();
+  ctx.translate(boss.x + boss.w / 2, boss.y + boss.h);
   ctx.scale(scale, scale); ctx.translate(-WIZARD_RIG.origin[0], -WIZARD_RIG.origin[1]);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';

@@ -81,6 +81,8 @@ export function syncParty(party, player, worldWidth = Infinity) {
     actor.grounded = player.grounded;
     actor.boostTime = player.boostTime;
     actor.climbing = player.climbing;
+    actor.walkDistance = player.walkDistance ?? 0;
+    actor.climbDistance = player.climbDistance ?? 0;
     actor.facing = actorFacing;
   }
 }

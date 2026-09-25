@@ -1,14 +1,28 @@
 import { PHYSICS } from './level.js';
 
+export function characterMotion(actor, time = 0) {
+  const climbing = Boolean(actor.climbing);
+  const airborne = !actor.grounded && !climbing;
+  const speed = Math.min(1, Math.abs(actor.vx ?? 0) / PHYSICS.speed);
+  const walking = actor.grounded && speed > .025 && !actor.attack;
+  const phase = climbing ? (actor.climbDistance ?? Math.abs(actor.vy ?? 0) * time) * .13
+    : (actor.walkDistance ?? Math.abs(actor.vx ?? 0) * time) * .095;
+  const stride = walking ? Math.sin(phase) * (.7 + speed * .3) : climbing ? Math.sin(phase) : 0;
+  return { climbing, airborne, stride,
+    backLift: climbing ? 4 + stride * 3 : walking ? Math.max(0, Math.cos(phase)) * 5 : 0,
+    frontLift: climbing ? 4 - stride * 3 : walking ? Math.max(0, -Math.cos(phase)) * 5 : 0,
+    bob: walking ? Math.abs(Math.sin(phase)) * 1.1 : 0,
+    backArm: climbing ? -2.7 + stride * .35 : airborne ? .9 : -stride,
+    frontArm: climbing ? -2.7 - stride * .35 : airborne ? -2.5 : stride };
+}
+
 // Draw in world coordinates after the caller applies its camera transform.
 // Uses engine player fields; never mutates state or changes collision bounds.
 // Custom procedural fan artwork, not an imported Nintendo sprite asset.
 export function drawCharacter(ctx, player, time = 0, reducedMotion = false, kickExtension = null) {
   const t = reducedMotion ? 0 : time;
-  const airborne = !player.grounded;
-  const speed = Math.min(1, Math.abs(player.vx) / PHYSICS.speed);
-  const stride = airborne ? 0 : Math.sin(t * 19) * speed;
-  const bob = airborne ? 0 : Math.abs(stride) * .7;
+  const motion = characterMotion(player, time);
+  const { airborne, stride, bob } = motion;
   const boosting = player.boostTime > 0;
   const outline = '#45282c';
   ctx.save();
@@ -80,23 +94,27 @@ export function drawCharacter(ctx, player, time = 0, reducedMotion = false, kick
     line([[.1, 9], [.3, 11]], '#9babc5', .6);
     ctx.restore();
   }
-  function leg(x, angle, back = false) {
+  function leg(x, angle, back = false, lift = 0, kick = false) {
     ctx.save();
     ctx.translate(x, 34);
-    ctx.rotate(angle);
-    shape([[-3.5, 0], [3.5, 0], [3.8, 7], [-3.2, 8]], back ? '#19438c' : blue);
-    ellipse(1.6, 8.6, 6, 3, shade('#a36538', '#563021', 6, 6));
-    line([[-3, 10.5], [6, 10.5]], '#35252a', 1);
-    line([[.5, 7], [4, 7.3]], '#d79d65', .8);
+    if (kick) ctx.rotate(angle);
+    const footX = kick ? 0 : Math.sin(angle) * 11;
+    const kneeX = kick ? 0 : footX * .4 + lift * .4;
+    line([[0,0],[kneeX,4 - lift * .2],[footX,8.6 - lift]], outline, 7.2);
+    line([[0,0],[kneeX,4 - lift * .2],[footX,8.6 - lift]], back ? '#19438c' : blue, 5.8);
+    line([[kneeX - 1,4 - lift * .2],[footX - 1,7.5 - lift]], '#70a7eb', 1);
+    ellipse(footX + 1.6, 8.6 - lift, 6, 3, shade('#a36538', '#563021', 6, 6));
+    line([[footX - 3,10.5 - lift],[footX + 6,10.5 - lift]], '#35252a', 1);
+    line([[footX + .5,7 - lift],[footX + 4,7.3 - lift]], '#d79d65', .8);
     ctx.restore();
   }
   const jumpAngle = player.vy < 0 ? -.9 : -.5;
-  arm(-8, 24, airborne ? .9 : -stride * .85, true);
-  leg(-5, airborne ? .85 : stride * .65, true);
+  arm(-8, 24, motion.backArm, true);
+  leg(-5, airborne ? .85 : stride * .95, true, airborne ? 3 : motion.backLift, airborne);
   // Pose the existing front leg for helper kicks; never add an extra limb.
   leg(5, kickExtension === null
-    ? (airborne ? jumpAngle : -stride * .65)
-    : -1.48 * kickExtension);
+    ? (airborne ? jumpAngle : -stride * .95)
+    : -1.48 * kickExtension, false, airborne ? 2 : motion.frontLift, kickExtension !== null || airborne);
   ellipse(0, 28, 10, 9, red);
   shape([[-8, 26], [-5, 28], [6, 28], [9, 26], [9, 36], [-8, 36]], blue);
   shape([[-7, 22], [-3.5, 22], [-3, 30], [-6.5, 30]], '#438aff');
@@ -104,7 +122,7 @@ export function drawCharacter(ctx, player, time = 0, reducedMotion = false, kick
   ellipse(-4.5, 29, 1.5, 1.5, '#ffe272');
   ellipse(5.5, 29, 1.5, 1.5, '#ffe272');
   line([[-2, 32], [3, 32], [3, 35], [-2, 35]], '#83b9ff', .65);
-  arm(9, 24, airborne ? -2.5 : stride * .85);
+  arm(9, 24, motion.frontArm);
 
   // Hair, face, ear, and the unmistakable rounded nose and moustache.
   ellipse(-1.5, 14.2, 11.4, 10.5, '#663822');

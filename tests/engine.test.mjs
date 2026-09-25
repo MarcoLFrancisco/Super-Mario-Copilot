@@ -6,7 +6,10 @@ import { assetManifest } from '../scripts/build-assets.mjs';
 import { createState as createOriginalState, setPaused, update } from '../src/engine.js';
 import { CAMPAIGN } from '../src/campaign.js';
 import { createBoss, SHOWMAN_MOVES } from '../src/boss.js';
-import { drawCampaignBoss } from '../src/world-art.js';
+import { drawCampaignBoss, drawClimb } from '../src/world-art.js';
+import { actionForKey } from '../src/input.js';
+import { drawPartyActor } from '../src/party-art.js';
+import { characterMotion } from '../src/character.js';
 import { bossDialogueLayout, drawBossDialogue, drawBossWarnings } from '../src/boss-art.js';
 import { drawProjectile } from '../src/enemy-art.js';
 import { loadWizardRig, wizardMatrices, wizardPose, wizardCrownY } from '../src/wizard-rig.js';
@@ -14,8 +17,8 @@ import { WIZARD_RIG } from '../images/Boss1-rig.js';
 import { interactionFor } from '../src/missions.js';
 import { workView, prepareQuiz, submitWork } from '../src/trivia-tasks.js';
 import { renderQuiz } from '../src/quiz-ui.js';
-import { createArcade, updateArcade, setArcadePaused } from '../src/arcade.js';
-import { renderArcade } from '../src/arcade-art.js';
+import { createArcade, updateArcade, setArcadePaused, chooseArcadeUpgrade, activateArcadeTool } from '../src/arcade.js';
+import { renderArcade, loadArcadeArt, drawInterceptor } from '../src/arcade-art.js';
 import { ORBIT, createOrbit, updateOrbit, setOrbitPaused, reboundVelocity, ballPosition } from '../src/orbit.js';
 import { APPS } from '../src/level.js';
 import { renderOrbit } from '../src/orbit-art.js';
@@ -27,6 +30,9 @@ const createState = () => createOriginalState('marco', CAMPAIGN[0]);
 const robotAtlas = { naturalWidth: WIZARD_RIG.atlasSize[0], naturalHeight: WIZARD_RIG.atlasSize[1],
   set src(value) { this.url = value; queueMicrotask(() => this.onload()); } };
 await loadWizardRig(() => robotAtlas);
+const interceptorImage = { naturalWidth: 1024, naturalHeight: 1024,
+  set src(value) { this.url = value; queueMicrotask(() => this.onload()); } };
+await loadArcadeArt(() => interceptorImage);
 
 function canvasRecorder(width = 1280) {
   const calls = [];
@@ -49,11 +55,11 @@ function canvasRecorder(width = 1280) {
   return { context, calls };
 }
 
-test('the Setup Wizard is a large grounded robot without the generic core overlay', () => {
+test('the Setup Wizard is a smaller grounded robot without the generic core overlay', () => {
   const mission = CAMPAIGN[0];
   const boss = createBoss(mission.arena);
   const floor = mission.arena.platforms.find(platform => platform.id === 'arena-floor');
-  assert.ok(boss.w >= 230 && boss.h >= 260, 'The robot must tower over the original characters');
+  assert.deepEqual([boss.w, boss.h], [210, 244], 'The same robot artwork is scaled down for arena space');
   assert.equal(boss.y + boss.h, floor.y, 'Boots must meet the arena floor');
   const before = JSON.stringify(boss);
   const { context, calls } = canvasRecorder();
@@ -165,6 +171,13 @@ test('Setup Wizard poses, countdown warnings, and crown balloons render without 
     defeatPoses.add(JSON.stringify(recorder.calls));
   }
   assert.equal(defeatPoses.size, 3);
+  boss.mode = 'fleeing'; boss.vx = 450; boss.walkDistance = 12;
+  const retreat = wizardPose(boss);
+  boss.walkDistance += 20;
+  const nextStep = wizardPose(boss);
+  assert.notDeepEqual(retreat.leftLeg, nextStep.leftLeg);
+  assert.notDeepEqual(retreat.rightArm, nextStep.rightArm);
+  assert.ok(Math.abs(retreat.body.angle) >= .1);
   const projectile = canvasRecorder();
   drawProjectile(projectile.context, { owner: 'enemy', kind: 'token', style: 'wizard', x: 300, y: 500, w: 16, h: 16, life: 1 });
   assert.ok(projectile.calls.some(([name]) => name === 'lineTo'));
@@ -182,6 +195,74 @@ function jumpHeight(held) {
   }
   return startY - highestY;
 }
+
+test('Up and Down arrows climb nearby ladders and ropes without replacing normal jumping', () => {
+  const bindings = { jump: 'Space', climbUp: 'KeyR', climbDown: 'KeyV' };
+  for (const mission of [CAMPAIGN[0], CAMPAIGN[1]]) {
+    const state = createOriginalState('marco', mission);
+    const climb = state.world.climbs[0];
+    Object.assign(state.player, { x: climb.x - 17, y: climb.bottom - 46, grounded: true });
+    const before = state.player.y;
+    assert.equal(actionForKey('ArrowUp', bindings, state.player, state.world), 'climbUp');
+    assert.equal(actionForKey('ArrowDown', bindings, state.player, state.world), 'climbDown');
+    for (let frame = 0; frame < 20; frame += 1) update(state, { up: true }, 1 / 120);
+    assert.ok(state.player.y < before);
+    const elevated = state.player.y;
+    for (let frame = 0; frame < 10; frame += 1) update(state, { down: true }, 1 / 120);
+    assert.ok(state.player.y > elevated);
+    assert.equal(actionForKey('Space', bindings, state.player, state.world), 'jump');
+    assert.equal(actionForKey('KeyW', bindings, state.player, state.world), 'jump');
+    assert.ok(update(state, { jumpPressed: true, jumpHeld: true }, 1 / 120));
+    assert.equal(state.player.climbing, null);
+    state.player.x = 0;
+    assert.equal(actionForKey('ArrowUp', bindings, state.player, state.world), 'jump');
+    assert.equal(actionForKey('ArrowUp', { attack: 'ArrowUp' }, state.player, state.world), 'attack');
+  }
+});
+
+test('ropes and ladders render detailed strands, rungs, and anchors with finite geometry', () => {
+  for (const kind of ['rope', 'ladder']) {
+    const climb = { kind, x: 414, top: 290, bottom: 610, width: 42 };
+    const before = JSON.stringify(climb);
+    const { context, calls } = canvasRecorder();
+    drawClimb(context, climb);
+    assert.equal(JSON.stringify(climb), before);
+    assert.ok(calls.length > 100);
+    assert.ok(calls.filter(([name]) => name === (kind === 'rope' ? 'bezierCurveTo' : 'roundRect')).length >= 16);
+  }
+});
+
+test('original characters visibly step and climb with reduced motion instead of hovering', () => {
+  for (const id of ['marco', 'mario', 'donkey']) for (const reduced of [true, false]) {
+    const actor = { id, x: 40, y: 400, vx: 240, vy: 0, grounded: true, facing: 1, walkDistance: 9, climbDistance: 0 };
+    const draw = () => {
+      const before = JSON.stringify(actor);
+      const { context, calls } = canvasRecorder();
+      drawPartyActor(context, actor, 0, reduced);
+      assert.equal(JSON.stringify(actor), before);
+      return calls;
+    };
+    const first = draw();
+    const motion = characterMotion(actor);
+    assert.notEqual(motion.backLift, motion.frontLift);
+    actor.walkDistance += 30;
+    assert.notDeepEqual(draw(), first, `${id}: feet must change with traveled distance`);
+    actor.climbing = 'ladder'; actor.grounded = false; actor.vx = 0; actor.vy = -200;
+    const reaching = draw();
+    actor.climbDistance += 15;
+    assert.notDeepEqual(draw(), reaching, `${id}: alternate limb positions during climbing`);
+    actor.climbing = null; actor.grounded = true; actor.vx = 0;
+    assert.equal(characterMotion(actor).stride, 0);
+  }
+  const state = createState();
+  for (let frame = 0; frame < 35; frame += 1) update(state, { right: true }, 1 / 120);
+  assert.ok(state.player.walkDistance > 10);
+  assert.equal(state.party.actors.marco.walkDistance, state.player.walkDistance);
+  setPaused(state, true);
+  const distance = state.player.walkDistance;
+  update(state, { right: true }, 1);
+  assert.equal(state.player.walkDistance, distance);
+});
 
 test('holding jump rises higher than tapping without changing the full jump', () => {
   const fullHeight = jumpHeight(true);
@@ -357,7 +438,7 @@ test('arcade interludes move, pause, fail, retry and finish without advancing af
     assert.equal(state.status, 'failed');
     assert.equal(createArcade(kind).health, 3);
     const won = createArcade(kind);
-    if (kind === 'invaders') { won.wave = 2; won.invaders.forEach(enemy => { enemy.dead = true; }); }
+    if (kind === 'invaders') won.core = { dead: true };
     if (kind === 'pang') won.bubbles = [];
     assert.ok(updateArcade(won, {}, step).some(event => event.type === 'complete'));
     const score = won.score;
@@ -377,6 +458,330 @@ test('AI Invaders uses physics contacts for projectiles and counts each opponent
   assert.equal(events.filter(event => event.type === 'enemyDefeated').length, 1);
   updateArcade(state, {}, .1);
   assert.equal(state.destroyed, 1);
+});
+
+test('AI Invaders banking and recoil preserve the original collider and pointer controls', () => {
+  const state = createArcade('invaders');
+  const collider = state.player.body.getFixtureList().getShape();
+  updateArcade(state, { right: true, fire: true }, .1);
+  assert.ok(state.player.bank > 0 && state.player.recoil > 0);
+  assert.deepEqual([state.player.w, state.player.h], [44, 44]);
+  assert.equal(state.player.body.getFixtureList().getShape(), collider);
+  updateArcade(state, { pointerX: 20 }, .1);
+  assert.equal(state.player.x, 55);
+  updateArcade(state, { pointerX: 1800 }, .1);
+  assert.equal(state.player.x, 1225);
+  setArcadePaused(state, true);
+  const before = [state.player.x, state.player.bank, state.player.recoil];
+  updateArcade(state, { left: true, fire: true }, .1);
+  assert.deepEqual([state.player.x, state.player.bank, state.player.recoil], before);
+});
+
+test('AI Invaders renders a transparent high-resolution ship with bounded movement effects', () => {
+  const source = readFileSync(new URL('../images/Interceptor.png', import.meta.url));
+  assert.deepEqual([source.readUInt32BE(16), source.readUInt32BE(20), source[25]], [1024, 1024, 6]);
+  const state = createArcade('invaders');
+  updateArcade(state, { right: true, fire: true }, .1);
+  state.grace = 1;
+  const before = [state.time, state.player.x, state.player.bank, state.player.recoil];
+  for (const reducedMotion of [false, true]) {
+    const { context, calls } = canvasRecorder();
+    drawInterceptor(context, state, reducedMotion);
+    assert.equal(calls.filter(([name, image]) => name === 'drawImage' && image === interceptorImage).length, 1);
+    assert.ok(calls.some(([name, angle]) => name === 'rotate' && angle === (reducedMotion ? 0 : state.player.bank)));
+    assert.ok(calls.some(([name]) => name === 'createLinearGradient'));
+    assert.ok(calls.some(([name]) => name === 'ellipse'));
+  }
+  assert.deepEqual([state.time, state.player.x, state.player.bank, state.player.recoil], before);
+});
+
+function arcadeSteps(state, seconds, input = {}) {
+  const events = [];
+  for (let frame = 0; frame < Math.ceil(seconds * 120); frame += 1) events.push(...updateArcade(state, input, 1 / 120));
+  return events;
+}
+
+function clearFormation(state) {
+  for (const enemy of state.invaders) if (!enemy.dead) {
+    state.physics.destroyBody(enemy.body); enemy.dead = true;
+  }
+  return updateArcade(state, {}, 1 / 60);
+}
+
+function nextInvaderWave(state, upgrade = 'laser') {
+  clearFormation(state);
+  assert.equal(state.phase, 'upgrade');
+  assert.equal(chooseArcadeUpgrade(state, upgrade), true);
+  arcadeSteps(state, 1.3);
+}
+
+function hitArcadeTarget(state, target) {
+  state.fireCooldown = 0;
+  updateArcade(state, { fire: true }, 1 / 120);
+  const projectile = state.shots.find(item => item.owner === 'playerShot' && !item.dead);
+  assert.ok(projectile);
+  projectile.body.setTransform({ x: target.x / 50, y: target.y / 50 }, 0);
+  return updateArcade(state, {}, 1 / 60);
+}
+
+function enemyShots(state, count = 1) {
+  for (const enemy of state.invaders.slice(0, count)) { enemy.fireWarning = .001; enemy.aimX = state.player.x; }
+  updateArcade(state, {}, 1 / 60);
+  return state.shots.filter(item => item.owner === 'enemyShot' && !item.dead);
+}
+
+function teleportArcade(item, x, y) {
+  item.x = x; item.y = y; item.body.setTransform({ x: x / 50, y: y / 50 }, 0);
+}
+
+test('AI Invaders offers one upgrade between each wave, freezing time and preserving defense damage', () => {
+  const state = createArcade('invaders');
+  state.bunkers[0].health = 3;
+  const nodeBody = state.bunkers[0].body;
+  for (const [index, key] of ['laser', 'shield', 'wingman'].entries()) {
+    assert.ok(clearFormation(state).some(event => event.type === 'arcadeUpgrade'));
+    const before = [state.time, state.remaining, state.player.x, state.score];
+    arcadeSteps(state, 2, { right: true, fire: true });
+    assert.deepEqual([state.time, state.remaining, state.player.x, state.score], before);
+    assert.equal(chooseArcadeUpgrade(state, 'invalid'), false);
+    assert.equal(chooseArcadeUpgrade(state, key), true);
+    assert.equal(chooseArcadeUpgrade(state, key), false);
+    arcadeSteps(state, 1.3);
+    assert.equal(state.wave, index + 2);
+    assert.equal(state.upgrades[key], 1);
+    if (key !== 'laser') assert.equal(state.abilities[key].charges, 1);
+    assert.equal(state.bunkers[0].health, 3);
+    assert.equal(state.bunkers[0].body, nodeBody);
+  }
+  assert.equal(state.phase, 'boss');
+  assert.ok(state.core.health > 0);
+  assert.notEqual(state.status, 'complete');
+});
+
+test('AI Invaders pickups grant temporary tools and repair damaged or destroyed nodes through contacts', () => {
+  const state = createArcade('invaders');
+  for (let count = 0; count < 4; count += 1) hitArcadeTarget(state, state.invaders.find(enemy => !enemy.dead && enemy.kind === 'scout'));
+  const shield = state.pickups.find(item => item.kind === 'shield');
+  assert.ok(shield);
+  teleportArcade(shield, state.player.x, state.player.y);
+  const collection = updateArcade(state, {}, 1 / 60);
+  assert.ok(collection.some(event => event.type === 'arcadeTool' && event.key === 'shield'));
+  assert.ok(state.abilities.shield.active > 5.9);
+  state.bunkers[0].health = 2;
+  state.physics.destroyBody(state.bunkers[1].body); state.bunkers[1].dead = true; state.bunkers[1].health = 0;
+  for (let count = 0; count < 4; count += 1) hitArcadeTarget(state, state.invaders.find(enemy => !enemy.dead && enemy.kind === 'scout'));
+  const repair = state.pickups.find(item => item.kind === 'repair');
+  assert.ok(repair);
+  teleportArcade(repair, state.player.x, state.player.y);
+  assert.ok(updateArcade(state, {}, 1 / 60).some(event => event.type === 'arcadeRepair'));
+  assert.deepEqual(state.bunkers.map(node => node.health), [5, 3, 8]);
+  assert.equal(state.bunkers[1].dead, false);
+});
+
+test('AI Invaders friendly lasers pass defense nodes while hostile shots damage them', () => {
+  const state = createArcade('invaders');
+  const node = state.bunkers[1];
+  updateArcade(state, { fire: true }, 1 / 60);
+  teleportArcade(state.shots[0], node.x, node.y);
+  updateArcade(state, {}, 1 / 60);
+  assert.equal(node.health, 8);
+  assert.ok(state.shots.some(projectile => projectile.owner === 'playerShot'));
+  const hostile = enemyShots(state)[0];
+  teleportArcade(hostile, node.x, node.y);
+  updateArcade(state, {}, 1 / 60);
+  assert.equal(node.health, 7);
+  assert.equal(hostile.dead, true);
+});
+
+test('AI Invaders shield, wingman, chain and pulse are bounded abilities with cooldowns', () => {
+  const shield = createArcade('invaders');
+  shield.upgrades.shield = 1; shield.abilities.shield.charges = 2;
+  assert.equal(activateArcadeTool(shield, 'shield'), true);
+  assert.equal(shield.abilities.shield.active, 9);
+  assert.equal(activateArcadeTool(shield, 'shield'), false);
+  const protectedShot = enemyShots(shield)[0];
+  teleportArcade(protectedShot, shield.player.x, shield.player.y);
+  updateArcade(shield, {}, 1 / 60);
+  assert.equal(shield.health, 3);
+  shield.abilities.shield.active = 0;
+  const hurtShot = enemyShots(shield)[0];
+  teleportArcade(hurtShot, shield.player.x, shield.player.y);
+  updateArcade(shield, {}, 1 / 60);
+  assert.equal(shield.health, 2); assert.ok(shield.grace > 1.7);
+
+  const wingman = createArcade('invaders');
+  wingman.upgrades.wingman = 1; wingman.abilities.wingman.charges = 1;
+  activateArcadeTool(wingman, 'wingman');
+  assert.equal(wingman.abilities.wingman.active, 15);
+  arcadeSteps(wingman, 1.5);
+  assert.ok(wingman.shots.some(item => item.owner === 'playerShot'));
+
+  const chain = createArcade('invaders');
+  chain.abilities.chain.charges = 1; activateArcadeTool(chain, 'chain');
+  hitArcadeTarget(chain, chain.invaders[0]);
+  assert.equal(chain.destroyed, 3);
+  assert.equal(chain.effects.filter(item => item.kind === 'chain').length, 2);
+
+  const pulse = createArcade('invaders');
+  const [near, far] = enemyShots(pulse, 2);
+  teleportArcade(near, pulse.player.x, pulse.player.y - 100);
+  teleportArcade(far, 80, 205);
+  pulse.abilities.pulse.charges = 1;
+  assert.equal(activateArcadeTool(pulse, 'pulse'), true);
+  assert.equal(near.dead, true); assert.notEqual(far.dead, true);
+  assert.equal(activateArcadeTool(pulse, 'pulse'), false);
+  setArcadePaused(pulse, true);
+  const cooldown = pulse.abilities.pulse.cooldown;
+  arcadeSteps(pulse, 2);
+  assert.equal(pulse.abilities.pulse.cooldown, cooldown);
+});
+
+test('AI Invaders hold-to-fire can be disabled without losing one-shot keyboard or touch firing', () => {
+  const held = createArcade('invaders');
+  const tapped = createArcade('invaders');
+  const rapid = arcadeSteps(held, 1, { fire: true });
+  const single = arcadeSteps(tapped, 1, { fire: true, holdToFire: false });
+  assert.ok(rapid.filter(event => event.type === 'shoot').length >= 4);
+  assert.equal(single.filter(event => event.type === 'shoot').length, 1);
+  updateArcade(tapped, { fire: false }, 1 / 60);
+  assert.ok(updateArcade(tapped, { fire: true, holdToFire: false }, 1 / 60).some(event => event.type === 'shoot'));
+  arcadeSteps(tapped, .3);
+  assert.ok(updateArcade(tapped, { jumpPressed: true, holdToFire: false }, 1 / 60).some(event => event.type === 'shoot'));
+});
+
+test('AI Invaders tool inputs and upgrade controls retain keyboard and touch access inside the game frame', () => {
+  const bindings = { patch: 'Digit1', query: 'Digit2', aegis: 'Digit3', pulse: 'KeyQ', fire: 'KeyF', jump: 'Space' };
+  for (const [code, action] of [['Digit1','shield'], ['Digit2','wingman'], ['Digit3','chain'], ['Digit4','pulse'], ['KeyQ','pulse']]) {
+    assert.equal(actionForKey(code, bindings, null, null, 'invaders'), `invader-${action}`);
+  }
+  assert.equal(actionForKey('Digit1', bindings), 'patch');
+  assert.equal(actionForKey('Digit4', { jump: 'Digit4' }, null, null, 'invaders'), 'jump');
+  assert.equal(actionForKey('KeyF', bindings, null, null, 'invaders'), 'fire');
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  for (const action of ['shield', 'wingman', 'chain', 'pulse']) {
+    assert.ok(html.includes(`data-action="invader-${action}"`));
+    assert.ok(html.includes(`id="invader-${action}-status"`));
+  }
+  const dialog = html.match(/<dialog id="arcade-upgrade-dialog"[\s\S]*?<\/dialog>/)?.[0];
+  assert.ok(dialog?.includes('aria-modal="true"'));
+  assert.deepEqual([...dialog.matchAll(/data-upgrade="([^"]+)"/g)].map(match => match[1]), ['laser', 'shield', 'wingman']);
+  assert.match(html, /id="hold-to-fire"/);
+  assert.match(html, /<progress id="invader-core-health"/);
+});
+
+test('AI Invaders dives and flanks lock their paths and shielded armor has a visible open interval', () => {
+  const state = createArcade('invaders');
+  nextInvaderWave(state);
+  state.grace = 30; state.diveTimer = 0;
+  const warning = updateArcade(state, {}, 1 / 60);
+  const diver = state.invaders.find(enemy => enemy.mode === 'diveWarning');
+  assert.ok(diver);
+  assert.ok(warning.some(event => event.type === 'arcadeWarning' && event.attack === 'dive'));
+  const locked = diver.maneuver.targetX;
+  arcadeSteps(state, .7, { pointerX: 100 });
+  assert.equal(diver.mode, 'diveWarning');
+  assert.equal(diver.maneuver.targetX, locked);
+  arcadeSteps(state, .5);
+  assert.equal(diver.mode, 'diving');
+  const height = diver.y;
+  arcadeSteps(state, .5);
+  assert.ok(diver.y > height);
+  nextInvaderWave(state);
+  state.serial = 100; state.diveTimer = 0;
+  updateArcade(state, {}, 1 / 60);
+  assert.ok(state.invaders.some(enemy => enemy.mode === 'flankWarning'));
+  const armor = state.invaders.find(enemy => enemy.kind === 'armored');
+  state.time = Math.ceil(state.time / 3.8) * 3.8 - armor.serial * .17 + .3;
+  updateArcade(state, {}, 1 / 60);
+  assert.equal(armor.shielded, true);
+  const health = armor.health;
+  hitArcadeTarget(state, armor);
+  assert.equal(armor.health, health);
+  arcadeSteps(state, 1.5);
+  assert.equal(armor.shielded, false);
+  hitArcadeTarget(state, armor);
+  assert.equal(armor.health, health - 1);
+});
+
+test('AI Invaders core telegraphs its sweep, leaves a safe side, and only takes exposed damage', () => {
+  const state = createArcade('invaders');
+  for (let wave = 0; wave < 3; wave += 1) nextInvaderWave(state);
+  const core = state.core;
+  const initialHealth = core.health;
+  hitArcadeTarget(state, core);
+  assert.equal(core.health, initialHealth);
+  core.mode = 'exposed'; core.timer = 0; core.cycle = 1;
+  const warnings = updateArcade(state, { pointerX: 200 }, 1 / 60);
+  assert.equal(core.mode, 'warning'); assert.equal(state.beam, null);
+  assert.ok(warnings.some(event => event.type === 'arcadeWarning' && event.attack === 'sweep'));
+  assert.ok(core.sweepFrom > 500 && core.sweepTo >= 600);
+  arcadeSteps(state, 1);
+  assert.equal(state.beam, null);
+  arcadeSteps(state, .8);
+  assert.ok(state.beam);
+  arcadeSteps(state, 1);
+  assert.equal(state.health, 3);
+  const beamX = state.beam.x;
+  arcadeSteps(state, .05, { pointerX: beamX });
+  assert.equal(state.health, 2, 'Sweeping beam must make real physical contact');
+  state.grace = 10;
+  arcadeSteps(state, 3, { pointerX: 200 });
+  assert.equal(core.mode, 'exposed'); assert.equal(state.beam, null);
+  core.health = 1;
+  const events = hitArcadeTarget(state, core);
+  assert.ok(events.some(event => event.type === 'arcadeCoreDefeated'));
+  assert.equal(state.status, 'complete');
+  assert.equal(state.shots.length, 0);
+  assert.deepEqual(updateArcade(state, { fire: true }, 1), []);
+});
+
+test('AI Invaders core opening accepts real approaching shots but armored side panels do not', () => {
+  const state = createArcade('invaders');
+  for (let wave = 0; wave < 3; wave += 1) nextInvaderWave(state);
+  const core = state.core;
+  core.mode = 'exposed'; core.timer = 5;
+  const before = core.health;
+  hitArcadeTarget(state, { x: core.x + 60, y: core.y });
+  assert.equal(core.health, before);
+  updateArcade(state, { pointerX: core.x }, 1 / 60);
+  state.fireCooldown = 0;
+  updateArcade(state, { fire: true }, 1 / 60);
+  arcadeSteps(state, .5);
+  assert.ok(core.health < before, 'A shot must pass the open outer armor and contact the exposed center');
+  assert.equal(state.coreWeakPoint.body.getPosition().x, core.body.getPosition().x);
+});
+
+test('AI Invaders renders every wave, warning, tool and core state without mutating simulation', () => {
+  const state = createArcade('invaders');
+  state.grace = 99;
+  const signatures = new Set();
+  for (let wave = 1; wave <= 4; wave += 1) {
+    if (wave > 1) nextInvaderWave(state);
+    state.abilities.wingman.active = 4;
+    state.abilities.shield.active = 4;
+    const enemy = state.invaders[0];
+    if (enemy) { enemy.fireWarning = .6; enemy.aimX = 640; }
+    state.effects = [{ kind: 'burst', x: 400, y: 300, serial: 1, life: .3 },
+      { kind: 'chain', x: 400, y: 300, targetX: 520, targetY: 320, serial: 2, life: .3 },
+      { kind: 'pulse', x: 640, y: 595, radius: 270, serial: 3, life: .4 }];
+    if (state.core) {
+      state.core.mode = 'exposed'; state.core.timer = 0; state.core.cycle = 1;
+      updateArcade(state, {}, 1 / 60);
+      arcadeSteps(state, 1.8);
+    }
+    for (const reducedMotion of [false, true]) {
+      const before = { time: state.time, health: state.health, score: state.score,
+        effects: structuredClone(state.effects), player: [state.player.x, state.player.y, state.player.bank] };
+      const { context, calls } = canvasRecorder();
+      renderArcade(context, state, reducedMotion);
+      assert.deepEqual({ time: state.time, health: state.health, score: state.score,
+        effects: state.effects, player: [state.player.x, state.player.y, state.player.bank] }, before);
+      assert.ok(calls.length > 200);
+      assert.ok(calls.some(([name, image]) => name === 'drawImage' && image === interceptorImage));
+      signatures.add(JSON.stringify(calls));
+    }
+  }
+  assert.equal(signatures.size, 8);
 });
 
 test('Bubble Firewall splits a hit bubble into two smaller physical bubbles', () => {

@@ -89,6 +89,48 @@ dd { margin: 5px 0 0; font-size: 1rem; font-weight: 750; font-variant-numeric: t
 .arcade-controls button { touch-action: none; min-height: 46px; background: #143c43; border-color: #b1dfc0; }
 .arcade-controls .arcade-action { min-width: 145px; background: #f5cf72; color: #2b382d; border-color: #ffe8a3; }
 .arcade-option { border-left-color: #e4c26a; background: #233b39; margin-left: 18px; }
+.is-invaders .game-viewport { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto minmax(0, 1fr) auto auto auto; aspect-ratio: auto; height: auto; }
+.is-invaders .game-ui { display: contents; }
+.is-invaders :is(.level-header, .hud, .mission-strip, #game-canvas, .invader-tools, .arcade-controls, .dialogue-strip) { grid-column: 1; }
+.is-invaders #game-canvas { grid-row: 4; height: auto; min-height: 0; align-self: center; }
+.is-invaders .level-header { grid-row: 1; min-height: 60px; height: auto; }
+.is-invaders .game-ui > .hud { grid-row: 2; position: static; width: 100%; max-width: 100%; height: auto; flex-wrap: wrap; }
+.is-invaders .hud > div { flex: 1; }
+.is-invaders .mission-strip { grid-row: 3; position: static; flex-wrap: wrap; margin: 0; border-bottom: 1px solid #53777366; }
+.is-invaders .dialogue-strip { grid-row: 7; position: static; margin: 0; border-top: 1px solid #44695b88; }
+.is-invaders .arcade-controls { grid-row: 5; position: static; margin: 8px 14px; align-self: center; pointer-events: none; }
+.is-invaders .arcade-controls button { pointer-events: auto; }
+.is-invaders .arcade-controls .arcade-action { min-width: 80px; }
+.invader-tools { grid-row: 5; justify-self: center; align-self: center; display: grid; grid-template-columns: repeat(4, 64px); gap: 7px; padding: 8px 0; }
+.invader-tools button { position: relative; display: grid; grid-template-columns: 1fr auto; grid-template-rows: 23px 15px; gap: 2px; padding: 5px 8px; min-height: 49px; height: 49px; border-color: var(--tool-color, #92c9bc); background: #152b30; touch-action: none; }
+.invader-tools button svg { width: 19px; height: 19px; color: var(--tool-color, #92c9bc); }
+.invader-tools button kbd { font-family: inherit; font-size: .58rem; color: #e3eddf; }
+.invader-tools button small { grid-column: 1 / -1; font-size: .55rem; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.invader-tools button[data-active='true'] { opacity: 1; border-width: 2px; background: #26484b; }
+.invader-tools [data-tooltip]::after { top: auto; bottom: calc(100% + 8px); }
+.invader-core-status { display: flex; align-items: center; gap: 9px; width: 100%; font-size: .7rem; color: #ffdab2; }
+.invader-core-status label { flex-shrink: 0; }
+.invader-core-status progress { flex: 1; min-width: 30px; height: 10px; accent-color: #f1b775; }
+.invader-core-status span { font-variant-numeric: tabular-nums; }
+.arcade-upgrade-dialog { width: min(500px, calc(100% - 24px)); background: #152b30; border-color: #87c5bb; }
+.arcade-upgrade-dialog h2 { font-size: 1.35rem; margin-bottom: 18px; }
+.arcade-upgrade-options { display: grid; gap: 10px; }
+.arcade-upgrade-options button { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 14px; text-align: left; min-height: 70px; padding: 12px 16px; background: #233e41; border-color: #628984; }
+.arcade-upgrade-options button > span { display: block; }
+.arcade-upgrade-options button:nth-child(1) svg { color: #ffcf77; }
+.arcade-upgrade-options button:nth-child(2) svg { color: #6bcfff; }
+.arcade-upgrade-options button:nth-child(3) svg { color: #8cf0b2; }
+.arcade-upgrade-options small { display: block; margin-top: 5px; font-size: .73rem; font-weight: 500; color: #c0d3cf; }
+.upgrade-level { color: #dde7c9; font-size: .68rem; }
+.is-invaders #mission-panel:fullscreen #game-canvas { height: 100%; object-fit: contain; }
+@media (max-width: 600px) {
+  .is-invaders .arcade-controls { grid-row: 6; margin: 3px 8px 8px; }
+  .is-invaders .invader-tools { grid-template-columns: repeat(4, 60px); gap: 7px; }
+  .is-invaders .hud > div:nth-child(4) { display: none; }
+  .is-invaders .mission-strip { font-size: .65rem; }
+  .is-invaders #chapter-name { display: none; }
+  .is-invaders .dialogue-strip { font-size: .65rem; }
+}
 .has-climb .dialogue-strip { bottom: 124px; }
 .touch-controls button { touch-action: none; user-select: none; -webkit-user-select: none; width: 48px; height: 46px; background: #132b3bef; }
 #jump-button { background: #24576a; border-color: #7bd0d2; }

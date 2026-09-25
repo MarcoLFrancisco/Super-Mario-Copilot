@@ -1,6 +1,6 @@
 import { PHYSICS as P } from './level.js';
 import { CHARACTERS, ATTACKS, visibleParty } from './party.js';
-import { drawCharacter } from './character.js';
+import { drawCharacter, characterMotion } from './character.js';
 
 // World coordinates; caller owns camera, culling and damage-grace opacity.
 // Artwork only: never advance timers, mutate actors or resolve damage here.
@@ -19,9 +19,8 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
   const active = spec && attack.elapsed >= spec.start && attack.elapsed < spec.end;
   const phase = spec ? Math.max(0, Math.min(1, attack.elapsed / spec.duration)) : 0;
   const extension = spec ? (active ? 1 : Math.sin(phase * Math.PI) * .55) : 0;
-  const t = reducedMotion ? 0 : time;
-  const stride = actor.grounded
-    ? Math.sin(t * 19) * Math.min(1, Math.abs(actor.vx) / P.speed) : .55;
+  const motion = characterMotion(actor, time);
+  const stride = motion.stride;
   const facing = attack ? attack.facing : actor.facing;
   const marco = actor.id === 'marco';
   const donkey = actor.id === 'donkey';
@@ -56,11 +55,16 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
       const fill = ctx.createLinearGradient(0, y, 0, y + h);
       fill.addColorStop(0, top); fill.addColorStop(1, bottom); return fill;
     };
-    const leg = (x, angle, color, hoof = false) => {
-      ctx.save(); ctx.translate(x, 33); ctx.rotate(angle);
-      poly([[-3, 0], [3, 0], [3, 9], [-3, 9]], color);
-      oval(1, 10, hoof ? 3.8 : 5, 2.5, hoof ? '#283443' : '#ecf7ff');
-      if (!hoof) line([[-2, 11], [5, 11]], '#366481', 1);
+    const leg = (x, angle, color, hoof = false, lift = 0, kick = false) => {
+      ctx.save(); ctx.translate(x, 33);
+      if (kick) ctx.rotate(angle);
+      const footX = kick ? 0 : Math.sin(angle) * 11;
+      const kneeX = kick ? 0 : footX * .45 + lift * .4;
+      line([[0,0],[kneeX,5 - lift * .2],[footX,10 - lift]], '#122239', 6.8);
+      line([[0,0],[kneeX,5 - lift * .2],[footX,10 - lift]], color, 5.3);
+      if (!hoof) line([[kneeX - 1,5 - lift * .2],[footX - 1,9 - lift]], '#7fb2e2', 1);
+      oval(footX + 1, 10 - lift, hoof ? 3.8 : 5, 2.5, hoof ? '#283443' : '#ecf7ff');
+      if (!hoof) line([[footX - 2,11 - lift],[footX + 5,11 - lift]], '#366481', 1);
       ctx.restore();
     };
     if (marco || donkey) {
@@ -75,10 +79,13 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
       const skin = gradient('#ffdbb8', '#c98a66', 10, 20);
       const jeans = gradient('#5287cf', outfit.jeans, 31, 13);
       // Keep the supporting leg steady throughout the kickboxing pose.
-      leg(-5, attack?.kind === 'kick' ? 0 : stride * .55, '#21467f');
-      leg(5, attack?.kind === 'kick' ? -1.48 * extension : -stride * .55, jeans);
-      oval(-10, 27, 3, 6, outfit.shirt);
-      oval(-10 - stride * 2, 32, 2.6, 3, skin);
+      leg(-5, attack?.kind === 'kick' ? 0 : motion.airborne ? .75 : stride * .95, '#21467f', false,
+        motion.airborne ? 3 : motion.backLift, motion.airborne);
+      leg(5, attack?.kind === 'kick' ? -1.48 * extension : motion.airborne ? -.8 : -stride * .95, jeans, false,
+        motion.airborne ? 2 : motion.frontLift, attack?.kind === 'kick' || motion.airborne);
+      const backHandY = motion.climbing ? 10 + stride * 3 : 31;
+      line([[-8,24],[-12 - stride * 3,motion.climbing ? 17 : 29],[-10 - stride * 6,backHandY]], outfit.shirt, 5);
+      oval(-10 - stride * 6, backHandY, 2.6, 3, skin);
       poly([[-8, 21], [7, 21], [11, 26], [7, 28], [8, 34], [-8, 34], [-9, 27], [-12, 26]],
         gradient('#70f2e7', outfit.shirt, 21, 13));
       line([[-6, 33], [6, 33]], '#142c4b', 1.8);
@@ -86,9 +93,11 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
       line([[-5, 35], [-3, 37]], '#a9c8ef', .7);
       poly([[-3, 24], [0, 22], [3, 25], [0, 28]], '#e7ffff');
       const punch = attack?.kind === 'punch' ? extension : 0;
-      line([[8, 25], [12 + punch * 8, 27 - punch * 3], [12 + punch * 27, 23]], skin, 4.5);
-      oval(12 + punch * 27, 23, 3.6, 3, skin);
-      line([[10 + punch * 27, 22], [14 + punch * 27, 22]], '#efffff', 1.6);
+      const handX = 12 + punch * 27 + (attack ? 0 : stride * 6);
+      const handY = motion.climbing ? 10 - stride * 3 : attack ? 23 : 30;
+      line([[8,25],[12 + punch * 8,motion.climbing ? 17 : 27 - punch * 3],[handX,handY]], skin, 4.5);
+      oval(handX, handY, 3.6, 3, skin);
+      line([[handX - 2,handY - 1],[handX + 2,handY - 1]], '#efffff', 1.6);
       oval(-1, 14, 10, 10, outfit.hair);
       oval(2, 15, 8.5, 9, skin);
       oval(-7, 16, 2.8, 3.6, skin);
@@ -109,9 +118,11 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
     if (donkey) {
       line([[-10, 28], [-17, 25], [-19, 29]], '#716b80', 2);
       oval(-19, 30, 2, 3, '#303343');
-      leg(-7, attack ? extension * 1.6 : stride * .5, '#787589', true);
+      leg(-7, attack ? extension * 1.6 : motion.airborne ? .7 : stride * .95, '#787589', true,
+        motion.airborne ? 3 : motion.backLift, Boolean(attack) || motion.airborne);
       // Plant the supporting leg during the kick instead of continuing its run cycle.
-      leg(6, attack ? 0 : -stride * .5, '#a3a1ad', true);
+      leg(6, attack ? 0 : motion.airborne ? -.7 : -stride * .95, '#a3a1ad', true,
+        motion.airborne ? 2 : motion.frontLift, motion.airborne);
       oval(-1, 29, 12, 9, gradient('#b4b1bf', '#706e80', 21, 16));
       oval(8, 20, 6, 10, '#a3a0ae');
       oval(4, 7, 2.5, 7, '#9691a5');

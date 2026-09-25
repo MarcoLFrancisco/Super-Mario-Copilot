@@ -19,6 +19,7 @@ export function createBoss(arena = ARENA) {
     recoil: 0, attackPulse: 0, attackType: null, attackHistory: [],
     attackStep: 0, lockedTarget: null, interruptible: false,
     facing: -1, walkDistance: 0, phaseTurn: 0, followUp: null,
+    leap: null,
     safeZone: null, hitZone: null, safeUntil: 0, missedAttacks: 0,
     idleTime: 0, playerTurns: [], lastPlayer: null, lastPlayerHealth: null,
     dialogue: createDialogue(arena.dialogue, arena.behavior) };
@@ -71,6 +72,32 @@ export function bossWeakPoint(boss) {
   return wizardChestBounds(boss);
 }
 
+export function updateBossDefeat(boss, dt, events) {
+  if (!boss.defeated || !Number.isFinite(dt) || dt <= 0) return false;
+  boss.defeatTime = (boss.defeatTime ?? 0) + dt;
+  if (boss.arena?.behavior !== 'showman') return boss.defeatTime >= 1.8;
+  const previousMode = boss.mode;
+  const elapsed = boss.defeatTime;
+  boss.mode = elapsed < .65 ? 'staggering' : elapsed < 1.55 ? 'buckled' : elapsed < 2.3 ? 'recovering' : 'fleeing';
+  boss.y = showmanFloor(boss) - boss.h;
+  if (boss.mode === 'fleeing') {
+    if (boss.retreatStartX === undefined) boss.retreatStartX = boss.x;
+    const runTime = elapsed - 2.3;
+    boss.retreatDirection ??= boss.retreatStartX + boss.w / 2 < boss.arena.width / 2 ? -1 : 1;
+    boss.facing = boss.retreatDirection;
+    boss.vx = boss.retreatDirection * Math.min(560, 220 + runTime * 320);
+    const previousX = boss.x;
+    boss.x += boss.vx * dt;
+    boss.walkDistance += Math.abs(boss.x - previousX);
+    if (previousMode !== 'fleeing') events.push({ type: 'bossRetreat', name: boss.arena.name });
+    const escaped = boss.retreatDirection < 0 ? boss.x + boss.w + 100 < 0 : boss.x - 100 > boss.arena.width;
+    if (escaped) boss.mode = 'escaped';
+    return escaped;
+  }
+  boss.vx = 0;
+  return false;
+}
+
 function rememberShowmanAttack(boss, attack) {
   boss.attackType = attack;
   boss.attackHistory.push(attack);
@@ -95,7 +122,7 @@ function chooseShowmanAttack(boss, player) {
   return attack;
 }
 
-function prepareShowman(boss, player) {
+function prepareShowman(boss, player, events) {
   boss.phase = phaseFor(boss);
   rememberShowmanAttack(boss, chooseShowmanAttack(boss, player));
   boss.followUp = boss.phase === 1 && boss.attackType === 'volley' ? 'slam' : null;
@@ -111,6 +138,21 @@ function prepareShowman(boss, player) {
   boss.timer = boss.attackType === 'countdown' ? Math.abs(boss.targetX - boss.x) / boss.moveSpeed + .25
     : (corneredPlayer(boss, player) ? 1.8 : [1.15, 1, .85][boss.phase]);
   boss.facing = -side;
+  const crossing = boss.cycle % 2 === 0;
+  if (crossing || boss.attackType === 'countdown' && Math.abs(boss.targetX - boss.x) > 280) {
+    const positions = [.24, .76, .5].map(position => clamp(boss.arena.width * position - boss.w / 2,
+      110, boss.arena.width - boss.w - 110));
+    let target = boss.attackType === 'countdown' ? boss.targetX : positions[(Math.floor(boss.cycle / 2) - 1) % positions.length];
+    if (boss.attackType !== 'countdown' && Math.abs(target + boss.w / 2 - playerCenter) < boss.w / 2 + 90) {
+      target = positions.filter(position => Math.abs(position + boss.w / 2 - playerCenter) >= boss.w / 2 + 90)
+        .sort((left, right) => Math.abs(right - boss.x) - Math.abs(left - boss.x))[0] ?? target;
+    }
+    boss.targetX = target;
+    boss.leap = { startX: boss.x, targetX: target, duration: .95 + Math.abs(target - boss.x) / 1800,
+      elapsed: 0, height: [86, 102, 116][boss.phase] };
+    boss.mode = 'jumpWarning'; boss.timer = .8; boss.vx = 0;
+    events.push({ type: 'bossWarning', attack: 'leap', name: 'Arena jump', duration: .8 });
+  }
 }
 
 function showmanWarning(boss, combat, player, events) {
@@ -125,7 +167,8 @@ function showmanWarning(boss, combat, player, events) {
   boss.lockedTarget = { x: player.x + P.playerWidth / 2, y: player.y + P.playerHeight / 2 };
   boss.facing = boss.lockedTarget.x < center ? -1 : 1;
   boss.chargeDirection = boss.facing;
-  boss.shotOrigin = { x: center + boss.facing * 167, y: floor - 134 };
+  const scale = boss.w / 250;
+  boss.shotOrigin = { x: center + boss.facing * 167 * scale, y: floor - 134 * scale };
   boss.lockedAngle = Math.atan2(boss.lockedTarget.y - boss.shotOrigin.y, boss.lockedTarget.x - boss.shotOrigin.x);
   if (boss.attackType === 'charge') {
     const left = boss.facing < 0 ? 0 : boss.x;
@@ -147,7 +190,7 @@ function showmanWarning(boss, combat, player, events) {
       .sort((left, right) => Math.abs(right - player.x) - Math.abs(left - player.x)).slice(0, available)
       .map(position => ({ x: position - 30, y: floor - 48, w: 60, h: 48, active: false, kind: 'summon' }));
   } else if (['slam', 'desperation', 'overload', 'burst'].includes(boss.attackType)) {
-    boss.zones = [-1, 1].map(side => ({ x: center + side * 167 - 35, y: floor - 30,
+    boss.zones = [-1, 1].map(side => ({ x: center + side * 167 * scale - 35, y: floor - 30,
       w: 70, h: 30, active: false, kind: 'impact' }));
   }
   events.push({ type: 'bossWarning', phase: boss.phase, name: move.name,
@@ -156,7 +199,7 @@ function showmanWarning(boss, combat, player, events) {
 }
 
 function showmanWave(boss, combat, direction, speed, height = 26) {
-  const origin = boss.x + boss.w / 2 + direction * 167;
+  const origin = boss.x + boss.w / 2 + direction * 167 * boss.w / 250;
   const travel = direction < 0 ? origin + 40 : boss.arena.width - origin + 40;
   spawnShot(combat, { owner: 'enemy', kind: 'wave', style: 'wizard', x: origin - 16, y: showmanFloor(boss) - height,
     w: 32, h: height, vx: direction * speed, vy: 0, life: travel / speed + .1 });
@@ -284,11 +327,36 @@ function observeShowman(boss, combat, player, step) {
 
 function updateShowman(boss, combat, player, step, events) {
   observeShowman(boss, combat, player, step);
-  boss.y = showmanFloor(boss) - boss.h;
+  if (boss.mode !== 'leaping') boss.y = showmanFloor(boss) - boss.h;
   boss.lookX = clamp((player.x + P.playerWidth / 2 - boss.x - boss.w / 2) / 240, -1, 1);
   boss.lookY = clamp((player.y + P.playerHeight / 2 - boss.y - boss.h / 2) / 160, -1, 1);
   boss.recoil = Math.max(0, boss.recoil - step); boss.attackPulse = Math.max(0, boss.attackPulse - step);
-  if (boss.mode === 'intro' && boss.timer === 0) prepareShowman(boss, player);
+  if (boss.mode === 'intro' && boss.timer === 0) prepareShowman(boss, player, events);
+  else if (boss.mode === 'jumpWarning') {
+    boss.windup = Math.min(1, 1 - boss.timer / .8);
+    if (boss.timer === 0 && boss.age >= boss.safeUntil && !hostileShots(combat)) {
+      boss.mode = 'leaping'; boss.timer = boss.leap.duration;
+      boss.facing = Math.sign(boss.leap.targetX - boss.x) || boss.facing;
+    }
+  } else if (boss.mode === 'leaping') {
+    const jump = boss.leap;
+    jump.elapsed = Math.min(jump.duration, jump.elapsed + step);
+    const progress = jump.elapsed / jump.duration;
+    boss.x = jump.startX + (jump.targetX - jump.startX) * progress;
+    boss.y = showmanFloor(boss) - boss.h - Math.sin(progress * Math.PI) * jump.height;
+    boss.vx = (jump.targetX - jump.startX) / jump.duration;
+    boss.vy = -Math.cos(progress * Math.PI) * jump.height * Math.PI / jump.duration;
+    if (progress >= 1) {
+      boss.x = jump.targetX; boss.y = showmanFloor(boss) - boss.h;
+      boss.vx = 0; boss.vy = 0; boss.mode = 'landing'; boss.timer = .55; boss.windup = 0;
+      events.push({ type: 'bossLanding' });
+    }
+  } else if (boss.mode === 'landing') {
+    if (boss.timer === 0 && boss.age >= boss.safeUntil && !hostileShots(combat)) {
+      boss.leap = null;
+      showmanWarning(boss, combat, player, events);
+    }
+  }
   else if (boss.mode === 'reposition') {
     const previousX = boss.x;
     boss.x += clamp(boss.targetX - boss.x, -boss.moveSpeed * step, boss.moveSpeed * step);
@@ -306,7 +374,7 @@ function updateShowman(boss, combat, player, step, events) {
     } else exposeShowman(boss, combat, events);
   } else if (boss.mode === 'exposed' && boss.timer === 0 && !hostileShots(combat) && boss.age >= boss.safeUntil) {
     if (combat.health === boss.attackStartHealth && boss.attackType !== 'reinforcements') boss.missedAttacks += 1;
-    prepareShowman(boss, player);
+    prepareShowman(boss, player, events);
   }
   boss.x = clamp(boss.x, 110, boss.arena.width - boss.w - 110);
   if (boss.phase === 2 && !boss.lowHealthSpoken) {
@@ -511,6 +579,9 @@ export function hitBoss(boss, combat, events, party = null, solids = []) {
       boss.defeatTime = 0;
       boss.zones = []; combat.shots = []; combat.enemies = [];
       boss.interruptible = false; boss.safeZone = null; boss.hitZone = null; boss.followUp = null;
+      boss.leap = null;
+      boss.retreatStartX = boss.x;
+      boss.retreatDirection = boss.x + boss.w / 2 < arena.width / 2 ? -1 : 1;
       boss.vx = 0; boss.vy = 0; boss.windup = 0; boss.attackPulse = 0;
       events.push({ type: 'bossDefeated', name: arena.name, points: 3000 });
       sayBoss(boss.dialogue, 'defeat', events);

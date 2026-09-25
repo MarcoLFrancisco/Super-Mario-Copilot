@@ -12,10 +12,11 @@ import { interactionFor, missionStations, stationStatus, missionReady, missionOb
 import { workView, prepareQuiz, validQuizOverrides } from './trivia-tasks.js';
 import { renderQuiz, createQuizEditor } from './quiz-ui.js';
 import { climbFor } from './actor-physics.js';
-import { INTERLUDES, arcadeObjective } from './arcade.js';
-import { renderArcade } from './arcade-art.js';
+import { INTERLUDES, arcadeObjective, INVADER_TOOLS, INVADER_UPGRADES, chooseArcadeUpgrade } from './arcade.js';
+import { renderArcade, loadArcadeArt } from './arcade-art.js';
 import { selectInterlude, nextDestination } from './campaign.js';
 import { loadWizardRig } from './wizard-rig.js';
+import { actionForKey } from './input.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -64,6 +65,7 @@ const preferences = { music: savedPrefs?.music === true, effects: savedPrefs?.ef
   bossVoice: savedPrefs?.bossVoice === true, dialogueVolume: volume(savedPrefs?.dialogueVolume, 65),
   reducedMotion: typeof savedPrefs?.reducedMotion === 'boolean' ? savedPrefs.reducedMotion : motion.matches,
   highContrast: savedPrefs?.highContrast === true, subtitles: savedPrefs?.subtitles !== false,
+  holdToFire: savedPrefs?.holdToFire !== false,
   shake: volume(savedPrefs?.shake, 0), bindings: { ...defaultBindings } };
 for (const action of Object.keys(defaultBindings)) {
   const binding = savedPrefs?.bindings?.[action];
@@ -82,6 +84,7 @@ let jumpPressed = false;
 let boostPressed = false;
 let interactPressed = false;
 let agentPressed = null;
+let abilityPressed = null;
 let orbitPointer = null;
 let lastStation = null;
 let missionMessageUntil = 0;
@@ -103,7 +106,7 @@ const pointers = new Map();
 const orbitMode = () => state.mode === 'orbit';
 const arcadeMode = () => state.mode === 'arcade';
 const currentMission = () => arcadeMode() ? state.mission : CAMPAIGN[campaign.levelIndex];
-const openDialog = () => ['task-dialog','settings-dialog','level-dialog','quiz-editor-dialog'].map(el).find(dialog => dialog.open);
+const openDialog = () => ['task-dialog','settings-dialog','level-dialog','quiz-editor-dialog','arcade-upgrade-dialog'].map(el).find(dialog => dialog.open);
 const playing = () => started && state.status === 'playing' && !openDialog();
 const finished = () => state.status === 'complete' || state.status === 'failed';
 const announce = message => text('game-announcement', message);
@@ -156,11 +159,12 @@ function clearInput() {
   keys.clear(); pointers.clear(); jumpPressed = false; boostPressed = false;
   interactPressed = false; agentPressed = null; orbitPointer = null;
   attackPressed = false; helperPressed = false; fireUntil = 0;
-  pulsePressed = false;
+  pulsePressed = false; abilityPressed = null;
 }
 function press(action) {
   if (!orbitMode() && state.boss?.defeated || el('task-dialog').open) return;
   if (arcadeMode()) {
+    if (state.kind === 'invaders' && action.startsWith('invader-')) abilityPressed = action.slice('invader-'.length);
     if (['jump', 'fire', 'attack', 'interact'].includes(action)) jumpPressed = true;
     if (['left', 'right'].includes(action)) orbitPointer = null;
     return;
@@ -187,16 +191,18 @@ function press(action) {
   if (action === 'left' || action === 'right') orbitPointer = null;
 }
 function actionFor(code) {
-  const assigned = Object.entries(preferences.bindings).find(([, key]) => key === code)?.[0];
-  return assigned ?? { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'jump', KeyW: 'jump', ShiftRight: 'boost' }[code];
+  const world = orbitMode() || arcadeMode() ? null : state.stage === 'boss' ? state.arena : state.world;
+  return actionForKey(code, preferences.bindings, state.player, world, arcadeMode() ? state.kind : null);
 }
 function resize() {
-  const width = VIEW.width;
-  const density = Math.min(devicePixelRatio || 1, 2);
-  if (canvas.width !== width * density || canvas.height !== VIEW.height * density) {
-    canvas.width = width * density; canvas.height = VIEW.height * density;
+  const bounds = canvas.getBoundingClientRect();
+  const displayWidth = Math.min(bounds.width, bounds.height * VIEW.width / VIEW.height);
+  const width = Math.min(3840, Math.max(VIEW.width, Math.ceil(displayWidth * Math.min(devicePixelRatio || 1, 3))));
+  const height = Math.round(width * VIEW.height / VIEW.width);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width; canvas.height = height;
   }
-  canvas.style.aspectRatio = `${width} / ${VIEW.height}`;
+  canvas.style.aspectRatio = `${VIEW.width} / ${VIEW.height}`;
 }
 
 function playfieldBounds() {
@@ -220,23 +226,44 @@ function positionWorkstation(station) {
   button.style.left = `${left}px`; button.style.top = `${top}px`;
 }
 function arcadeHud() {
-  const active = playing();
+  const active = playing() && state.phase !== 'upgrade';
+  const defense = state.kind === 'invaders';
   controls.forEach(button => { button.disabled = !active; });
   text('score-value', state.score.toLocaleString());
   text('items-label', 'Health'); text('sparks-value', state.health); text('sparks-total', 3);
-  text('combo-label', 'Cleared');
-  text('combo-value', state.destroyed);
-  text('checkpoint-label', 'Stage'); text('checkpoint-value', 'Arcade');
+  text('combo-label', defense ? 'Wave' : 'Cleared');
+  text('combo-value', defense ? `${state.wave} / 4` : state.destroyed);
+  text('checkpoint-label', defense ? 'Nodes' : 'Stage');
+  text('checkpoint-value', defense ? `${state.bunkers.filter(node => !node.dead).length} / 3` : 'Arcade');
   text('boost-label', 'Time'); text('boost-value', `${Math.ceil(state.remaining)}s`);
-  text('mission-objective', arcadeObjective(state)); text('chapter-name', 'Arcade interlude');
+  text('mission-objective', arcadeObjective(state)); text('chapter-name', defense ? 'Azure orbital network' : 'Arcade interlude');
   text('arcade-action-label', 'Fire');
   el('interact-button').hidden = true;
   el('climb-controls').hidden = true;
   el('game-viewport').classList.remove('has-workstation', 'has-climb');
+  el('invader-core-status').hidden = !defense || !state.core || state.core.dead;
+  if (defense) {
+    for (const [key, spec] of Object.entries(INVADER_TOOLS)) {
+      const tool = state.abilities[key];
+      const button = el(`invader-${key}`);
+      const status = tool.active > 0 ? `${Math.ceil(tool.active)}s active` : tool.cooldown > 0 ? `${Math.ceil(tool.cooldown)}s` : tool.charges ? 'Ready' : '0';
+      text(`invader-${key}-status`, status);
+      button.disabled = !active || state.waveDelay > 0 || tool.charges <= 0 || tool.cooldown > 0 || tool.active > 0;
+      button.dataset.active = String(tool.active > 0);
+      button.style.setProperty('--tool-color', spec.color);
+      button.setAttribute('aria-label', `${spec.name}: ${status}. ${tool.charges} charges.`);
+    }
+    if (state.core) {
+      el('invader-core-health').max = state.core.maxHealth;
+      el('invader-core-health').value = Math.max(0, state.core.health);
+      text('invader-core-value', `${Math.max(0, state.core.health)} / ${state.core.maxHealth}`);
+    }
+  }
 }
 
 function hud() {
   if (arcadeMode()) { arcadeHud(); return; }
+  el('invader-core-status').hidden = true;
   const orbit = orbitMode();
   const mission = currentMission();
   const active = playing() && !state.boss?.defeated;
@@ -348,6 +375,7 @@ function panels() {
   audio.setTheme(orbit ? 'orbit' : mission.theme);
   document.body.classList.toggle('is-orbit', orbit);
   document.body.classList.toggle('is-arcade', arcade);
+  document.body.classList.toggle('is-invaders', arcade && state.kind === 'invaders');
   document.body.style.setProperty('--world-accent', mission.color);
   el('agent-controls').hidden = !orbit;
   el('character-choice').hidden = started;
@@ -357,10 +385,12 @@ function panels() {
   el('combat-controls').hidden = orbit || arcade;
   el('touch-controls').hidden = orbit || arcade;
   el('arcade-controls').hidden = !arcade;
+  el('invader-tools').hidden = !arcade || state.kind !== 'invaders';
   el('task-ribbon').hidden = arcade || orbit && state.finale;
   text('build-label', `${CHARACTERS[campaign.leader].name.toUpperCase()} / ${arcade ? 'ARCADE BREAK' : `TRIVIA / WORLD ${mission.number} OF 8`}`);
   text('mission-number', String(mission.number).padStart(2, '0'));
-  text('world-label', mission.world ? `${mission.world.traversal} / ${mission.world.difficulty}` : mission.subtitle);
+  text('world-label', arcade && state.kind === 'invaders' ? 'Microsoft & AI Space Defense'
+    : mission.world ? `${mission.world.traversal} / ${mission.world.difficulty}` : mission.subtitle);
   text('level-title', mission.title);
   text('level-counter', arcade ? 'Arcade' : `${mission.number} / 8`);
   text('start-eyebrow', arcade ? `ARCADE / AFTER WORLD ${mission.number}` : `WORLD ${mission.number} / ${mission.world?.traversal ?? mission.subtitle}`);
@@ -372,10 +402,10 @@ function panels() {
   canvas.setAttribute('aria-label', `${mission.title}, level ${mission.number}, ${CHARACTERS[campaign.leader].name}`);
   const bindings = Object.fromEntries(Object.entries(preferences.bindings).map(([action, code]) => [action, keyLabel(code)]));
   text('keyboard-help', arcade
-    ? `${bindings.left} and ${bindings.right} move; mouse or touch dragging also moves your character. Hold ${bindings.jump} or ${bindings.fire} to fire. Escape pauses.`
+    ? `${bindings.left} and ${bindings.right} move; mouse or touch dragging also moves your ${state.kind === 'invaders' ? 'interceptor' : 'character'}. ${bindings.jump} or ${bindings.fire} fires. ${state.kind === 'invaders' ? 'Hold-to-fire is optional in Preferences. Keys 1 through 4 activate collected tools.' : 'Hold to keep firing.'} Escape pauses.`
     : orbit
     ? `${bindings.left} and ${bindings.right} move the saucer. Mouse or touch dragging also moves it. ${bindings.jump} launches. ${bindings.patch}, ${bindings.query}, ${bindings.aegis} activate repair, analysis, defense. Escape pauses.`
-    : `${bindings.left} and ${bindings.right} move. Hold ${bindings.jump}, W, or Up Arrow for a full jump. ${bindings.climbUp} and ${bindings.climbDown} climb ladders or ropes. Jump to dismount. ${bindings.boost} boosts. ${bindings.attack} attacks, ${bindings.fire} fires, ${bindings.helper} commands your recruited team. ${bindings.interact} interacts with terminals. ${bindings.pulse} activates Debug Pulse. Escape pauses.`);
+    : `${bindings.left} and ${bindings.right} move. Hold ${bindings.jump} or W for a full jump. Up and Down arrows climb ladders or ropes; Up jumps elsewhere. ${bindings.climbUp} and ${bindings.climbDown} also climb. Jump to dismount. ${bindings.boost} boosts. ${bindings.attack} attacks, ${bindings.fire} fires, ${bindings.helper} commands your recruited team. ${bindings.interact} interacts with terminals. ${bindings.pulse} activates Debug Pulse. Escape pauses.`);
   hud();
 }
 
@@ -595,7 +625,7 @@ el('quiz-editor-dialog').addEventListener('close', () => {
   syncPanels();
   (started && state.status === 'paused' ? el('resume-button') : el('settings-button')).focus({ preventScroll: true });
 });
-for (const [id, name] of [['reduced-motion', 'reducedMotion'], ['high-contrast', 'highContrast'], ['subtitles', 'subtitles']]) {
+for (const [id, name] of [['reduced-motion', 'reducedMotion'], ['high-contrast', 'highContrast'], ['subtitles', 'subtitles'], ['hold-to-fire', 'holdToFire']]) {
   el(id).checked = preferences[name];
   el(id).addEventListener('change', () => { preferences[name] = el(id).checked; applyAccessibility(); savePreferences(); });
 }
@@ -633,6 +663,16 @@ el('next-level-button').addEventListener('click', () => {
 el('levels-button').addEventListener('click', openMap);
 el('results-map-button').addEventListener('click', openMap);
 el('close-levels').addEventListener('click', () => el('level-dialog').close());
+for (const button of document.querySelectorAll('[data-upgrade]')) button.addEventListener('click', () => {
+  if (!arcadeMode() || !chooseArcadeUpgrade(state, button.dataset.upgrade)) return;
+  el('arcade-upgrade-dialog').close();
+  say(`${INVADER_UPGRADES[button.dataset.upgrade].name} installed. ${state.wave === 4 ? 'Orchestration core detected.' : `Sector ${state.wave}.`}`, 'FLIGHT');
+});
+el('arcade-upgrade-dialog').addEventListener('cancel', event => event.preventDefault());
+el('arcade-upgrade-dialog').addEventListener('close', () => {
+  syncPanels();
+  if (arcadeMode() && state.phase !== 'upgrade') pause(false);
+});
 el('level-dialog').addEventListener('close', () => {
   syncPanels();
   if (state.status === 'paused') el('resume-button').focus({ preventScroll: true });
@@ -688,7 +728,7 @@ el('pause-button').addEventListener('click', event => {
 window.addEventListener('keydown', event => {
   const dialog = openDialog();
   if (dialog) {
-    if (event.code === 'Escape') { event.preventDefault(); dialog.close(); }
+    if (event.code === 'Escape') { event.preventDefault(); if (dialog.id !== 'arcade-upgrade-dialog') dialog.close(); }
     if (event.code === 'Tab') {
       const focusable = [...dialog.querySelectorAll('button,select,input,textarea,a[href],[tabindex="0"]')]
         .filter(node => !node.matches(':disabled') && node.getClientRects().length);
@@ -784,6 +824,16 @@ function processEvents(events) {
     if (event.type === 'wave') say(`${ORBIT.waves[event.wave]}. ${event.wave === 4 ? 'Recovery reserve restored. We are repairing the defense, not removing it.' : 'Sector checkpoint online.'}`);
     if (event.type === 'quizRequired') openTask(event.station);
     if (event.type === 'arcadeWave') say(`AI Invaders / Wave ${event.wave}.`);
+    if (event.type === 'arcadeUpgrade') {
+      pause(true, false);
+      text('arcade-upgrade-sector', `Sector ${state.wave} secured`);
+      for (const key of Object.keys(INVADER_UPGRADES)) text(`upgrade-${key}-level`, `Lv ${state.upgrades[key] + 1}`);
+      showPanel('arcade-upgrade-dialog', 'arcade-upgrade-title');
+    }
+    if (event.type === 'arcadeTool') say(`${event.name} active.`, 'FLIGHT');
+    if (event.type === 'arcadePickup') say(`${INVADER_TOOLS[event.key].name} charge recovered.`, 'FLIGHT');
+    if (event.type === 'arcadeRepair') say('Cloud defense nodes repaired.', 'NETWORK');
+    if (event.type === 'arcadeCoreExposed') announce('Orchestration core exposed.');
     if (event.type === 'finaleStart') {
       clearInput(); panels(); say('Board the saucer. Restore the Monolith command interface and return control to the team.');
     }
@@ -793,17 +843,18 @@ function processEvents(events) {
 function frame(now) {
   const dt = previous ? (now - previous) / 1000 : 0; previous = now;
   if (playing()) {
-    const held = new Set([...keys.values(), ...pointers.values()]);
+    const held = new Set([...keys.keys()].map(actionFor).concat([...pointers.values()]));
     const input = { left: held.has('left'), right: held.has('right'), jumpHeld: held.has('jump'),
       up: held.has('climbUp'), down: held.has('climbDown'),
       jumpPressed, boostPressed, interactPressed, agentPressed, pointerX: orbitPointer,
-      fire: held.has('fire') || now < fireUntil, attackPressed, helperPressed, pulsePressed };
+      fire: held.has('fire') || now < fireUntil, attackPressed, helperPressed, pulsePressed,
+      abilityPressed, holdToFire: preferences.holdToFire };
     const slow = !arcadeMode() && held.has('focus') && campaign.unlocked >= 6 ? .5 : 1;
     const events = updateCampaign(campaign, input, dt * slow);
     state = campaign.run;
     audio.setStage(orbitMode() || arcadeMode() ? 'world' : state.stage, state.boss?.phase ?? 0);
     jumpPressed = false; boostPressed = false; interactPressed = false; agentPressed = null;
-    attackPressed = false; helperPressed = false; pulsePressed = false; processEvents(events);
+    attackPressed = false; helperPressed = false; pulsePressed = false; abilityPressed = null; processEvents(events);
   }
   const reduced = preferences.reducedMotion || motion.matches;
   syncQuestDialogue();
@@ -812,7 +863,7 @@ function frame(now) {
   hud(); requestAnimationFrame(frame);
 }
 if (ctx) {
-  await loadWizardRig();
+  await Promise.all([loadWizardRig(), loadArcadeArt()]);
   icons(); applyAccessibility(); resize(); panels(); audioControls();
   el('start-button').disabled = false; el('sound-button').disabled = false;
   text('load-status', ''); text('storage-status', storageAvailable ? 'Local progress' : 'Session-only progress');

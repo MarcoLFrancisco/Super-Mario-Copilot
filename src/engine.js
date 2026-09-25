@@ -2,12 +2,12 @@ import { LEVEL, VIEW, PHYSICS as P } from './level.js';
 import { ARENA, ENCOUNTERS } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
 import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat, helperAllowance } from './combat.js';
-import { createBoss, updateBoss, hitBoss, bossSupportTarget } from './boss.js';
+import { createBoss, updateBoss, hitBoss, bossSupportTarget, updateBossDefeat } from './boss.js';
 import { sayBoss } from './boss-dialogue.js';
 import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty, companionIds, unlockHelper } from './party.js';
 import { createPartyDialogue, updatePartyDialogue, sayParty, reactPartyDialogue, clearPartyCaption } from './party-dialogue.js';
 import { createMissionProgress, updateMission, missionReady } from './missions.js';
-import { stepClimbing } from './actor-physics.js';
+import { stepClimbing, advanceActorGait } from './actor-physics.js';
 
 // Public API: createState(leader = 'marco'), setPaused(state, boolean), update(state,input,dt).
 // Input: held left/right/fire; one-frame jumpPressed/boostPressed/attackPressed/helperPressed.
@@ -24,7 +24,7 @@ const cameraTarget = (player, world = LEVEL) => clamp(player.x - VIEW.width * .3
 
 function makePlayer(spawn) {
   return { ...spawn, vx: 0, vy: 0, facing: 1, grounded: true,
-    coyote: P.coyoteTime, jumpBuffer: 0, boostTime: 0, boostCooldown: 0 };
+    coyote: P.coyoteTime, jumpBuffer: 0, boostTime: 0, boostCooldown: 0, walkDistance: 0, climbDistance: 0 };
 }
 
 function partyContext(state) {
@@ -125,8 +125,7 @@ function tick(state, input, events) {
   // but bypass every physics, AI and combat update after the killing blow.
   if (state.boss?.defeated) {
     state.pendingJump = false; state.pendingBoost = false; state.pendingMelee = {};
-    state.boss.defeatTime = Math.min(1.8, state.boss.defeatTime + STEP);
-    if (state.boss.defeatTime >= 1.8) {
+    if (updateBossDefeat(state.boss, STEP, events)) {
       state.status = 'complete';
       events.push({ type: 'complete', score: state.score, sparks: state.collected.size });
     }
@@ -214,6 +213,7 @@ function tick(state, input, events) {
     respawn(state, events);
     return;
   }
+  advanceActorGait(p, oldX, oldY);
   for (const reward of collectBlockRewards(state.blocks, p)) {
     if (!unlockHelper(state.party, reward, combatEvents, p, partyContext(state))) {
       grantPower(state.combat, reward, combatEvents);

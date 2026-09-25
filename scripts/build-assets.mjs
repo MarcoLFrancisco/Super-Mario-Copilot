@@ -45,5 +45,5 @@ export function buildAssets() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const manifest = buildAssets();
-  console.log(`Versioned ${Object.keys(manifest.imports).length} modules, robot images, and CSS: ${manifest.version}`);
+  console.log(`Versioned ${Object.keys(manifest.imports).length} modules, images, and CSS: ${manifest.version}`);
 }

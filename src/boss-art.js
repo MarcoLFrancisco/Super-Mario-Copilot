@@ -62,6 +62,22 @@ export function drawArena(c, time = 0, reducedMotion = false) {
 }
 
 function drawShowmanWarnings(c, boss) {
+  if (['jumpWarning', 'leaping', 'landing'].includes(boss.mode) && boss.leap) {
+    const floor = boss.arena.platforms.find(platform => platform.id === 'arena-floor').y;
+    const target = boss.leap.targetX + boss.w / 2;
+    c.save();
+    ellipse(c, target, floor - 6, boss.w * .55, 12, '#78dfff33');
+    ellipse(c, target, floor - 6, boss.w * .55, 12, '#89eaff', false);
+    line(c, [[target - 12,floor - 24],[target,floor - 12],[target + 12,floor - 24]], '#b6f6ff', 3);
+    if (boss.mode === 'jumpWarning') {
+      c.setLineDash([7, 9]);
+      c.beginPath(); c.moveTo(boss.x + boss.w / 2, floor - 26);
+      c.quadraticCurveTo((boss.x + boss.leap.targetX + boss.w) / 2, floor - boss.leap.height * 2, target, floor - 26);
+      c.strokeStyle = '#7ed7ff88'; c.lineWidth = 2; c.stroke();
+    }
+    c.restore();
+    return;
+  }
   const move = SHOWMAN_MOVES[boss.attackType];
   if (!move || !['warning', 'attack', 'comboGap', 'exposed'].includes(boss.mode)) return;
   const floor = boss.y + boss.h;
@@ -174,7 +190,7 @@ export function drawBossWarnings(c, boss) {
 
 export function bossDialogueLayout(c, boss, player = null) {
   const caption = boss.dialogue.current;
-  if (!caption) return null;
+  if (!caption || boss.mode === 'escaped') return null;
   const arena = boss.arena ?? ARENA;
   const width = Math.min(boss.arena?.behavior === 'showman' ? 418 : 366, arena.width - 32);
   c.save();

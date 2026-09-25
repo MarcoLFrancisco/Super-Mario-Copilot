@@ -48,7 +48,7 @@ There are no shoulder cubes. The artwork comes directly from the supplied
 [images/Boss1.png](images/Boss1.png), not a procedural likeness. A transparent
 13-layer sprite rig moves the upper arms, fists, thighs, boots, head/cables,
 eyes, and grin separately. Alternating steps, raised fists, recoil, charge
-lean, panic, and the final collapse follow combat state; it is not a static
+lean, jumps, panic, and the final retreat follow combat state; it is not a static
 picture sliding around. Later bosses retain their existing designs.
 
 The neutral pose preserves the source's retained robot pixels and proportions.
@@ -60,9 +60,14 @@ and use the same cache version as the game's modules. On macOS with Swift,
 reconstruction. No Swift installation is needed to play, build, or run Node tests;
 the hand-authored masks need adjustment if the reference pose changes.
 
+He is about 16% smaller than the initial rig, leaving more room in the arena.
 He strolls and poses early, walks more aggressively after 70% health, and
-becomes visibly unstable below 35%. Every sequence includes repositioning,
-a warning, committed attacks, and an exposed recovery window. His 36 health
+becomes visibly unstable below 35%. Between attack sequences he also jumps
+between the left, center, and right arena positions. An advance landing marker
+and crouch announce each jump; the destination stays fixed, the jump and landing
+cause no damage, and a landing pause precedes the next attack warning.
+Every sequence includes repositioning, a warning, committed attacks, and an
+exposed recovery window. His 36 health
 points, existing blaster access, companion damage limits, and normal jump
 physics apply throughout; no new quiz or special ability is required.
 
@@ -85,8 +90,11 @@ jokes wait ten seconds and rotate without immediate repeats. Wall impacts,
 shield breaks, missed attacks, idle players, low health, and retries trigger
 their corresponding reactions; phase and defeat lines take priority. Warnings,
 impacts, and countdown ticks have synthesized cues when effects are enabled.
-At zero health, threats stop immediately; he attempts one last pose and
-collapses before the results appear. Pause also freezes this animation.
+At zero health, threats stop immediately. He staggers, buckles, pulls himself
+up for one last defiant pose, then runs out of the arena to fight another day.
+His arms and legs animate during the escape. Results appear only after he has
+left the screen; pause freezes the entire sequence. Other bosses keep their
+existing defeat presentations.
 
 Automated simulation and mocked-canvas checks cover these rules, including
 real-engine jump counters, chest access, countdown escape, companion attacks,
@@ -95,14 +103,28 @@ phone scale, sound balance, and encounter feel still need human playtesting.
 
 ### Jumping And Climbing
 
-**Jumping and all original jump platforms remain.** Space, W, and Up Arrow still
-jump. Holding jump still reaches higher than tapping, and the original coyote
+**Jumping and all original jump platforms remain.** Space and W jump everywhere;
+Up Arrow jumps when no ladder or rope is in reach. Holding jump still reaches
+higher than tapping, and the original coyote
 time, buffered jumps, gaps, and optional upper jump areas remain available.
 
-Ladders and ropes add routes rather than replacing jumps. Hold **R** to climb up
-or **V** to climb down; release to hold your position. Jump to leave a climb.
+Ladders and ropes add routes rather than replacing jumps. Hold **Up Arrow** to
+climb up or **Down Arrow** to descend a nearby ladder or rope. **R/V** also work;
+release to hold your position. Space or W leaves the climb with a jump.
 On-screen climbing buttons appear near a ladder or rope. Companions use the same
 climbing physics and can include climbs in their route planning.
+
+Added decks now reserve character headroom around existing platforms and the
+full travel of moving lifts. Reward bricks and recruitment boxes are distributed
+into reachable spaces away from climb lanes and terminals instead of intersecting
+the upper decks. All original jump platforms remain in their original positions.
+Ropes have braided strands and anchors; ladders have shaded rails, rung grips,
+and fasteners. Canvas resolution follows display size and pixel density.
+
+Marco, Mario, and Donkey animate their knees, foot lifts, and alternating strides
+from actual travel distance, with separate climbing poses. Essential limb motion
+remains enabled with reduced motion; stationary or paused characters do not keep
+walking. Their original artwork, attack poses, and collision dimensions remain.
 
 The original lower route is retained in each world, with different upper paths:
 
@@ -128,14 +150,72 @@ bubble motion. Interludes do not add or replace any of the 72 questions.
 
 | After World | Interlude | Game |
 | --- | --- | --- |
-| GitHub | AI Invaders | Two bot formations, projectiles, and destructible cover |
+| GitHub | AI Invaders | Three orbital defense waves, tools, upgrades, cloud nodes, and an orchestration-core boss |
 | Cowork | Bubble Firewall | Harpoons split bouncing Copilot-symbol bubbles into smaller targets |
-| Agent City | AI Invaders: Night Shift | Faster formations and enemy fire |
+| Agent City | AI Invaders: Night Shift | A stronger orbital swarm and core encounter with the same readable counters |
 | Teams | Bubble Festival | A larger Copilot-bubble challenge before Azure Orbit |
 
-Move with **A/D**, Left/Right arrows, mouse, or touch dragging. Hold **Space** or
-**F** to fire. Dedicated on-screen buttons are available. Escape
-pauses every game. The selected original character appears in each interlude.
+Move with **A/D**, Left/Right arrows, mouse, or touch dragging. **Space** or
+**F** fires; hold-to-fire in AI Invaders can be disabled in Preferences.
+Dedicated on-screen buttons are available. Escape pauses every game.
+AI Invaders uses a spacecraft while retaining the selected pilot in campaign
+state; Bubble Firewall shows the original selected character.
+
+#### Microsoft & AI Space Defense
+
+Defend the Azure orbital network. Pilot your AI-powered interceptor, recover
+tool upgrades, and stop rogue bots before they breach the cloud.
+
+The interceptor uses original 1024x1024 transparent artwork in
+[images/Interceptor.png](images/Interceptor.png), with metallic panels, a lit
+cockpit, four-color accents, banked turns, recoil, blue exhaust, and shield
+ripples. Its original 44x44 collider stays axis-aligned; wings and effects do
+not enlarge it. Layered stars, two distant planets, data streams, and an orbital
+station replace the skyline. Background motion remains slow; reduced motion
+removes decorative movement and limits impact effects without hiding warnings.
+The original asset can be rebuilt on macOS with
+`swift scripts/build-interceptor.swift`; prebuilt artwork ships with the game.
+
+The first wave teaches the formation pattern. Later waves add fast divers,
+flanking interceptors, armored shield cycles, and larger command units. Amber
+aim lines and path markers precede shots and maneuvers; targets lock before
+release. Player lasers are pale cyan, while hostile bolts are coral diamonds.
+Damage grants 1.8 seconds of invulnerability. Repair drops restore three health
+to each cloud defense node and can bring destroyed nodes back online. Nodes
+retain damage between waves; friendly fire passes through them.
+
+Every fourth destroyed bot drops a tool or repair module in a fixed rotation.
+Tool pickups activate immediately when ready; otherwise a charge is stored,
+up to two per tool. Use the icon controls or default keys **1-4** to activate
+stored charges when their cooldown ends. **Q** also activates Defender Pulse.
+Primary custom bindings take precedence over aliases.
+
+| Tool | Effect | Duration | Cooldown |
+| --- | --- | --- | --- |
+| Azure Shield | Prevents damage while active | 6s | 12s |
+| GitHub Copilot Wingman | A support drone fires alongside the ship | 10s | 14s |
+| Power Automate Chain | Hits link to up to two nearby bots | 7s | 15s |
+| Defender Pulse | Clears hostile bolts within 270 pixels; does not erase the boss laser | Instant | 9s |
+
+After each of the three waves, the mission freezes for one upgrade choice:
+Rapid Lasers fires 20% faster per level, Shield Capacitor adds three seconds
+of protection, and Wingman Reserve adds five seconds of support. Defensive
+upgrades extend an active tool or provide a ready charge. Choices stack for
+the current round, and completing a wave restores one health point.
+
+Wave four is the Rogue Orchestration Core. It cycles through capped drone
+deployment, a warned sweeping laser that leaves the opposite side clear, and
+a locked three-shot volley. Its center opens between attacks; side armor does
+not take damage. Defeating it clears all remaining threats and ends the round.
+The HUD retains score, health, wave, and time, with compact tool readouts and
+a core health bar. Mission text and controls are outside the combat canvas
+but remain inside the game frame, including in full screen.
+
+The four-minute timer, retry/continue options, original interlude IDs, campaign
+progress, and separate best-score saves remain. These are themed in-game
+abilities, not live Microsoft services. Physics and mocked-canvas tests cover
+the mechanics and drawing paths; visual polish, touch comfort, difficulty,
+and sound balance still need human playtesting.
 
 The racing interludes have been removed. Campus continues directly to GitHub;
 Foundry continues directly to Agent City. Saves left inside a removed race resume
@@ -221,8 +301,8 @@ voice provided by your browser or operating system.
 | Action | Default Input |
 | --- | --- |
 | Move | A/D or Left/Right arrows |
-| Jump | Hold Space, W, or Up for a full jump; release for a shorter jump |
-| Climb | R up / V down, or the ladder buttons; jump to dismount |
+| Jump | Hold Space or W for a full jump; Up also jumps away from ladders/ropes; release for a shorter jump |
+| Climb | Up/Down arrows near a ladder or rope; R/V and on-screen climb buttons also work; Space/W dismounts |
 | Copilot boost | Shift; the original boost remains available |
 | Melee attack | J or Attack; tap once per attack |
 | Debug Blaster | Hold F or Fire after collecting a blaster |
@@ -236,9 +316,10 @@ voice provided by your browser or operating system.
 | Saucer support | 1: repair net, 2: analyze targets, 3: defend shield |
 | Arcade movement | A/D, Left/Right, mouse, or touch dragging |
 | Arcade action | Space/F fires in Invaders and Bubble Firewall |
+| Invaders tools | 1: Azure Shield, 2: Copilot Wingman, 3: Power Automate Chain, 4 or Q: Defender Pulse; icon buttons also activate stored charges |
 
 Primary bindings can be changed in Preferences. Duplicate assignments are
-rejected. Arrow/W/right-Shift aliases remain unless assigned elsewhere. Touch
+rejected. Contextual arrow/W/right-Shift aliases remain unless assigned elsewhere. Touch
 controls use pointer capture and clear held input on release or cancellation.
 
 Quiz terminals open a contained dialog and freeze simulation while you choose.
@@ -311,6 +392,9 @@ checks the player form without opening a browser. Additional checks cover helper
 collection and sustained combat, ladder/rope ascent and descent, jumping beside
 climbs, preserved old platforms, arcade physics, pause, failure, replay, and saves.
 Mock canvas tests verify finite drawing calls and distinct arcade scenes.
+Additional regressions cover deck and block clearance, contextual arrow climbing,
+travel-driven character strides, first-boss arena hops, and damage-free retreat
+completion with pause/resume.
 See [tests/campaign.test.mjs](tests/campaign.test.mjs) and
 [tests/engine.test.mjs](tests/engine.test.mjs).
 
@@ -336,7 +420,9 @@ recorded dialogue from the broader concept are not implemented.
 - [src/engine.js](src/engine.js): original fixed-step platform/combat engine, parameterized per world.
 - [src/world-art.js](src/world-art.js): themed architecture, platforms, terminals, and boss silhouettes.
 - [src/world-routes.js](src/world-routes.js): additive upper paths, ladders, ropes, conveyors, and complexity labels.
-- [src/arcade.js](src/arcade.js) and [src/arcade-art.js](src/arcade-art.js): AI Invaders and Copilot-bubble interludes.
+- [src/input.js](src/input.js): customizable key resolution and contextual arrow climbing.
+- [src/wizard-rig.js](src/wizard-rig.js): image-based robot joints, jumps, and defeat/escape poses.
+- [src/arcade.js](src/arcade.js) and [src/arcade-art.js](src/arcade-art.js): orbital Invaders waves, abilities, upgrades, defense nodes, the core encounter, and Copilot-bubble interludes.
 - [src/party.js](src/party.js) and [src/party-art.js](src/party-art.js): the original team and character artwork.
 - [src/orbit.js](src/orbit.js) and [src/orbit-art.js](src/orbit-art.js): saucer physics and the selected original pilot.
 - [src/main.js](src/main.js): campaign UI, input, decisions, preferences, and lifecycle.

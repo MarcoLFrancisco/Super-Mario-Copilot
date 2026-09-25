@@ -128,6 +128,40 @@ test('Setup Wizard walks faster through the three phases and has no passive cont
   assert.ok(CAMPAIGN.slice(1).filter(mission => mission.arena).every(mission => mission.arena.boss.h === ARENA.boss.h));
 });
 
+test('Setup Wizard hops between both sides of the arena with a fixed landing marker and a recovery pause', () => {
+  const fixture = wizardFixture(1, 600);
+  const { boss, player, combat, events } = fixture;
+  const landings = [];
+  for (const cycle of [1, 3, 5]) {
+    boss.mode = 'exposed'; boss.timer = 0; boss.cycle = cycle; boss.phaseTurn = 0;
+    combat.shots = []; combat.enemies = [];
+    stepWizard(fixture);
+    assert.equal(boss.mode, 'jumpWarning');
+    const target = boss.leap.targetX;
+    const start = boss.x;
+    player.x = target + boss.w / 2 - 17;
+    const groundY = 630 - boss.h;
+    let high = groundY;
+    wizardUntil(fixture, () => boss.mode === 'landing', 5, () => {
+      high = Math.min(high, boss.y);
+      assert.equal(boss.leap.targetX, target, 'Jump destination cannot track the player');
+      assert.equal(combat.shots.length, 0);
+    });
+    assert.ok(high <= groundY - 80);
+    assert.ok(Math.abs(start - boss.x) > 100);
+    assert.equal(boss.y, groundY);
+    assert.equal(boss.x, target);
+    assert.ok(boss.timer >= .5);
+    assert.equal(combat.health, 3, 'Repositioning jumps are harmless even at the marked landing');
+    landings.push(boss.x + boss.w / 2);
+    wizardUntil(fixture, () => boss.mode === 'warning');
+    assert.ok(boss.timer >= 1.25);
+    player.x = 600;
+  }
+  assert.ok(Math.min(...landings) < 400 && Math.max(...landings) > 880);
+  assert.equal(events.filter(event => event.type === 'bossLanding').length, 3);
+});
+
 test('Setup Wizard locks all three volley directions before the player dodges', () => {
   const fixture = wizardFixture();
   const { boss, player, combat } = fixture;
@@ -336,7 +370,11 @@ test('Setup Wizard jokes come from idle, dodged attacks, low health, and a real 
   wizardUntil(idle, () => idle.events.some(event => event.type === 'bossDialogue' && event.key === 'idle'), 14);
   const dodging = wizardFixture(0, 600);
   dodging.player.y = 250;
-  wizardUntil(dodging, () => dodging.events.some(event => event.type === 'bossDialogue' && event.key === 'dodge'), 45);
+  wizardUntil(dodging, () => dodging.events.some(event => event.type === 'bossDialogue' && event.key === 'dodge'), 60, () => {
+    if (dodging.boss.mode === 'warning' && dodging.boss.attackType === 'volley') {
+      dodging.player.x = dodging.boss.lockedTarget.x < 640 ? 1060 : 220;
+    }
+  });
   const low = wizardFixture(2);
   low.boss.mode = 'exposed'; low.boss.timer = 30;
   wizardUntil(low, () => low.events.some(event => event.type === 'bossDialogue' && event.key === 'lowHealth'), 14);
@@ -422,7 +460,7 @@ test('Setup Wizard countdown allows an ordinary ground escape and freezes while 
   assert.deepEqual(events.filter(event => event.type === 'bossCountdown').map(event => event.value), [3, 2, 1]);
 });
 
-test('Setup Wizard victory clears every threat and completes once after its collapse', () => {
+test('Setup Wizard defeat staggers, pauses, and runs away before completing exactly once', () => {
   const state = wizardEngine(430, 'countdown', 2, 515);
   state.boss.health = 1; state.boss.mode = 'exposed'; state.boss.timer = 5;
   state.boss.safeZone = { x: 70, y: 0, w: 240, h: 630 };
@@ -436,7 +474,28 @@ test('Setup Wizard victory clears every threat and completes once after its coll
   assert.equal(state.boss.zones.length, 0);
   assert.equal(state.boss.safeZone, null);
   assert.equal(state.boss.interruptible, false);
-  for (let frame = 0; frame < 300; frame += 1) events.push(...update(state, { fire: true, right: true }, 1 / 120));
+  const playerBefore = { ...state.player };
+  const defeatX = state.boss.x;
+  const modes = new Set();
+  for (let frame = 0; frame < 1100 && state.status !== 'complete'; frame += 1) {
+    events.push(...update(state, { fire: true, right: true }, 1 / 120));
+    modes.add(state.boss.mode);
+    if (frame === 320) {
+      assert.equal(state.status, 'playing');
+      assert.notEqual(state.boss.x, defeatX);
+      assert.notEqual(state.boss.vx, 0);
+      const bossBefore = JSON.stringify(state.boss);
+      setPaused(state, true);
+      update(state, { right: true }, 1);
+      assert.equal(JSON.stringify(state.boss), bossBefore);
+      setPaused(state, false);
+    }
+  }
+  assert.deepEqual([...modes], ['staggering', 'buckled', 'recovering', 'fleeing', 'escaped']);
+  assert.deepEqual(state.player, playerBefore);
+  assert.equal(events.filter(event => event.type === 'bossRetreat').length, 1);
+  assert.ok(state.boss.x + state.boss.w < 0 || state.boss.x > state.arena.width);
+  events.push(...update(state, {}, 1));
   assert.equal(state.combat.health, 3);
   assert.equal(events.filter(event => event.type === 'bossDefeated').length, 1);
   assert.equal(events.filter(event => event.type === 'complete').length, 1);
@@ -487,6 +546,43 @@ test('themed upper paths add climbing without replacing original jumping platfor
     }
   }
   assert.equal(routes.size, 7);
+});
+
+test('added route decks leave headroom and clear moving-platform travel', () => {
+  for (const mission of CAMPAIGN.filter(item => item.type === 'platform')) {
+    for (const deck of mission.world.platforms.filter(platform => platform.structure)) {
+      for (const other of mission.world.platforms.filter(platform => platform !== deck)) {
+        const travelX = other.motion?.axis === 'x' ? other.motion.distance : 0;
+        const travelY = other.motion?.axis === 'y' ? other.motion.distance : 0;
+        const horizontal = deck.x < other.x + other.w + travelX + 20 && deck.x + deck.w > other.x - travelX - 20;
+        const headroom = deck.y >= other.y + other.h + travelY + PHYSICS.playerHeight + 12
+          || other.y - travelY >= deck.y + deck.h + PHYSICS.playerHeight + 12;
+        assert.ok(!horizontal || headroom, `${mission.id}: ${deck.id} crowds ${other.id}`);
+      }
+    }
+  }
+});
+
+test('reward blocks have jumping clearance and stay out of platforms and climb lanes', () => {
+  for (const mission of CAMPAIGN.filter(item => item.type === 'platform')) {
+    for (const block of mission.encounters.blocks) {
+      const support = mission.world.mainRoute.find(platform => block.x >= platform.x && block.x + block.w <= platform.x + platform.w);
+      assert.ok(support, `${block.id}: no supporting floor`);
+      assert.ok(support.y - block.y >= 118 && support.y - block.y <= 142);
+      for (const platform of mission.world.platforms) {
+        const travelX = platform.motion?.axis === 'x' ? platform.motion.distance : 0;
+        const travelY = platform.motion?.axis === 'y' ? platform.motion.distance : 0;
+        const horizontal = block.x < platform.x + platform.w + travelX + 20 && block.x + block.w > platform.x - travelX - 20;
+        assert.ok(!horizontal || block.y >= platform.y + platform.h + travelY + PHYSICS.playerHeight + 12
+          || block.y + block.h + PHYSICS.playerHeight + 12 <= platform.y - travelY, `${block.id}: crowds ${platform.id}`);
+      }
+      for (const climb of mission.world.climbs) {
+        assert.ok(block.x + block.w + 24 < climb.x - climb.width / 2 || block.x - 24 > climb.x + climb.width / 2
+          || block.y + block.h < climb.top || block.y > climb.bottom, `${block.id}: obstructs ${climb.id}`);
+      }
+    }
+    assert.equal(mission.encounters.blocks.filter(block => block.reward?.startsWith('recruit-')).length, 2);
+  }
 });
 
 function atStation(state, key) {
@@ -783,6 +879,10 @@ test('campaign progression carries the original leader, recruits, and equipment 
     else {
       state.boss = createBoss(state.arena);
       state.boss.defeated = true; state.boss.defeatTime = 1.8;
+      if (state.arena.behavior === 'showman') {
+        state.boss.defeatTime = 5; state.boss.retreatDirection = 1;
+        state.boss.x = state.arena.width + 150;
+      }
     }
     let events = updateCampaign(campaign, {}, 1 / 60);
     if (index === 7) {

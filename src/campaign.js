@@ -6,7 +6,7 @@ import { CHARACTERS, resetPartyMotion } from './party.js';
 import { WORK_TASKS, QUIZ_THEMES } from './quiz-catalog.js';
 import { createMissionProgress, interactionFor } from './missions.js';
 import { validQuizOverrides } from './trivia-tasks.js';
-import { addWorldRoutes } from './world-routes.js';
+import { addWorldRoutes, placeRewardBlocks } from './world-routes.js';
 import { INTERLUDES, createArcade, updateArcade, setArcadePaused } from './arcade.js';
 
 const definitions = [
@@ -201,6 +201,7 @@ function buildMission(definition, index) {
     blocks.push({ id: `${definition.id}-${reward}`, x: floor.x + floor.w - 80, y: floor.y - 142,
       w: 32, h: 32, app: definition.app, kind: 'reward', reward });
   }
+  placeRewardBlocks(blocks, mainRoute, platforms, traversal.climbs, stations);
   const last = mainRoute.at(-1);
   const world = { title: definition.title, id: definition.id, theme: definition.theme,
     width: last.x + last.w + 100, height: 900, deathY: 810, spawn: checkpoints[0].spawn,
@@ -218,7 +219,7 @@ function buildMission(definition, index) {
     dialogue: bossDialogue[definition.id],
     checkpointName: `${definition.boss} checkpoint`, stations: [],
     boss: { ...ARENA.boss, health, ...(definition.id === 'campus'
-      ? { x: 870, y: 340, w: 250, h: 290, damageGrace: .42, introDuration: 2.6 } : {}) },
+      ? { x: 870, y: 386, w: 210, h: 244, damageGrace: .42, introDuration: 2.6 } : {}) },
     phases: definition.phases.map((name, phase) => ({ ...ARENA.phases[phase], name,
       healthAbove: phase === 2 ? 0 : definition.id === 'campus'
         ? health * (phase === 0 ? .7 : .35) : Math.floor(health * (phase === 0 ? 2 / 3 : 1 / 3)),

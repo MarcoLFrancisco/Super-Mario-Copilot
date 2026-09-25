@@ -360,25 +360,49 @@ export function drawWorldPlatform(ctx, platform, mission, time, reducedMotion, h
   ctx.restore();
 }
 
+export function drawClimb(ctx, climb) {
+  ctx.save(); ctx.lineCap = 'round';
+  if (climb.kind === 'rope') {
+    line(ctx, [[climb.x,climb.top],[climb.x,climb.bottom]], '#263244', 10);
+    line(ctx, [[climb.x,climb.top],[climb.x,climb.bottom]], '#bf9251', 7);
+    for (let height = climb.top; height < climb.bottom - 3; height += 9) {
+      ctx.beginPath(); ctx.moveTo(climb.x - 2.5, height);
+      ctx.bezierCurveTo(climb.x + 4, height + 1, climb.x + 4, height + 5, climb.x - 2.5, Math.min(climb.bottom, height + 8));
+      ctx.strokeStyle = '#fff0b2'; ctx.lineWidth = 2; ctx.stroke();
+      line(ctx, [[climb.x - 3,height + 4],[climb.x + 2,height + 7]], '#6a5436', 1);
+    }
+    panel(ctx, climb.x - 12, climb.top - 6, 24, 12, '#17344e', 3, '#c0e9f5');
+    oval(ctx, climb.x, climb.top + 6, 6, 6, '#ddba73');
+    oval(ctx, climb.x, climb.top + 6, 2.5, 3, '#5c543e');
+    for (let knot = 0; knot < 3; knot += 1) oval(ctx, climb.x, climb.bottom - 4 - knot * 3, 5, 2.5, '#d3a961');
+  } else {
+    const rung = ctx.createLinearGradient(0, 0, 0, 6);
+    rung.addColorStop(0, '#fff3c2'); rung.addColorStop(.45, '#f2c575'); rung.addColorStop(1, '#a47133');
+    for (const side of [-1, 1]) {
+      const rail = climb.x + side * 18;
+      line(ctx, [[rail,climb.top - 19],[rail,climb.bottom]], '#243e55', 9);
+      line(ctx, [[rail,climb.top - 19],[rail,climb.bottom]], '#9ec7d4', 6);
+      line(ctx, [[rail - 1.5,climb.top - 17],[rail - 1.5,climb.bottom - 2]], '#effdff', 1.5);
+      panel(ctx, rail - 5, climb.bottom - 6, 10, 7, '#1d3346', 2);
+    }
+    for (let height = climb.top - 9; height < climb.bottom - 4; height += 19) {
+      ctx.save(); ctx.translate(climb.x - 18, height - 3);
+      panel(ctx, 0, 0, 36, 6, rung, 2, '#596e79');
+      line(ctx, [[4,1],[32,1]], '#fff6d5', 1);
+      for (const grip of [10, 16, 22]) line(ctx, [[grip,3],[grip,5]], '#a97e46', 1);
+      oval(ctx, 0, 3, 1.6, 1.6, '#e4f8ff'); oval(ctx, 36, 3, 1.6, 1.6, '#e4f8ff');
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
 export function drawMissionObjects(ctx, state, visible) {
   const progress = state.missionProgress;
   if (!progress) return;
   if (state.stage !== 'boss') for (const climb of state.world.climbs ?? []) {
     if (!visible(climb.x - 30, 60)) continue;
-    if (climb.kind === 'rope') {
-      line(ctx, [[climb.x - 2, climb.top], [climb.x - 2, climb.bottom]], '#533e33', 8);
-      line(ctx, [[climb.x, climb.top], [climb.x, climb.bottom]], '#ffdc80', 5);
-      for (let height = climb.top + 12; height < climb.bottom; height += 18) {
-        line(ctx, [[climb.x - 3, height], [climb.x + 4, height + 5]], '#a37b42', 2);
-      }
-      oval(ctx, climb.x, climb.top + 5, 10, 7, '#edc264');
-    } else {
-      for (const side of [-1, 1]) line(ctx, [[climb.x + side * 18, climb.top - 20],
-        [climb.x + side * 18, climb.bottom]], '#c8eff3', 5);
-      for (let height = climb.top - 12; height < climb.bottom; height += 22) {
-        line(ctx, [[climb.x - 18, height], [climb.x + 18, height]], '#f7bd62', 5);
-      }
-    }
+    drawClimb(ctx, climb);
   }
   for (const station of missionStations(state)) {
     if (!visible(station.x - 100, 260)) continue;

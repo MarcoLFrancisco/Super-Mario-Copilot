@@ -165,7 +165,7 @@ export function createAudio() {
         beats: power ? .28 : .5, gain: .095 }, now + i * .085, 'effects'));
       return;
     }
-    if (event.type === 'bossWarning') {
+    if (event.type === 'bossWarning' || event.type === 'arcadeWarning') {
       const cue = event.attack === 'charge' ? { voice: 'bass', midi: 43, endMidi: 67, beats: .55, gain: .12 }
         : ['slam', 'desperation'].includes(event.attack) ? { voice: 'bass', midi: 48, endMidi: 40, beats: .3, gain: .1 }
           : { voice: 'bell', midi: 83, endMidi: 81, beats: .18, gain: .085 };
@@ -190,6 +190,12 @@ export function createAudio() {
       bossHit: { voice: 'bell', midi: 74, endMidi: 62, beats: .18, gain: .09 },
       bossAttack: { voice: 'kick', midi: null, beats: .22, gain: .12 },
       bossImpact: { voice: 'kick', midi: null, beats: .45, gain: .15 },
+      bossLanding: { voice: 'kick', midi: null, beats: .25, gain: .09 },
+      bossRetreat: { voice: 'lead', midi: 65, endMidi: 83, beats: .65, gain: .08 },
+      arcadeTool: { voice: 'bell', midi: 74, endMidi: 86, beats: .4, gain: .08 },
+      arcadePickup: { voice: 'bell', midi: 79, endMidi: 86, beats: .25, gain: .08 },
+      arcadeRepair: { voice: 'bell', midi: 67, endMidi: 79, beats: .4, gain: .08 },
+      arcadeCoreExposed: { voice: 'bell', midi: 88, beats: .55, gain: .09 },
       bossStunned: { voice: 'bell', midi: 88, endMidi: 50, beats: .65, gain: .1 },
       bossExposed: { voice: 'bell', midi: 88, beats: .6, gain: .09 },
       suggestion: { voice: 'bell', midi: 76, endMidi: 88, beats: .45, gain: .12 },
