@@ -1,5 +1,6 @@
 import { VIEW } from './level.js';
 import { missionStations, stationStatus } from './missions.js';
+import { drawWizardRig } from './wizard-rig.js';
 
 function panel(ctx, x, y, width, height, color, radius = 3, border = null) {
   ctx.beginPath(); ctx.roundRect(x, y, width, height, radius);
@@ -428,6 +429,10 @@ export function drawMissionObjects(ctx, state, visible) {
 }
 
 export function drawCampaignBoss(ctx, boss, mission, reducedMotion) {
+  if (mission.bossStyle === 'wizard') {
+    drawWizardRig(ctx, boss, reducedMotion);
+    return;
+  }
   const time = reducedMotion ? 0 : boss.age;
   const exposed = boss.mode === 'exposed' && !boss.objectivesLocked;
   const color = exposed || boss.defeated ? '#9afbd0' : mission.color;
@@ -437,51 +442,7 @@ export function drawCampaignBoss(ctx, boss, mission, reducedMotion) {
   const metal = ctx.createLinearGradient(x, y, x + w, y + h);
   metal.addColorStop(0, '#d9eafa'); metal.addColorStop(.4, '#7593a8'); metal.addColorStop(1, '#253d52');
   const center = x + w / 2;
-  if (mission.bossStyle === 'wizard') {
-    const panic = boss.phase === 2 ? Math.sin(time * 19) * 4 : 0;
-    const pose = boss.mode === 'warning' ? boss.windup * 22 : boss.mode === 'attack' ? -8 : 0;
-    ctx.save(); ctx.translate(panic, 0);
-    ctx.shadowColor = '#138dff'; ctx.shadowBlur = exposed ? 24 : 13;
-    for (const side of [-1, 1]) {
-      const shoulderX = center + side * 83;
-      const fistX = center + side * (116 + pose);
-      line(ctx, [[center + side * 55,y + 54],[shoulderX,y + 72],[fistX,y + 137 - pose]], '#10244d', 34);
-      line(ctx, [[center + side * 55,y + 54],[shoulderX,y + 72],[fistX,y + 137 - pose]], '#dbe3e8', 24);
-      oval(ctx, shoulderX, y + 66, 28, 31, '#f0f1ed');
-      oval(ctx, shoulderX + side * 5, y + 66, 20, 24, '#142a5b');
-      oval(ctx, fistX, y + 142 - pose, 28, 31, '#122758');
-      line(ctx, [[shoulderX,y + 42],[shoulderX + side * 9,y + 67]], '#159dff', 4);
-    }
-    for (let cable = 0; cable < 4; cable += 1) {
-      const side = cable % 2 ? 1 : -1;
-      ctx.beginPath(); ctx.moveTo(center + side * (22 + cable * 5), y + 17);
-      ctx.bezierCurveTo(center + side * (65 + cable * 7), y - 35 - cable * 4,
-        center + side * (92 + cable * 4), y + 8, center + side * 70, y + 43);
-      ctx.strokeStyle = cable % 2 ? '#168eff' : '#172957'; ctx.lineWidth = 8; ctx.stroke();
-      ctx.strokeStyle = '#52caff'; ctx.lineWidth = 2; ctx.stroke();
-    }
-    panel(ctx, x - 4, y + 25, w + 8, h - 12, metal, 26, '#168eff');
-    panel(ctx, x + 18, y + 38, w - 36, 48, '#08162d', 18, '#38bdff');
-    const panels = [['#ef2d24',0,0],['#75cb16',1,0],['#1477eb',0,1],['#ffb51c',1,1]];
-    for (const [panelColor, column, row] of panels) {
-      const panelX = center - 43 + column * 46;
-      const panelY = y + 96 + row * 43;
-      panel(ctx, panelX, panelY, 38, 35, panelColor, 4, '#eaf8ff');
-    }
-    for (let crystal = -2; crystal <= 2; crystal += 1) {
-      ctx.beginPath(); ctx.moveTo(center + crystal * 15 - 7, y + 29);
-      ctx.lineTo(center + crystal * 17, y - 25 - (2 - Math.abs(crystal)) * 11);
-      ctx.lineTo(center + crystal * 15 + 9, y + 29); ctx.closePath();
-      ctx.fillStyle = crystal % 2 ? '#1e8dff' : '#35c8ff'; ctx.fill();
-      ctx.strokeStyle = '#d5f6ff'; ctx.lineWidth = 2; ctx.stroke();
-    }
-    if (boss.phase > 0) {
-      line(ctx, [[x + 13,y + 92],[x + 40,y + 111],[x + 29,y + 137]], '#10243e', 3);
-      line(ctx, [[x + w - 18,y + 87],[x + w - 45,y + 107],[x + w - 29,y + 129]], '#38bdff', 3);
-    }
-    ctx.shadowBlur = 0;
-    ctx.restore();
-  } else if (mission.bossStyle === 'merge') {
+  if (mission.bossStyle === 'merge') {
     for (const side of [-1, 1]) {
       const gap = exposed ? 13 : 2;
       panel(ctx, center + (side < 0 ? -70 - gap : gap), y, 68, h, side < 0 ? '#528f75' : '#5876a6', 8, color);

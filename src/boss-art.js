@@ -1,4 +1,7 @@
 import { ARENA } from './encounters.js';
+import { PHYSICS } from './level.js';
+import { SHOWMAN_MOVES } from './boss.js';
+import { wizardCrownY } from './wizard-rig.js';
 
 // Arena coordinates; caller sets canvas scale. Background goes before solid
 // platforms; telegraphs and boss go afterward, before player/projectiles.
@@ -58,8 +61,95 @@ export function drawArena(c, time = 0, reducedMotion = false) {
   c.restore();
 }
 
+function drawShowmanWarnings(c, boss) {
+  const move = SHOWMAN_MOVES[boss.attackType];
+  if (!move || !['warning', 'attack', 'comboGap', 'exposed'].includes(boss.mode)) return;
+  const floor = boss.y + boss.h;
+  const width = boss.arena.width;
+  const countdown = boss.attackType === 'countdown' && boss.mode === 'attack';
+  c.save();
+  if (countdown) rect(c, 0, 145, width, floor - 145, '#05132633');
+  for (const zone of boss.zones) {
+    const color = zone.active ? '#ff735b' : '#ffc85b';
+    if (zone.kind === 'impact' || zone.kind === 'summon') {
+      ellipse(c, zone.x + zone.w / 2, floor - 7, zone.w / 2, 10, color + '55');
+      ellipse(c, zone.x + zone.w / 2, floor - 7, zone.w / 2, 10, color, false);
+      if (zone.kind === 'summon') {
+        c.setLineDash([5, 5]); c.strokeStyle = color;
+        c.strokeRect(zone.x + 10, zone.y, zone.w - 20, zone.h); c.setLineDash([]);
+      } else {
+        const direction = zone.x < boss.x + boss.w / 2 ? -1 : 1;
+        for (let arrow = 1; arrow <= 3; arrow += 1) {
+          const position = zone.x + zone.w / 2 + direction * (40 + arrow * 35);
+          line(c, [[position - direction * 10,floor - 20],[position,floor - 12],
+            [position - direction * 10,floor - 4]], color + 'bb', 2);
+        }
+      }
+      continue;
+    }
+    const top = Math.max(150, zone.y);
+    rect(c, zone.x, top, zone.w, floor - top, color + (zone.active ? '44' : '18'));
+    line(c, [[zone.x,top],[zone.x,floor],[zone.x + zone.w,floor],[zone.x + zone.w,top]], color, 2);
+    if (zone.kind === 'charge') {
+      for (let position = zone.x + 25; position < zone.x + zone.w - 15; position += 65) {
+        const direction = boss.chargeDirection;
+        line(c, [[position - direction * 10,floor - 33],[position + direction * 10,floor - 23],
+          [position - direction * 10,floor - 13]], '#ffd17f', 3);
+      }
+    } else {
+      for (let position = zone.x + 14; position < zone.x + zone.w - 12; position += 38) {
+        line(c, [[position,floor - 16],[position + 13,floor - 3]], color, 3);
+      }
+    }
+  }
+  if (boss.safeZone) {
+    const safe = boss.safeZone;
+    const top = Math.max(150, safe.y);
+    rect(c, safe.x, top, safe.w, floor - top, '#58ffb01c');
+    line(c, [[safe.x,top],[safe.x,floor],[safe.x + safe.w,floor],[safe.x + safe.w,top]], '#8affc9', 3);
+    for (const side of [-1, 1]) {
+      const position = safe.x + safe.w / 2 + side * 65;
+      line(c, [[position - side * 9,floor - 23],[position,floor - 16],[position - side * 9,floor - 9]], '#a7ffcd', 3);
+    }
+    label(c, 'SAFE', safe.x + safe.w / 2, floor - 60, 14, '#a7ffcd');
+  }
+  if (boss.mode === 'warning' && ['volley', 'desperation'].includes(boss.attackType) && boss.shotOrigin) {
+    c.save(); c.beginPath(); c.rect(0, 147, width, floor - 147); c.clip();
+    c.setLineDash([9, 8]);
+    for (const offset of [-.13, 0, .13]) {
+      const angle = boss.lockedAngle + offset;
+      line(c, [[boss.shotOrigin.x,boss.shotOrigin.y],
+        [boss.shotOrigin.x + Math.cos(angle) * width,boss.shotOrigin.y + Math.sin(angle) * width]], '#ffc75d99', 2);
+    }
+    c.setLineDash([]);
+    ellipse(c, boss.lockedTarget.x, boss.lockedTarget.y, 15, 15, '#ffd187', false);
+    c.restore();
+  }
+  if (boss.hitZone) {
+    rect(c, boss.hitZone.x, boss.hitZone.y, boss.hitZone.w, boss.hitZone.h, '#ff745b44');
+  }
+  const exposed = boss.mode === 'exposed';
+  const heading = exposed ? 'ARMOR OPEN' : boss.mode === 'comboGap' ? 'COMBO PAUSE' : move.name.toUpperCase();
+  rect(c, 240, 105, 800, 38, exposed ? '#123e3dee' : '#192840ee');
+  label(c, heading, countdown || boss.interruptible ? 582 : 640, 130, 17, exposed ? '#aaffdd' : '#ffda92');
+  if (boss.mode === 'warning') {
+    const progress = 1 - boss.timer / boss.warningDuration;
+    rect(c, 247, 139, 786 * Math.max(0, Math.min(1, progress)), 3, '#ffce71');
+  }
+  if (boss.interruptible) label(c, 'CORE OPEN', 910, 130, 12, '#9efcff');
+  if (countdown) {
+    const count = boss.countdown > 0 ? String(Math.ceil(boss.countdown)) : '!';
+    label(c, count, 1007, 132, 28, boss.countdown > 0 ? '#ffe4a1' : '#ff927d');
+  }
+  c.restore();
+}
+
 export function drawBossWarnings(c, boss) {
   if (boss.defeated) return;
+  if (boss.arena?.behavior === 'showman') {
+    drawShowmanWarnings(c, boss);
+    return;
+  }
   c.save();
   for (const zone of boss.zones) {
     if (!zone.active && boss.mode !== 'warning') continue;
@@ -72,11 +162,7 @@ export function drawBossWarnings(c, boss) {
     label(c, zone.active ? 'DANGER' : 'MOVE!', zone.x + zone.w / 2, 135, 13, '#ffe1a7');
   }
   if (boss.mode === 'warning') {
-    const tips = { tokens: 'PROJECTILE BURST INCOMING', agents: 'MARKED COLUMN ACTIVATING', waves: 'FLOOR WAVES INCOMING',
-      slam: 'JUMP THE SHOCKWAVE', volley: 'AIM LOCKED — MOVE!', charge: 'STRAIGHT-LINE CHARGE',
-      arenaControl: 'REACH THE CLEAR FLOOR', reinforcements: 'REINFORCEMENTS INCOMING',
-      overload: 'HIT THE GLOWING CORE', desperation: 'TWO QUICK — ONE DELAYED',
-      countdown: 'SAFE ZONE OR CORE INTERRUPT', burst: 'ALTERNATING POWER WAVES' };
+    const tips = { tokens: 'PROJECTILE BURST INCOMING', agents: 'MARKED COLUMN ACTIVATING', waves: 'FLOOR WAVES INCOMING' };
     const attack = boss.attackType ?? (boss.arena ?? ARENA).phases[boss.phase].attack;
     rect(c, 240, 106, 800, 35, '#35223eee');
     label(c, tips[attack], 640, 129, 16, '#ffdb95');
@@ -86,36 +172,60 @@ export function drawBossWarnings(c, boss) {
   c.restore();
 }
 
-export function drawBossDialogue(c, boss) {
+export function bossDialogueLayout(c, boss, player = null) {
   const caption = boss.dialogue.current;
-  if (!caption) return;
+  if (!caption) return null;
+  const arena = boss.arena ?? ARENA;
+  const width = Math.min(boss.arena?.behavior === 'showman' ? 418 : 366, arena.width - 32);
   c.save();
-  c.font = "bold 17px 'Segoe UI', sans-serif";
-  const rows = [];
-  let row = '';
-  for (const word of caption.text.split(' ')) {
-    const candidate = row ? `${row} ${word}` : word;
-    if (row && c.measureText(candidate).width > 330) {
-      rows.push(row); row = word;
-    } else row = candidate;
-  }
-  if (row) rows.push(row);
-  const width = 366, height = 39 + rows.length * 23;
-  const x = Math.max(16, Math.min(ARENA.width - width - 16, boss.x + boss.w / 2 - width / 2));
-  const y = Math.max(151, boss.y - height - 40);
+  let rows = [], fontSize = 18;
+  do {
+    fontSize -= 1;
+    c.font = `bold ${fontSize}px 'Trebuchet MS', sans-serif`;
+    rows = [];
+    let row = '';
+    for (const word of caption.text.split(' ')) {
+      const candidate = row ? `${row} ${word}` : word;
+      if (row && c.measureText(candidate).width > width - 34) {
+        rows.push(row); row = word;
+      } else row = candidate;
+    }
+    if (row) rows.push(row);
+  } while (rows.length > 2 && fontSize > 13);
+  c.restore();
+  const height = 35 + rows.length * 22;
+  const top = boss.arena?.behavior === 'showman' ? wizardCrownY(boss) : boss.y - 26;
+  const y = Math.max(151, top - height - 18);
+  const centered = boss.x + boss.w / 2 - width / 2;
+  const candidates = [centered, centered - width / 2, centered + width / 2, 16, arena.width - width - 16]
+    .map(position => Math.max(16, Math.min(arena.width - width - 16, position)));
+  const coversPlayer = position => player && position < player.x + PHYSICS.playerWidth && position + width > player.x
+    && y < player.y + PHYSICS.playerHeight && y + height + 12 > player.y;
+  const x = candidates.find(position => !coversPlayer(position)) ?? candidates[0];
+  return { x, y, w: width, h: height, rows, fontSize };
+}
+
+export function drawBossDialogue(c, boss, player = null) {
+  const layout = bossDialogueLayout(c, boss, player);
+  if (!layout) return;
+  const { x, y, w: width, h: height, rows, fontSize } = layout;
+  c.save();
   const anchor = Math.max(x + 22, Math.min(x + width - 22, boss.x + boss.w / 2));
   c.shadowColor = '#00000066'; c.shadowBlur = 12;
   rect(c, x, y, width, height, '#eff8ff');
   c.shadowBlur = 0;
   c.strokeStyle = '#8be6ec'; c.lineWidth = 2; c.strokeRect(x, y, width, height);
-  c.beginPath(); c.moveTo(anchor - 9, y + height);
-  c.lineTo(anchor, y + height + 14); c.lineTo(anchor + 9, y + height);
-  c.closePath(); c.fillStyle = '#eff8ff'; c.fill();
+  if (!player || anchor + 9 < player.x || anchor - 9 > player.x + PHYSICS.playerWidth
+      || y + height + 12 < player.y || y + height > player.y + PHYSICS.playerHeight) {
+    c.beginPath(); c.moveTo(anchor - 9, y + height);
+    c.lineTo(anchor, y + height + 12); c.lineTo(anchor + 9, y + height);
+    c.closePath(); c.fillStyle = '#eff8ff'; c.fill();
+  }
   c.textAlign = 'left'; c.fillStyle = '#476687';
-  c.font = "bold 10px 'Segoe UI', sans-serif";
-  c.fillText('HALLUCINATION ENGINE', x + 17, y + 18);
-  c.font = "bold 17px 'Segoe UI', sans-serif"; c.fillStyle = '#172940';
-  rows.forEach((text, i) => c.fillText(text, x + 17, y + 42 + i * 23));
+  c.font = "bold 10px 'Trebuchet MS', sans-serif";
+  c.fillText((boss.arena ?? ARENA).name.toUpperCase(), x + 17, y + 18);
+  c.font = `bold ${fontSize}px 'Trebuchet MS', sans-serif`; c.fillStyle = '#172940';
+  rows.forEach((text, index) => c.fillText(text, x + 17, y + 40 + index * 22));
   c.restore();
 }
 

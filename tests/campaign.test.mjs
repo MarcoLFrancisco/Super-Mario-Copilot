@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createState, update } from '../src/engine.js';
+import { createState, update, setPaused } from '../src/engine.js';
 import { LEVEL, PHYSICS } from '../src/level.js';
 import { ARENA } from '../src/encounters.js';
 import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, selectInterlude, nextDestination, saveCampaign, pauseCampaign, retryLevel } from '../src/campaign.js';
 import { INTERLUDES } from '../src/arcade.js';
-import { createBoss, hitBoss, updateBoss } from '../src/boss.js';
+import { createBoss, hitBoss, updateBoss, bossWeakPoint } from '../src/boss.js';
+import { createCombat, updateCombat } from '../src/combat.js';
+import { createDialogue, updateDialogue, sayBoss } from '../src/boss-dialogue.js';
+import { unlockHelper } from '../src/party.js';
 import { worldMusicStep } from '../src/music.js';
 import { interact, updateMission, missionReady, missionStations, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
 import { submitWork, workView, prepareQuiz, validateQuiz, validQuizOverrides } from '../src/trivia-tasks.js';
@@ -33,7 +36,7 @@ test('the original engine accepts a mission without changing the selected charac
 test('the Setup Wizard telegraphs responsive attacks and always leaves a punish window', () => {
   const arena = CAMPAIGN[0].arena;
   assert.equal(arena.behavior, 'showman');
-  assert.deepEqual(arena.phases.map(phase => phase.healthAbove), [8, 4, 0]);
+  assert.deepEqual(arena.phases.map(phase => phase.healthAbove), [arena.boss.health * .7, arena.boss.health * .35, 0]);
   const boss = createBoss(arena);
   const combat = { health: 3, grace: 0, protection: 0, shots: [], enemies: [] };
   const player = { x: boss.x - 90, y: 584, vx: 0, vy: 0, grounded: true };
@@ -52,15 +55,16 @@ test('the Setup Wizard telegraphs responsive attacks and always leaves a punish 
   assert.notEqual(boss.attackType, 'charge');
 
   boss.attackType = 'charge'; boss.chargeDirection = 1; boss.mode = 'attack'; boss.timer = 1;
-  boss.x = arena.width - boss.w - 36;
+  boss.x = arena.width - boss.w - 111;
   updateBoss(boss, combat, player, 1 / 60, events);
   assert.equal(boss.mode, 'exposed');
-  assert.ok(events.some(event => event.type === 'bossDialogue' && event.key === 'chargeMiss'));
+  assert.ok(events.some(event => event.type === 'bossStunned' && event.reason === 'wall'));
 
   boss.dialogue.current = null; boss.dialogue.cooldown = 0;
   boss.attackType = 'overload'; boss.mode = 'attack'; boss.interruptible = true;
   boss.grace = 0; boss.health = boss.maxHealth;
-  combat.shots.push({ owner: 'player', x: boss.x + 20, y: boss.y + 20,
+  const weakPoint = bossWeakPoint(boss);
+  combat.shots.push({ owner: 'player', x: weakPoint.x + 10, y: weakPoint.y + 10,
     w: 12, h: 12, damage: 1, life: 1 });
   hitBoss(boss, combat, events);
   assert.equal(boss.mode, 'exposed');
@@ -74,6 +78,382 @@ test('the Setup Wizard telegraphs responsive attacks and always leaves a punish 
   assert.equal(boss.mode, 'defeated');
   assert.equal(combat.shots.length, 0);
   assert.equal(combat.enemies.length, 0);
+});
+
+function wizardFixture(phase = 0, playerX = 100) {
+  const boss = createBoss(CAMPAIGN[0].arena);
+  boss.phase = phase; boss.health = [36, 20, 10][phase]; boss.timer = 0;
+  return { boss, combat: createCombat({ enemies: [], pickups: [] }), events: [],
+    player: { x: playerX, y: 584, vx: 0, vy: 0, grounded: true, facing: 1 } };
+}
+
+function stepWizard(fixture, inspect = () => {}) {
+  const { boss, combat, player, events } = fixture;
+  const start = events.length;
+  updateBoss(boss, combat, player, 1 / 120, events);
+  inspect(fixture);
+  updateCombat(combat, player, {}, 1 / 120, player.y + PHYSICS.playerHeight, events);
+  hitBoss(boss, combat, events);
+  for (const event of events.slice(start)) event.at = boss.age;
+}
+
+function wizardUntil(fixture, condition, seconds = 20, inspect) {
+  for (let frame = 0; frame < seconds * 120 && !condition(); frame += 1) stepWizard(fixture, inspect);
+  assert.ok(condition(), `Timed out in ${fixture.boss.mode}: ${fixture.boss.attackType}`);
+}
+
+test('Setup Wizard walks faster through the three phases and has no passive contact damage', () => {
+  const speeds = [];
+  for (let phase = 0; phase < 3; phase += 1) {
+    const fixture = wizardFixture(phase);
+    stepWizard(fixture);
+    assert.equal(fixture.boss.mode, 'reposition');
+    const initialX = fixture.boss.x;
+    for (let frame = 0; frame < 60; frame += 1) stepWizard(fixture);
+    speeds.push(Math.abs(fixture.boss.vx));
+    assert.ok(fixture.boss.x < initialX);
+    assert.equal(fixture.boss.y + fixture.boss.h, 630);
+    fixture.boss.mode = 'exposed'; fixture.boss.timer = 1;
+    fixture.player.x = fixture.boss.x + 30;
+    stepWizard(fixture);
+    assert.equal(fixture.combat.health, 3);
+  }
+  assert.ok(speeds[0] < speeds[1] && speeds[1] < speeds[2]);
+  for (const [health, phase] of [[36 * .7, 1], [36 * .35, 1], [36 * .35 - .01, 2]]) {
+    const fixture = wizardFixture();
+    fixture.boss.health = health;
+    stepWizard(fixture);
+    assert.equal(fixture.boss.phase, phase);
+  }
+  assert.ok(CAMPAIGN.slice(1).filter(mission => mission.arena).every(mission => mission.arena.boss.h === ARENA.boss.h));
+});
+
+test('Setup Wizard locks all three volley directions before the player dodges', () => {
+  const fixture = wizardFixture();
+  const { boss, player, combat } = fixture;
+  wizardUntil(fixture, () => boss.mode === 'warning');
+  assert.equal(boss.attackType, 'volley');
+  const aim = boss.lockedAngle;
+  const target = { ...boss.lockedTarget };
+  const origin = { ...boss.shotOrigin };
+  player.x = 1090; player.y = 300;
+  const projectiles = new Set();
+  wizardUntil(fixture, () => boss.attackStep === 3, 6, () => {
+    combat.shots.filter(shot => shot.owner === 'enemy').forEach(shot => projectiles.add(shot));
+  });
+  assert.deepEqual(boss.lockedTarget, target);
+  assert.deepEqual(boss.shotOrigin, origin);
+  assert.equal(projectiles.size, 3);
+  [...projectiles].forEach((shot, index) => {
+    assert.ok(Math.abs(shot.vx - Math.cos(aim + (index - 1) * .13) * 235) < .001);
+    assert.ok(Math.abs(shot.vy - Math.sin(aim + (index - 1) * .13) * 235) < .001);
+  });
+  assert.equal(combat.health, 3);
+});
+
+test('Setup Wizard shockwaves remain dangerous and visible during the slam recovery', () => {
+  const fixture = wizardFixture(0, 760);
+  const { boss, combat, player } = fixture;
+  wizardUntil(fixture, () => boss.mode === 'warning');
+  assert.equal(boss.attackType, 'slam');
+  player.y = 300;
+  wizardUntil(fixture, () => boss.mode === 'exposed');
+  const waves = combat.shots.filter(shot => shot.kind === 'wave');
+  assert.equal(waves.length, 2);
+  assert.ok(boss.timer >= 4.5);
+  const positions = waves.map(shot => shot.x);
+  for (let frame = 0; frame < 40; frame += 1) stepWizard(fixture);
+  assert.ok(waves[0].x < positions[0] && waves[1].x > positions[1]);
+  assert.equal(boss.mode, 'exposed');
+});
+
+test('Setup Wizard observes circling and backs away from cornered players', () => {
+  const fixture = wizardFixture(0, 800);
+  const { boss, player, combat } = fixture;
+  boss.mode = 'exposed'; boss.timer = 2;
+  for (const position of [800, 1100, 820, 1100]) {
+    player.x = position;
+    stepWizard(fixture);
+  }
+  boss.timer = 0;
+  stepWizard(fixture);
+  assert.equal(boss.attackType, 'charge');
+  assert.equal(boss.mode, 'reposition');
+  const corner = wizardFixture(0, 0);
+  corner.boss.x = 110;
+  corner.boss.playerTurns = [0, 0];
+  stepWizard(corner);
+  assert.notEqual(corner.boss.attackType, 'charge');
+  stepWizard(corner);
+  assert.ok(corner.boss.vx > 0, 'Reposition away from the occupied corner');
+  boss.mode = 'comboGap'; boss.timer = 0; boss.followUp = 'slam';
+  combat.health = 2;
+  stepWizard(fixture);
+  assert.equal(boss.followUp, null);
+  assert.ok(boss.safeUntil - boss.age >= 2.4);
+  assert.notEqual(boss.mode, 'warning');
+});
+
+test('Setup Wizard phase two combines a volley and slam only after a clear escape gap', () => {
+  const fixture = wizardFixture(1, 420);
+  const { boss, combat, player, events } = fixture;
+  wizardUntil(fixture, () => boss.mode === 'warning');
+  assert.equal(boss.attackType, 'volley');
+  player.y = 300;
+  wizardUntil(fixture, () => boss.mode === 'comboGap');
+  const gapStart = boss.age;
+  wizardUntil(fixture, () => boss.mode === 'warning' && boss.attackType === 'slam');
+  assert.ok(boss.age - gapStart >= 1.15);
+  assert.equal(combat.shots.filter(shot => shot.owner === 'enemy').length, 0);
+  assert.ok(boss.timer >= 1.25);
+  assert.deepEqual(events.filter(event => event.type === 'bossWarning').map(event => event.attack), ['volley', 'slam']);
+  wizardUntil(fixture, () => boss.mode === 'exposed');
+  assert.equal(combat.health, 3);
+});
+
+test('Setup Wizard arena control and countdown keep a reachable safe lane through activation', () => {
+  for (const phase of [1, 2]) for (const position of [0, 610, 1246]) {
+    const fixture = wizardFixture(phase, position);
+    const { boss, player, combat } = fixture;
+    boss.phaseTurn = 1;
+    wizardUntil(fixture, () => boss.mode === 'warning');
+    assert.equal(boss.attackType, phase === 1 ? 'arenaControl' : 'countdown');
+    assert.ok(boss.zones.every(zone => !zone.active));
+    assert.ok(boss.safeZone.w >= 240);
+    const safeX = clampToLane(player.x, boss.safeZone);
+    assert.ok(Math.abs(safeX - player.x) < 350);
+    if (phase === 2) assert.equal(boss.x, (boss.arena.width - boss.w) / 2);
+    player.x = safeX;
+    wizardUntil(fixture, () => boss.mode === 'attack');
+    if (phase === 2) {
+      assert.ok(boss.countdown >= 2.9);
+      assert.ok(boss.zones.every(zone => !zone.active));
+    }
+    wizardUntil(fixture, () => boss.mode === 'exposed');
+    assert.equal(combat.health, 3);
+    assert.equal(boss.zones.length, 0);
+    assert.equal(boss.safeZone, null);
+    if (phase === 2) assert.deepEqual(fixture.events.filter(event => event.type === 'bossCountdown').map(event => event.value), [3, 2, 1]);
+  }
+});
+
+function clampToLane(position, lane) {
+  return Math.max(lane.x + 12, Math.min(lane.x + lane.w - PHYSICS.playerWidth - 12, position));
+}
+
+test('Setup Wizard reinforcements are weak, capped, warned, and enter without boss fire', () => {
+  const fixture = wizardFixture(1, 380);
+  const { boss, combat, player } = fixture;
+  boss.phaseTurn = 2;
+  wizardUntil(fixture, () => boss.mode === 'warning');
+  assert.equal(boss.attackType, 'reinforcements');
+  assert.equal(boss.zones.length, 2);
+  assert.equal(combat.enemies.length, 0);
+  assert.ok(boss.zones.every(zone => Math.abs(zone.x - player.x) > 170));
+  wizardUntil(fixture, () => boss.mode === 'attack');
+  assert.equal(combat.enemies.length, 2);
+  assert.ok(combat.enemies.every(enemy => enemy.health === 1 && enemy.speed === 42));
+  player.y = 300;
+  wizardUntil(fixture, () => boss.mode === 'exposed', 8, () => {
+    assert.equal(combat.shots.filter(shot => shot.owner === 'enemy').length, 0);
+  });
+  assert.equal(combat.enemies.length, 2);
+  boss.timer = 0; boss.phaseTurn = 2;
+  wizardUntil(fixture, () => boss.mode === 'attack');
+  assert.equal(combat.enemies.length, 2);
+});
+
+test('Setup Wizard shield blocks armor hits but a traveling blaster shot interrupts the chest', () => {
+  const fixture = wizardFixture(1, 420);
+  const { boss, combat, player, events } = fixture;
+  boss.phaseTurn = 3;
+  wizardUntil(fixture, () => boss.mode === 'attack');
+  assert.equal(boss.attackType, 'overload');
+  const initialHealth = boss.health;
+  combat.shots.push({ owner: 'player', kind: 'patch', x: boss.x + 5, y: 606,
+    w: 10, h: 8, vx: 690, vy: 0, damage: 1, life: 1.6 });
+  stepWizard(fixture);
+  assert.equal(boss.health, initialHealth);
+  assert.equal(combat.shots.length, 0);
+  const weakPoint = bossWeakPoint(boss);
+  player.y = 300;
+  combat.shots.push({ owner: 'player', kind: 'patch', x: boss.x - 20, y: weakPoint.y + 85,
+    w: 10, h: 8, vx: 690, vy: 0, damage: 1, life: 1.6 });
+  wizardUntil(fixture, () => boss.mode === 'exposed', 1);
+  assert.equal(boss.health, initialHealth - 1);
+  assert.ok(events.some(event => event.type === 'bossStunned' && event.reason === 'interrupt'));
+  assert.equal(bossWeakPoint(boss), null);
+  assert.ok(boss.timer >= 5);
+});
+
+test('Setup Wizard desperation delays its finisher and unstable waves follow fixed beats', () => {
+  const combo = wizardFixture(2);
+  wizardUntil(combo, () => combo.boss.mode === 'warning');
+  combo.player.y = 300;
+  wizardUntil(combo, () => combo.boss.mode === 'exposed');
+  const strikes = combo.events.filter(event => event.type === 'bossImpact');
+  assert.equal(strikes.length, 3);
+  assert.ok(strikes[1].at - strikes[0].at >= .5);
+  assert.ok(strikes[2].at - strikes[1].at >= 1.25);
+  assert.ok(combo.boss.timer >= 5);
+  const burst = wizardFixture(2);
+  burst.boss.phaseTurn = 2;
+  wizardUntil(burst, () => burst.boss.mode === 'warning');
+  burst.player.y = 300;
+  const projectiles = new Set();
+  wizardUntil(burst, () => burst.boss.mode === 'exposed', 8, () => {
+    burst.combat.shots.forEach(shot => projectiles.add(shot));
+  });
+  assert.deepEqual([...projectiles].map(shot => shot.vx), [-200, 200, -220, 220, -240, 240]);
+  assert.ok(burst.boss.timer >= 5);
+  assert.ok(burst.events.some(event => event.type === 'bossDialogue' && event.key === 'malfunction'));
+});
+
+test('Setup Wizard routine jokes wait ten seconds, rotate, and yield to phase and defeat lines', () => {
+  const dialogue = createDialogue(CAMPAIGN[0].arena.dialogue, 'showman');
+  assert.equal(sayBoss(dialogue, 'idle').text, 'Are you buffering?');
+  updateDialogue(dialogue, 9.9);
+  assert.equal(sayBoss(dialogue, 'dodge'), null);
+  updateDialogue(dialogue, .11);
+  assert.ok(sayBoss(dialogue, 'dodge'));
+  for (const key of ['miss', 'reinforcements', 'slam']) {
+    updateDialogue(dialogue, 10);
+    assert.equal(sayBoss(dialogue, 'idle'), null);
+    assert.ok(sayBoss(dialogue, key));
+  }
+  updateDialogue(dialogue, 10);
+  assert.ok(sayBoss(dialogue, 'idle'));
+  assert.ok(sayBoss(dialogue, 'phase1'));
+  assert.equal(sayBoss(dialogue, 'chargeMiss'), null);
+  assert.equal(sayBoss(dialogue, 'phase1'), null);
+  assert.equal(sayBoss(dialogue, 'defeat').text, 'I demand a rematch with fewer witnesses.');
+  assert.equal(sayBoss(dialogue, 'shieldBreak'), null);
+});
+
+test('Setup Wizard jokes come from idle, dodged attacks, low health, and a real arena retry', () => {
+  const idle = wizardFixture();
+  idle.boss.mode = 'exposed'; idle.boss.timer = 30;
+  wizardUntil(idle, () => idle.events.some(event => event.type === 'bossDialogue' && event.key === 'idle'), 14);
+  const dodging = wizardFixture(0, 600);
+  dodging.player.y = 250;
+  wizardUntil(dodging, () => dodging.events.some(event => event.type === 'bossDialogue' && event.key === 'dodge'), 45);
+  const low = wizardFixture(2);
+  low.boss.mode = 'exposed'; low.boss.timer = 30;
+  wizardUntil(low, () => low.events.some(event => event.type === 'bossDialogue' && event.key === 'lowHealth'), 14);
+  const state = createState('marco', CAMPAIGN[0]);
+  state.stage = 'boss'; state.boss = createBoss(state.arena);
+  state.combat.health = 0;
+  const events = update(state, {}, 1 / 60);
+  assert.equal(state.deaths, 1);
+  assert.equal(state.boss.dialogue.current.key, 'playerDefeated');
+  assert.ok(events.some(event => event.type === 'bossDialogue' && event.text === 'Excellent tutorial attempt. Shall we begin?'));
+  assert.equal(state.combat.health, 3);
+});
+
+function wizardEngine(playerX, attack, phase = 0, bossX = 870) {
+  const arena = CAMPAIGN[0].arena;
+  const state = createState('marco', { arena, encounters: { enemies: [], pickups: [], blocks: [] } });
+  state.stage = 'boss'; state.boss = createBoss(arena); state.combat.blaster = true;
+  Object.assign(state.player, { x: playerX, y: 630 - PHYSICS.playerHeight, vx: 0, vy: 0 });
+  Object.assign(state.boss, { x: bossX, phase, health: [36, 20, 10][phase], mode: 'reposition',
+    attackType: attack, targetX: bossX, moveSpeed: 70, timer: 0 });
+  return state;
+}
+
+test('Setup Wizard charges can be jumped in both directions with original movement physics', () => {
+  for (const direction of [-1, 1]) {
+    const state = wizardEngine(direction < 0 ? 430 : 710, 'charge', 0, direction < 0 ? 870 : 110);
+    let jumped = false;
+    const events = [];
+    for (let frame = 0; frame < 900 && state.boss.mode !== 'exposed'; frame += 1) {
+      const boss = state.boss;
+      const distance = direction < 0 ? boss.x + 20 - state.player.x - PHYSICS.playerWidth
+        : state.player.x - boss.x - boss.w + 20;
+      const jumpPressed = !jumped && boss.mode === 'attack' && distance < 76;
+      if (jumpPressed) jumped = true;
+      events.push(...update(state, { jumpPressed, jumpHeld: true }, 1 / 120));
+    }
+    assert.equal(jumped, true);
+    assert.equal(state.combat.health, 3);
+    assert.equal(state.deaths, 0);
+    assert.ok(events.some(event => event.type === 'bossStunned' && event.reason === 'wall'));
+    assert.equal(state.boss.mode, 'exposed');
+  }
+});
+
+test('Setup Wizard chest interrupts are reachable with a normal platform jump and the granted blaster', () => {
+  const state = wizardEngine(800, 'overload', 1);
+  let jumps = 0;
+  const events = [];
+  for (let frame = 0; frame < 900 && state.boss.mode !== 'exposed'; frame += 1) {
+    const jumpPressed = jumps === 0 && state.boss.mode === 'warning'
+      || jumps === 1 && state.player.grounded && state.player.y < 500 && state.boss.interruptible;
+    if (jumpPressed) jumps += 1;
+    const chest = bossWeakPoint(state.boss);
+    const fire = chest && state.player.y + 22 >= chest.y && state.player.y + 22 < chest.y + chest.h;
+    events.push(...update(state, { jumpPressed, jumpHeld: true, fire }, 1 / 120));
+  }
+  assert.equal(jumps, 2);
+  assert.ok(state.player.y < 520 - PHYSICS.playerHeight);
+  assert.ok(events.some(event => event.type === 'bossStunned' && event.reason === 'interrupt'));
+  assert.equal(state.combat.health, 3);
+  assert.equal(state.boss.health, 19);
+});
+
+test('Setup Wizard countdown allows an ordinary ground escape and freezes while paused', () => {
+  const state = wizardEngine(610, 'countdown', 2, 515);
+  const events = [];
+  for (let frame = 0; frame < 1000 && state.boss.mode !== 'exposed'; frame += 1) {
+    const safe = state.boss.safeZone;
+    const target = safe ? safe.x + safe.w / 2 : state.player.x + PHYSICS.playerWidth / 2;
+    const offset = target - state.player.x - PHYSICS.playerWidth / 2;
+    events.push(...update(state, { left: offset < -12, right: offset > 12 }, 1 / 120));
+    if (frame === 250) {
+      setPaused(state, true);
+      const before = JSON.stringify({ boss: state.boss, combat: state.combat, player: state.player });
+      assert.deepEqual(update(state, { right: true }, 1), []);
+      assert.equal(JSON.stringify({ boss: state.boss, combat: state.combat, player: state.player }), before);
+      setPaused(state, false);
+    }
+  }
+  assert.equal(state.boss.mode, 'exposed');
+  assert.equal(state.deaths, 0);
+  assert.equal(state.combat.health, 3);
+  assert.deepEqual(events.filter(event => event.type === 'bossCountdown').map(event => event.value), [3, 2, 1]);
+});
+
+test('Setup Wizard victory clears every threat and completes once after its collapse', () => {
+  const state = wizardEngine(430, 'countdown', 2, 515);
+  state.boss.health = 1; state.boss.mode = 'exposed'; state.boss.timer = 5;
+  state.boss.safeZone = { x: 70, y: 0, w: 240, h: 630 };
+  state.boss.zones = [{ x: 310, y: 0, w: 970, h: 630, active: true }];
+  state.combat.shots.push({ owner: 'player', kind: 'patch', x: state.boss.x + 10, y: 606,
+    w: 10, h: 8, vx: 690, vy: 0, damage: 1, life: 1 });
+  const events = update(state, {}, 1 / 120);
+  assert.equal(state.boss.defeated, true);
+  assert.equal(state.combat.shots.length, 0);
+  assert.equal(state.combat.enemies.length, 0);
+  assert.equal(state.boss.zones.length, 0);
+  assert.equal(state.boss.safeZone, null);
+  assert.equal(state.boss.interruptible, false);
+  for (let frame = 0; frame < 300; frame += 1) events.push(...update(state, { fire: true, right: true }, 1 / 120));
+  assert.equal(state.combat.health, 3);
+  assert.equal(events.filter(event => event.type === 'bossDefeated').length, 1);
+  assert.equal(events.filter(event => event.type === 'complete').length, 1);
+  assert.equal(state.status, 'complete');
+});
+
+test('Setup Wizard grounded recovery remains reachable by the original companion AI', () => {
+  const state = wizardEngine(800, 'slam');
+  state.boss.mode = 'exposed'; state.boss.timer = 10;
+  const events = [];
+  assert.equal(unlockHelper(state.party, { kind: 'helper-mario' }, events, state.player,
+    { world: state.arena, blocks: [], enemies: [], collectibles: [], supportSlots: 2, bossTarget: null, geometryVersion: 0 }), true);
+  Object.assign(state.party.actors.mario, { x: 755, y: 584, vx: 0, vy: 0, grounded: true });
+  for (let frame = 0; frame < 900 && state.boss.helperDamage === 0; frame += 1) events.push(...update(state, {}, 1 / 120));
+  assert.ok(state.boss.helperDamage > 0 && state.boss.helperDamage <= 2);
+  assert.ok(events.some(event => event.type === 'bossHit' && event.helper && event.actorId === 'mario'));
+  assert.equal(state.combat.health, 3);
 });
 
 test('the campaign has eight distinct sequential worlds with original-party states', () => {

@@ -166,8 +166,14 @@ export function createAudio() {
       return;
     }
     if (event.type === 'bossWarning') {
-      [0, .18].forEach(offset => note({ voice: 'bell', midi: 83, endMidi: 81,
-        beats: .18, gain: .085 }, now + offset, 'effects'));
+      const cue = event.attack === 'charge' ? { voice: 'bass', midi: 43, endMidi: 67, beats: .55, gain: .12 }
+        : ['slam', 'desperation'].includes(event.attack) ? { voice: 'bass', midi: 48, endMidi: 40, beats: .3, gain: .1 }
+          : { voice: 'bell', midi: 83, endMidi: 81, beats: .18, gain: .085 };
+      [0, .22].forEach(offset => note(cue, now + offset, 'effects'));
+      return;
+    }
+    if (event.type === 'bossCountdown') {
+      note({ voice: 'bell', midi: 76 + (3 - event.value) * 5, beats: .3, gain: .1 }, now, 'effects');
       return;
     }
     const sounds = {
@@ -183,6 +189,8 @@ export function createAudio() {
       enemyDefeated: { voice: 'bass', midi: 60, endMidi: 36, beats: .25, gain: .1 },
       bossHit: { voice: 'bell', midi: 74, endMidi: 62, beats: .18, gain: .09 },
       bossAttack: { voice: 'kick', midi: null, beats: .22, gain: .12 },
+      bossImpact: { voice: 'kick', midi: null, beats: .45, gain: .15 },
+      bossStunned: { voice: 'bell', midi: 88, endMidi: 50, beats: .65, gain: .1 },
       bossExposed: { voice: 'bell', midi: 88, beats: .6, gain: .09 },
       suggestion: { voice: 'bell', midi: 76, endMidi: 88, beats: .45, gain: .12 },
       enemy: { voice: 'bass', midi: 60, endMidi: 43, beats: .2, gain: .1 },

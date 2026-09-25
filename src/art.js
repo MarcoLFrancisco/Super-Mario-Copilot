@@ -54,7 +54,7 @@ function drawCombatScene(ctx, state, reducedMotion, visible) {
     drawBossWarnings(ctx, state.boss);
     if (state.mission.id) {
       drawCampaignBoss(ctx, state.boss, state.mission, reducedMotion);
-      drawBossDialogue(ctx, state.boss);
+      drawBossDialogue(ctx, state.boss, player);
     }
     else drawBoss(ctx, state.boss, reducedMotion);
   }

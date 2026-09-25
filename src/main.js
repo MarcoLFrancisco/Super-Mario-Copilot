@@ -15,6 +15,7 @@ import { climbFor } from './actor-physics.js';
 import { INTERLUDES, arcadeObjective } from './arcade.js';
 import { renderArcade } from './arcade-art.js';
 import { selectInterlude, nextDestination } from './campaign.js';
+import { loadWizardRig } from './wizard-rig.js';
 
 const el = id => document.getElementById(id);
 const text = (id, value) => {
@@ -811,6 +812,7 @@ function frame(now) {
   hud(); requestAnimationFrame(frame);
 }
 if (ctx) {
+  await loadWizardRig();
   icons(); applyAccessibility(); resize(); panels(); audioControls();
   el('start-button').disabled = false; el('sound-button').disabled = false;
   text('load-status', ''); text('storage-status', storageAvailable ? 'Local progress' : 'Session-only progress');

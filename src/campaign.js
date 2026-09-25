@@ -17,7 +17,8 @@ const definitions = [
     boss: 'The Setup Wizard', bossStyle: 'wizard', unlock: 'Copilot Dash',
     intro: 'Cross the campus by mastering AI fundamentals: machine learning, tokens, context, hallucinations, and verification.',
     ending: 'Campus access restored. The repository forest is still splitting into unstable branches.',
-    phases: ['Loading Rings', 'Popup Cascade', 'Restart Required'], attacks: ['waves', 'agents', 'tokens'],
+    phases: ['This Will Be Embarrassing For You', 'You Are Ruining My Moment', 'This Is Still Part Of My Plan'],
+    attacks: ['waves', 'agents', 'tokens'],
     route: [[0,610,720],[820,560,290],[1210,500,280],[1590,565,390],[2090,610,640],[2830,550,310],[3240,485,280],[3620,545,450],[4180,600,650],[4930,535,300],[5340,475,270],[5710,535,430],[6250,600,700],[7050,540,320],[7470,485,290],[7860,550,840]],
     upper: [[360,495,170],[610,400,190],[930,320,180],[2370,490,200],[2660,380,210],[4470,480,190],[4760,375,210],[6500,490,200],[6790,380,220]],
   },
@@ -101,7 +102,8 @@ const definitions = [
 const bossDialogue = {
   campus: { entrance: ['Oh good. My final appointment.'],
     phase1: ['You are ruining my moment.'], phase2: ['This is still part of my plan.'],
-    exposed: ['A restart? But you have not filled in the feedback form.'],
+    exposed: ["I was posing. That doesn't count.", 'My armor is still in preview.'],
+    hit: ['That was a demonstration of your luck.', 'This damage is purely cosmetic.', 'I meant to let you do that.'],
     lowHealth: ['That health bar is spreading misinformation.'],
     defeat: ['I demand a rematch with fewer witnesses.'] },
   github: { entrance: ['Two branches. One deeply unresolved conflict.'],
@@ -210,15 +212,16 @@ function buildMission(definition, index) {
       name: checkpoint.name, app: definition.app,
       theme: definition.id === 'core' ? ['github','agents','foundry','core'][chapter] : definition.theme })),
     goal: { x: last.x + last.w - 125, y: last.y - 130, w: 76, h: 130 } };
-  const health = index === 7 ? 24 : 12 + Math.min(index, 5) * 2;
+  const health = definition.id === 'campus' ? 36 : index === 7 ? 24 : 12 + Math.min(index, 5) * 2;
   const arena = { ...ARENA, name: definition.boss, theme: definition.theme, bossStyle: definition.bossStyle,
     behavior: definition.id === 'campus' ? 'showman' : 'core',
     dialogue: bossDialogue[definition.id],
     checkpointName: `${definition.boss} checkpoint`, stations: [],
-    boss: { ...ARENA.boss, health },
+    boss: { ...ARENA.boss, health, ...(definition.id === 'campus'
+      ? { x: 870, y: 340, w: 250, h: 290, damageGrace: .42, introDuration: 2.6 } : {}) },
     phases: definition.phases.map((name, phase) => ({ ...ARENA.phases[phase], name,
-      healthAbove: phase === 2 ? 0 : Math.floor(health * (definition.id === 'campus'
-        ? phase === 0 ? .7 : .35 : phase === 0 ? 2 / 3 : 1 / 3)),
+      healthAbove: phase === 2 ? 0 : definition.id === 'campus'
+        ? health * (phase === 0 ? .7 : .35) : Math.floor(health * (phase === 0 ? 2 / 3 : 1 / 3)),
       attack: definition.attacks[phase], warningTime: 1.6, attackDuration: 2.8 + index * .14,
       summonCount: 2, dangerDuration: .65, projectileSpeed: 145 + index * 5,
       waveSpeed: 160 + index * 5, interval: 1.8 - Math.min(index, 5) * .04 })) };

@@ -1,9 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { assetManifest } from '../scripts/build-assets.mjs';
 import { createState as createOriginalState, setPaused, update } from '../src/engine.js';
 import { CAMPAIGN } from '../src/campaign.js';
+import { createBoss, SHOWMAN_MOVES } from '../src/boss.js';
+import { drawCampaignBoss } from '../src/world-art.js';
+import { bossDialogueLayout, drawBossDialogue, drawBossWarnings } from '../src/boss-art.js';
+import { drawProjectile } from '../src/enemy-art.js';
+import { loadWizardRig, wizardMatrices, wizardPose, wizardCrownY } from '../src/wizard-rig.js';
+import { WIZARD_RIG } from '../images/Boss1-rig.js';
 import { interactionFor } from '../src/missions.js';
 import { workView, prepareQuiz, submitWork } from '../src/trivia-tasks.js';
 import { renderQuiz } from '../src/quiz-ui.js';
@@ -17,12 +24,21 @@ import { runTests as runPartyTests } from './party-tests.js';
 const step = 1 / 120;
 const LEVEL = CAMPAIGN[0].world;
 const createState = () => createOriginalState('marco', CAMPAIGN[0]);
+const robotAtlas = { naturalWidth: WIZARD_RIG.atlasSize[0], naturalHeight: WIZARD_RIG.atlasSize[1],
+  set src(value) { this.url = value; queueMicrotask(() => this.onload()); } };
+await loadWizardRig(() => robotAtlas);
 
 function canvasRecorder(width = 1280) {
   const calls = [];
   const context = new Proxy({ canvas: { width, height: 720 } }, {
+    set(target, key, value) {
+      target[key] = value;
+      if (key === 'fillStyle') calls.push([key, value]);
+      return true;
+    },
     get(target, key) {
       if (key in target) return target[key];
+      if (key === 'measureText') return text => ({ width: text.length * Number(target.font?.match(/(\d+)px/)?.[1] ?? 17) * .53 });
       return (...args) => {
         assert.ok(args.filter(value => typeof value === 'number').every(Number.isFinite));
         calls.push([key, ...args]);
@@ -32,6 +48,128 @@ function canvasRecorder(width = 1280) {
   });
   return { context, calls };
 }
+
+test('the Setup Wizard is a large grounded robot without the generic core overlay', () => {
+  const mission = CAMPAIGN[0];
+  const boss = createBoss(mission.arena);
+  const floor = mission.arena.platforms.find(platform => platform.id === 'arena-floor');
+  assert.ok(boss.w >= 230 && boss.h >= 260, 'The robot must tower over the original characters');
+  assert.equal(boss.y + boss.h, floor.y, 'Boots must meet the arena floor');
+  const before = JSON.stringify(boss);
+  const { context, calls } = canvasRecorder();
+  drawCampaignBoss(context, boss, mission, true);
+  assert.equal(JSON.stringify(boss), before);
+  const draws = calls.filter(([name]) => name === 'drawImage');
+  assert.equal(draws.length, WIZARD_RIG.layers.length);
+  assert.equal(draws.length, 13);
+  for (const [index, name] of WIZARD_RIG.drawOrder.entries()) {
+    const layer = WIZARD_RIG.layers.find(item => item.name === name);
+    assert.deepEqual(draws[index], ['drawImage', robotAtlas, ...layer.frame, ...layer.source]);
+  }
+  assert.ok(WIZARD_RIG.layers.every(layer => !/cube/i.test(layer.name)));
+  assert.equal(calls.filter(([name]) => name === 'bezierCurveTo').length, 0);
+  assert.ok(!calls.some(([name, x, y, width, height]) => name === 'strokeRect'
+    && x === boss.x && y === boss.y && width === boss.w && height === boss.h));
+});
+
+test('Setup Wizard articulated layers preserve the supplied artwork and animate relative to each other', () => {
+  const source = readFileSync(new URL('../images/Boss1.png', import.meta.url));
+  const image = readFileSync(new URL('../images/Boss1-rig.png', import.meta.url));
+  assert.equal(createHash('sha256').update(source).digest('hex'), WIZARD_RIG.sourceHash);
+  assert.equal(image.readUInt32BE(16), WIZARD_RIG.atlasSize[0]);
+  assert.equal(image.readUInt32BE(20), WIZARD_RIG.atlasSize[1]);
+  assert.equal(image[25], 6, 'The cutout atlas has an alpha channel');
+  assert.match(robotAtlas.url, /\/images\/Boss1-rig\.png$/);
+  const boss = createBoss(CAMPAIGN[0].arena);
+  Object.assign(boss, { mode: 'warning', attackType: 'slam', windup: 0, lookX: 0 });
+  const rest = wizardMatrices(boss, true);
+  for (const matrix of Object.values(rest)) matrix.forEach((value, index) => {
+    assert.ok(Math.abs(value - [1, 0, 0, 1, 0, 0][index]) < 1e-8, 'The bind pose must retain source proportions');
+  });
+  boss.windup = 1;
+  const raised = wizardMatrices(boss);
+  assert.notDeepEqual(raised.leftFist, rest.leftFist);
+  assert.notDeepEqual(raised.rightFist, rest.rightFist);
+  assert.notDeepEqual(raised.leftFist, raised.torso);
+  assert.notDeepEqual(raised.head, raised.leftArm);
+  Object.assign(boss, { mode: 'attack', attackStep: 1, attackPulse: .4 });
+  const impact = wizardPose(boss);
+  assert.ok(impact.body.y >= 150, 'The slam crouches to bring the painted fists to the floor');
+  assert.notDeepEqual(impact.leftFist, wizardPose({ ...boss, mode: 'warning', windup: 1 }).leftFist);
+  boss.attackPulse = 0;
+  Object.assign(boss, { mode: 'reposition', vx: 70, walkDistance: 35 });
+  const walk = wizardPose(boss);
+  assert.notDeepEqual(walk.leftLeg, walk.rightLeg);
+  assert.notDeepEqual(walk.leftBoot, walk.rightBoot);
+  boss.walkDistance += 40;
+  assert.notDeepEqual(wizardPose(boss).leftBoot, walk.leftBoot);
+  const forward = wizardMatrices({ ...boss, walkDistance: Math.PI / .16 }).leftBoot;
+  const backward = wizardMatrices({ ...boss, walkDistance: 3 * Math.PI / .16 }).leftBoot;
+  const footX = matrix => matrix[0] * 290 + matrix[2] * 925 + matrix[4];
+  assert.ok(Math.abs(footX(forward) - footX(backward)) * WIZARD_RIG.scale > 30,
+    'The boots must stride relative to the body, not just translate with the sprite');
+  Object.assign(boss, { vx: 0, age: 1, dialogue: { current: { text: 'Are you buffering?' } } });
+  const mouth = wizardPose(boss).mouth;
+  boss.age += .1;
+  assert.notDeepEqual(wizardPose(boss).mouth, mouth);
+  const reduced = wizardPose(boss, true);
+  boss.age += .3;
+  assert.deepEqual(wizardPose(boss, true), reduced);
+});
+
+test('Setup Wizard poses, countdown warnings, and crown balloons render without changing state', () => {
+  const mission = CAMPAIGN[0];
+  const poses = new Set();
+  for (const reducedMotion of [false, true]) for (const phase of [0, 1, 2]) {
+    for (const attackType of Object.keys(SHOWMAN_MOVES)) {
+      const boss = createBoss(mission.arena);
+      Object.assign(boss, { age: 3.2, phase, attackType, mode: 'warning', windup: .85,
+        warningDuration: 1.6, timer: .24, lockedAngle: 2.8,
+        shotOrigin: { x: 828, y: 496 }, lockedTarget: { x: 500, y: 607 } });
+      const before = JSON.stringify(boss);
+      const { context, calls } = canvasRecorder();
+      drawBossWarnings(context, boss);
+      drawCampaignBoss(context, boss, mission, reducedMotion);
+      assert.equal(JSON.stringify(boss), before);
+      poses.add(JSON.stringify(calls));
+    }
+  }
+  assert.ok(poses.size >= 20);
+  const boss = createBoss(mission.arena);
+  Object.assign(boss, { mode: 'attack', attackType: 'countdown', countdown: 2,
+    interruptible: true, safeZone: { x: 70, y: 0, w: 240, h: 630 },
+    zones: [{ x: 310, y: 0, w: 970, h: 630, active: false, kind: 'floor' }] });
+  const { context, calls } = canvasRecorder();
+  drawBossWarnings(context, boss);
+  assert.ok(calls.some(([name, text]) => name === 'fillText' && text === '2'));
+  assert.ok(calls.some(([name, text]) => name === 'fillText' && text === 'SAFE'));
+  assert.ok(calls.some(([name, x, y, width, height]) => name === 'fillRect' && x === 310 && y === 150 && width === 970 && height === 480));
+  boss.dialogue.current = { text: 'Please remain calm during your scheduled destruction.' };
+  for (const position of [110, 500, 920]) {
+    boss.x = position;
+    const player = { x: position + 110, y: 178 };
+    const bubble = bossDialogueLayout(context, boss, player);
+    assert.ok(bubble.rows.length <= 2);
+    assert.ok(bubble.x >= 16 && bubble.x + bubble.w <= 1264);
+    assert.ok(bubble.y > 143 && bubble.y + bubble.h + 12 < wizardCrownY(boss));
+    assert.ok(bubble.x + bubble.w <= player.x || bubble.x >= player.x + 34);
+    drawBossDialogue(context, boss, player);
+  }
+  assert.ok(calls.some(([name, text]) => name === 'fillText' && text === 'THE SETUP WIZARD'));
+  const defeatPoses = new Set();
+  boss.defeated = true;
+  for (const defeatTime of [0, .5, 1.8]) {
+    boss.defeatTime = defeatTime;
+    const recorder = canvasRecorder();
+    drawCampaignBoss(recorder.context, boss, mission, false);
+    defeatPoses.add(JSON.stringify(recorder.calls));
+  }
+  assert.equal(defeatPoses.size, 3);
+  const projectile = canvasRecorder();
+  drawProjectile(projectile.context, { owner: 'enemy', kind: 'token', style: 'wizard', x: 300, y: 500, w: 16, h: 16, life: 1 });
+  assert.ok(projectile.calls.some(([name]) => name === 'lineTo'));
+  assert.ok(!projectile.calls.some(([name]) => name === 'fillText'));
+});
 
 function jumpHeight(held) {
   const state = createState();

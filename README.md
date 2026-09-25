@@ -38,6 +38,61 @@ The **Level map** control opens the campaign map;
 unlocked worlds can be replayed. Azure Orbit is level seven, not a simulator.
 The final world transitions from the platform encounter into a saucer finale.
 
+### The Setup Wizard
+
+The first world's boss is a large, grounded robot: a rounded glossy white and
+metallic-blue body, short armored legs, blue-lit boots, oversized segmented
+fists, four glowing red/green/blue/yellow chest panels, a low black-glass face
+with cyan eyes and a digital grin, a faceted crystal crown, and thick cable loops.
+There are no shoulder cubes. The artwork comes directly from the supplied
+[images/Boss1.png](images/Boss1.png), not a procedural likeness. A transparent
+13-layer sprite rig moves the upper arms, fists, thighs, boots, head/cables,
+eyes, and grin separately. Alternating steps, raised fists, recoil, charge
+lean, panic, and the final collapse follow combat state; it is not a static
+picture sliding around. Later bosses retain their existing designs.
+
+The neutral pose preserves the source's retained robot pixels and proportions.
+Animation uses 2D joints and overlapping cutouts, not newly generated 3D views.
+The white background is removed without changing the original PNG. The atlas
+and joint metadata are included in the repository, load before play is enabled,
+and use the same cache version as the game's modules. On macOS with Swift,
+`swift scripts/build-boss-rig.swift` rebuilds them and checks neutral-pose pixel
+reconstruction. No Swift installation is needed to play, build, or run Node tests;
+the hand-authored masks need adjustment if the reference pose changes.
+
+He strolls and poses early, walks more aggressively after 70% health, and
+becomes visibly unstable below 35%. Every sequence includes repositioning,
+a warning, committed attacks, and an exposed recovery window. His 36 health
+points, existing blaster access, companion damage limits, and normal jump
+physics apply throughout; no new quiz or special ability is required.
+
+| Phase | Patterns And Counters |
+| --- | --- |
+| Above 70% | Heavy Slam sends outward ground waves; jump them and retaliate. Triple Volley locks its three aim lines before firing. Royal Charge follows a marked boot-height lane; jump or use an elevated platform, then punish the wall stun. |
+| 70% through 35% | Volley can link into a separately warned slam after a clear gap. Arena Control leaves a marked safe lane. At most two weak helpers enter while the boss stops attacking. Defensive Overload exposes the four chest panels: jump and shoot from an existing platform to interrupt it; the released wave is also jumpable. |
+| Below 35% | Desperation Combo has two quick energy strikes and a delayed heavy slam. Catastrophe Countdown walks to arena center and counts 3-2-1: run into the green safe lane or interrupt the chest. Unstable Power Burst sends three pairs of waves at fixed intervals. Strong attacks leave longer recovery windows. |
+
+Charges do not turn after commitment. Cornered players get repositioning room;
+damage cancels queued follow-ups. No special repeats more than twice in a row.
+Ground waves remain visible and active during recovery, and the next attack
+waits for old projectiles to clear. The ordinary full jump can clear a charge
+in either direction; decorative shoulders and crystals do not cause contact
+damage. Armor is hittable during recovery; only the marked chest is interruptible
+during overload or countdown charging.
+
+Balloons sit above the crown and avoid the player and attack banner. Optional
+jokes wait ten seconds and rotate without immediate repeats. Wall impacts,
+shield breaks, missed attacks, idle players, low health, and retries trigger
+their corresponding reactions; phase and defeat lines take priority. Warnings,
+impacts, and countdown ticks have synthesized cues when effects are enabled.
+At zero health, threats stop immediately; he attempts one last pose and
+collapses before the results appear. Pause also freezes this animation.
+
+Automated simulation and mocked-canvas checks cover these rules, including
+real-engine jump counters, chest access, countdown escape, companion attacks,
+caption placement, and victory cleanup. The visual likeness, readability at
+phone scale, sound balance, and encounter feel still need human playtesting.
+
 ### Jumping And Climbing
 
 **Jumping and all original jump platforms remain.** Space, W, and Up Arrow still

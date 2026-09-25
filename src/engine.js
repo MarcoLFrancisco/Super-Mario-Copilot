@@ -3,6 +3,7 @@ import { ARENA, ENCOUNTERS } from './encounters.js';
 import { createBlocks, resolveBlockX, resolveBlockY, updateBlocks, collectBlockRewards } from './blocks.js';
 import { createCombat, resetCombat, grantPower, hurtPlayer, updateCombat, helperAllowance } from './combat.js';
 import { createBoss, updateBoss, hitBoss, bossSupportTarget } from './boss.js';
+import { sayBoss } from './boss-dialogue.js';
 import { createParty, syncParty, resetPartyMotion, updateParty, requestPartyAttacks, initializeIndependentParty, updateCompanions, visibleParty, companionIds, unlockHelper } from './party.js';
 import { createPartyDialogue, updatePartyDialogue, sayParty, reactPartyDialogue, clearPartyCaption } from './party-dialogue.js';
 import { createMissionProgress, updateMission, missionReady } from './missions.js';
@@ -95,7 +96,13 @@ function respawn(state, events) {
   const checkpoint = state.stage === 'boss'
     ? { name: state.arena.checkpointName, spawn: state.arena.spawn }
     : state.world.checkpoints[state.checkpointIndex];
-  if (state.stage === 'boss') enterArena(state);
+  if (state.stage === 'boss') {
+    enterArena(state);
+    if (state.arena.behavior === 'showman') {
+      sayBoss(state.boss.dialogue, 'playerDefeated', events);
+      state.boss.dialogue.usedOnce.push('entrance');
+    }
+  }
   else {
     state.player = makePlayer(checkpoint.spawn);
     state.cameraX = cameraTarget(state.player, state.world);

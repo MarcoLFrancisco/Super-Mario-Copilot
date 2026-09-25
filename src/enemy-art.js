@@ -81,11 +81,17 @@ export function drawEnemy(ctx, enemy, reducedMotion = false) {
 export function drawProjectile(ctx, shot) {
   if (shot.life <= 0) return;
   ctx.save(); ctx.translate(shot.x, shot.y);
-  const color = shot.owner === 'player' ? '#80ffdd' : '#ff91b2';
+  const color = shot.owner === 'player' ? '#80ffdd' : shot.style === 'wizard' ? '#45caff' : '#ff91b2';
   ctx.shadowColor = color; ctx.shadowBlur = 7;
   if (shot.kind === 'wave') {
     line(ctx, [[0, shot.h], [5, 8], [12, 1], [22, 9], [shot.w, shot.h]], color, 3);
     line(ctx, [[7, shot.h], [13, 12], [20, shot.h]], '#ffe4f1', 2);
+  } else if (shot.style === 'wizard') {
+    box(ctx, 1, 3, shot.w - 4, shot.h - 4, '#0b469d');
+    line(ctx, [[1,3],[shot.w - 4,3],[shot.w - 4,shot.h - 1],[1,shot.h - 1],[1,3],
+      [5,0],[shot.w,0],[shot.w,shot.h - 5],[shot.w - 4,shot.h - 1]], color, 2);
+    line(ctx, [[shot.w - 4,3],[shot.w,0]], '#d1f8ff', 2);
+    line(ctx, [[5,7],[shot.w - 7,shot.h - 5]], '#87efff', 2);
   } else {
     box(ctx, 0, 0, shot.w, shot.h, color);
     ctx.shadowBlur = 0;

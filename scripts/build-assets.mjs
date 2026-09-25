@@ -15,9 +15,11 @@ function modulesIn(directory) {
 }
 
 export function assetManifest() {
-  const modules = [...modulesIn('src/'), ...modulesIn('vendor/')].sort();
+  const modules = [...modulesIn('src/'), ...modulesIn('vendor/'), ...modulesIn('images/')].sort();
+  const images = readdirSync(new URL('images/', root)).filter(path => /\.png$/.test(path))
+    .map(path => `images/${path}`).sort();
   const hash = createHash('sha256');
-  for (const path of [...modules, 'styles.css']) {
+  for (const path of [...modules, ...images, 'styles.css']) {
     hash.update(path).update('\0').update(readFileSync(new URL(path, root))).update('\0');
   }
   const version = hash.digest('hex').slice(0, 16);
@@ -43,5 +45,5 @@ export function buildAssets() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const manifest = buildAssets();
-  console.log(`Versioned ${Object.keys(manifest.imports).length} modules and CSS: ${manifest.version}`);
+  console.log(`Versioned ${Object.keys(manifest.imports).length} modules, robot images, and CSS: ${manifest.version}`);
 }
