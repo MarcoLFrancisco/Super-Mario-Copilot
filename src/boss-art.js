@@ -72,8 +72,12 @@ export function drawBossWarnings(c, boss) {
     label(c, zone.active ? 'DANGER' : 'MOVE!', zone.x + zone.w / 2, 135, 13, '#ffe1a7');
   }
   if (boss.mode === 'warning') {
-    const tips = { tokens: 'PROJECTILE BURST INCOMING', agents: 'MARKED COLUMN ACTIVATING', waves: 'FLOOR WAVES INCOMING' };
-    const attack = (boss.arena ?? ARENA).phases[boss.phase].attack;
+    const tips = { tokens: 'PROJECTILE BURST INCOMING', agents: 'MARKED COLUMN ACTIVATING', waves: 'FLOOR WAVES INCOMING',
+      slam: 'JUMP THE SHOCKWAVE', volley: 'AIM LOCKED — MOVE!', charge: 'STRAIGHT-LINE CHARGE',
+      arenaControl: 'REACH THE CLEAR FLOOR', reinforcements: 'REINFORCEMENTS INCOMING',
+      overload: 'HIT THE GLOWING CORE', desperation: 'TWO QUICK — ONE DELAYED',
+      countdown: 'SAFE ZONE OR CORE INTERRUPT', burst: 'ALTERNATING POWER WAVES' };
+    const attack = boss.attackType ?? (boss.arena ?? ARENA).phases[boss.phase].attack;
     rect(c, 240, 106, 800, 35, '#35223eee');
     label(c, tips[attack], 640, 129, 16, '#ffdb95');
   } else if (boss.mode === 'exposed') {
@@ -82,7 +86,7 @@ export function drawBossWarnings(c, boss) {
   c.restore();
 }
 
-function drawDialogueBubble(c, boss) {
+export function drawBossDialogue(c, boss) {
   const caption = boss.dialogue.current;
   if (!caption) return;
   c.save();
@@ -276,5 +280,5 @@ export function drawBoss(c, boss, reducedMotion = false) {
   c.restore();
   // Draw in arena coordinates so bubbles stay inside the viewport and below
   // the attack-guidance banner, without altering the core's collision shape.
-  drawDialogueBubble(c, boss);
+  drawBossDialogue(c, boss);
 }

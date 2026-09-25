@@ -15,7 +15,9 @@ export function createBoss(arena = ARENA) {
     shotTimer: 0, grace: 0, cycle: 0, zones: [], defeated: false,
     helperDamage: 0, helperWindowDamage: 0,
     vx: 0, vy: 0, lookX: -1, lookY: 0, windup: 0,
-    recoil: 0, attackPulse: 0, dialogue: createDialogue(arena.dialogue) };
+    recoil: 0, attackPulse: 0, attackType: null, attackHistory: [],
+    attackStep: 0, lockedTarget: null, interruptible: false,
+    dialogue: createDialogue(arena.dialogue) };
 }
 // Helpers may contribute one third of total health, at most two per exposure.
 // Keep the last point for the player; reset all counters with a fresh encounter.
@@ -29,7 +31,8 @@ export function bossSupportTarget(boss) {
       || supportAllowance(boss) <= 0) return null;
   const arena = boss.arena ?? ARENA;
   const platform = arena.platforms.find(p => p.id === 'arena-right');
-  return { id: 'boss-core', x: arena.boss.x, y: arena.boss.y,
+  return { id: 'boss-core', x: arena.behavior === 'showman' ? boss.x : arena.boss.x,
+    y: arena.behavior === 'showman' ? boss.y : arena.boss.y,
     w: boss.w, h: boss.h, exposed: boss.mode === 'exposed',
     approachY: platform.y - P.playerHeight };
 }
@@ -37,6 +40,154 @@ export function bossSupportTarget(boss) {
 const playerBox = p => ({ x: p.x, y: p.y, w: P.playerWidth, h: P.playerHeight });
 const phaseFor = boss => Math.max(0, (boss.arena ?? ARENA).phases.findIndex(phase => boss.health > phase.healthAbove));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+const SHOWMAN_ATTACKS = [
+  ['slam', 'volley', 'charge'],
+  ['volley', 'slam', 'arenaControl', 'reinforcements', 'overload'],
+  ['desperation', 'countdown', 'burst']
+];
+
+function chooseShowmanAttack(boss, player) {
+  const pool = SHOWMAN_ATTACKS[boss.phase];
+  const distance = Math.abs(player.x + P.playerWidth / 2 - boss.x - boss.w / 2);
+  let preferred = boss.phase === 0
+    ? distance < 230 ? 'slam' : distance > 540 ? 'volley' : 'charge'
+    : pool[boss.cycle % pool.length];
+  const lastTwo = boss.attackHistory.slice(-2);
+  if (lastTwo.length === 2 && lastTwo.every(attack => attack === preferred)) {
+    preferred = pool[(pool.indexOf(preferred) + 1) % pool.length];
+  }
+  boss.attackHistory.push(preferred);
+  if (boss.attackHistory.length > 4) boss.attackHistory.shift();
+  return preferred;
+}
+
+function showmanWarning(boss, player, events) {
+  const arena = boss.arena;
+  boss.phase = phaseFor(boss);
+  boss.attackType = chooseShowmanAttack(boss, player);
+  boss.mode = 'warning'; boss.timer = boss.phase === 2 ? 1.15 : 1.55;
+  boss.cycle += 1; boss.attackStep = 0; boss.zones = [];
+  boss.lockedTarget = { x: player.x + P.playerWidth / 2, y: player.y + P.playerHeight / 2 };
+  const direction = boss.lockedTarget.x < boss.x + boss.w / 2 ? -1 : 1;
+  boss.chargeDirection = direction;
+  if (boss.attackType === 'charge') {
+    const x = direction < 0 ? 0 : boss.x + boss.w;
+    boss.zones.push({ x, y: 520, w: direction < 0 ? boss.x : arena.width - x,
+      h: 110, active: false, kind: 'charge' });
+  } else if (boss.attackType === 'arenaControl') {
+    const safeX = clamp(player.x - 75, 180, arena.width - 330);
+    boss.zones.push({ x: 0, y: 585, w: safeX, h: 45, active: false, kind: 'floor' });
+    boss.zones.push({ x: safeX + 180, y: 585, w: arena.width - safeX - 180,
+      h: 45, active: false, kind: 'floor' });
+  } else if (boss.attackType === 'countdown') {
+    const safeX = player.x < arena.width / 2 ? 80 : arena.width - 300;
+    boss.safeZone = { x: safeX, y: 540, w: 220, h: 90 };
+    boss.zones.push({ x: 0, y: 0, w: safeX, h: 630, active: false, kind: 'countdown' });
+    boss.zones.push({ x: safeX + 220, y: 0, w: arena.width - safeX - 220,
+      h: 630, active: false, kind: 'countdown' });
+  }
+  events.push({ type: 'bossWarning', phase: boss.phase,
+    name: arena.phases[boss.phase].name, attack: boss.attackType });
+  sayBoss(boss.dialogue, boss.attackType, events);
+}
+
+function showmanShot(boss, combat, speed, spread = 0) {
+  const originX = boss.x + boss.w / 2;
+  const originY = boss.y + boss.h * .42;
+  const angle = Math.atan2(boss.lockedTarget.y - originY,
+    boss.lockedTarget.x - originX) + spread;
+  spawnShot(combat, { owner: 'enemy', kind: 'token', x: originX, y: originY,
+    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, w: 16, h: 16, life: 5 });
+}
+
+function exposeShowman(boss, combat, events, longRecovery = false) {
+  boss.mode = 'exposed'; boss.timer = longRecovery ? 4.8 : boss.phase === 0 ? 4.2 : 3.4;
+  boss.interruptible = false; boss.helperWindowDamage = 0; boss.zones = [];
+  clearThreats(combat);
+  events.push({ type: 'bossExposed', duration: boss.timer, attack: boss.attackType });
+  sayBoss(boss.dialogue, 'exposed', events);
+}
+
+function beginShowmanAttack(boss, combat, events) {
+  const durations = { slam: .7, volley: 2.2, charge: 2.4, arenaControl: 2.5,
+    reinforcements: 2.2, overload: 3.2, desperation: 2.4, countdown: 4.2, burst: 3.2 };
+  boss.mode = 'attack'; boss.timer = durations[boss.attackType]; boss.shotTimer = .12;
+  boss.attackPulse = .45; boss.interruptible = ['overload', 'countdown'].includes(boss.attackType);
+  if (boss.attackType === 'reinforcements') summon(boss, combat);
+  events.push({ type: 'bossAttack', phase: boss.phase, attack: boss.attackType });
+}
+
+function updateShowmanAttack(boss, combat, player, step, events) {
+  const elapsed = ({ slam: .7, volley: 2.2, charge: 2.4, arenaControl: 2.5,
+    reinforcements: 2.2, overload: 3.2, desperation: 2.4, countdown: 4.2, burst: 3.2 })[boss.attackType] - boss.timer;
+  if (boss.attackType === 'slam' && boss.attackStep === 0) {
+    for (const direction of [-1, 1]) spawnShot(combat, { owner: 'enemy', kind: 'wave',
+      x: boss.x + boss.w / 2, y: 604, w: 32, h: 26, vx: direction * 175, vy: 0, life: 5 });
+    boss.attackStep = 1;
+  } else if (boss.attackType === 'volley') {
+    boss.shotTimer -= step;
+    if (boss.shotTimer <= 0 && boss.attackStep < 3) {
+      showmanShot(boss, combat, 220, (boss.attackStep - 1) * .12);
+      boss.attackStep += 1; boss.shotTimer = .48;
+    }
+  } else if (boss.attackType === 'charge') {
+    boss.x += boss.chargeDirection * (boss.phase === 0 ? 330 : 390) * step;
+    const edge = boss.chargeDirection < 0 ? 35 : boss.arena.width - boss.w - 35;
+    if ((boss.chargeDirection < 0 && boss.x <= edge) || (boss.chargeDirection > 0 && boss.x >= edge)) {
+      boss.x = edge; boss.recoil = .6;
+      sayBoss(boss.dialogue, 'chargeMiss', events); exposeShowman(boss, combat, events, true); return;
+    }
+  } else if (boss.attackType === 'arenaControl' || boss.attackType === 'countdown') {
+    const active = boss.attackType === 'arenaControl' ? elapsed > .65 : boss.timer < 1.1;
+    for (const zone of boss.zones) {
+      zone.active = active;
+      if (active && overlaps(playerBox(player), zone)) hurtPlayer(combat, player, zone.x + zone.w / 2, events);
+    }
+  } else if (boss.attackType === 'overload' && boss.timer < .25 && boss.attackStep === 0) {
+    for (const direction of [-1, 1]) spawnShot(combat, { owner: 'enemy', kind: 'wave',
+      x: boss.x + boss.w / 2, y: 604, w: 32, h: 26, vx: direction * 230, vy: 0, life: 5 });
+    boss.attackStep = 1;
+  } else if (boss.attackType === 'desperation') {
+    boss.shotTimer -= step;
+    const delays = [.15, .38, .9];
+    if (boss.attackStep < 3 && boss.shotTimer <= 0) {
+      showmanShot(boss, combat, boss.attackStep === 2 ? 285 : 245,
+        boss.attackStep === 0 ? -.1 : boss.attackStep === 1 ? .1 : 0);
+      boss.shotTimer = delays[boss.attackStep]; boss.attackStep += 1;
+    }
+  } else if (boss.attackType === 'burst') {
+    boss.shotTimer -= step;
+    if (boss.shotTimer <= 0 && boss.attackStep < 5) {
+      const direction = boss.attackStep % 2 ? -1 : 1;
+      spawnShot(combat, { owner: 'enemy', kind: 'wave', x: direction < 0 ? boss.arena.width - 40 : 8,
+        y: 604, w: 32, h: 26, vx: direction * 205, vy: 0, life: 7 });
+      boss.attackStep += 1; boss.shotTimer = .55;
+    }
+  }
+  if (boss.mode === 'attack' && boss.timer === 0) {
+    exposeShowman(boss, combat, events, ['slam', 'charge', 'countdown', 'burst'].includes(boss.attackType));
+  }
+}
+
+function updateShowman(boss, combat, player, step, events) {
+  const arena = boss.arena;
+  boss.lookX = clamp((player.x + P.playerWidth / 2 - boss.x - boss.w / 2) / 240, -1, 1);
+  boss.lookY = clamp((player.y + P.playerHeight / 2 - boss.y - boss.h / 2) / 160, -1, 1);
+  boss.windup = boss.mode === 'warning' ? clamp(1 - boss.timer / (boss.phase === 2 ? 1.15 : 1.55), 0, 1) : 0;
+  boss.recoil = Math.max(0, boss.recoil - step); boss.attackPulse = Math.max(0, boss.attackPulse - step);
+  if (boss.mode === 'intro' && boss.timer === 0) showmanWarning(boss, player, events);
+  else if (boss.mode === 'warning' && boss.timer === 0) beginShowmanAttack(boss, combat, events);
+  else if (boss.mode === 'attack') updateShowmanAttack(boss, combat, player, step, events);
+  else if (boss.mode === 'exposed' && boss.timer === 0) showmanWarning(boss, player, events);
+  if (!['intro', 'warning'].includes(boss.mode) && overlaps(playerBox(player), boss)) {
+    hurtPlayer(combat, player, boss.x + boss.w / 2, events);
+  }
+  if (boss.phase === 2 && !boss.lowHealthSpoken) {
+    boss.lowHealthSpoken = true; sayBoss(boss.dialogue, 'lowHealth', events);
+  }
+  boss.x = clamp(boss.x, 35, arena.width - boss.w - 35);
+}
+
 function moveCore(boss, player, dt) {
   const arena = boss.arena ?? ARENA;
   const exposed = boss.mode === 'exposed';
@@ -129,6 +280,10 @@ export function updateBoss(boss, combat, player, dt, events) {
   if (boss.age === 0) sayBoss(boss.dialogue, 'entrance', events);
   boss.age += step; boss.timer = Math.max(0, boss.timer - step);
   boss.grace = Math.max(0, boss.grace - step);
+  if (arena.behavior === 'showman') {
+    updateShowman(boss, combat, player, step, events);
+    return;
+  }
   moveCore(boss, player, step);
   const phase = arena.phases[boss.phase];
   if (boss.mode === 'intro') {
@@ -196,7 +351,7 @@ export function hitBoss(boss, combat, events, party = null, solids = []) {
   for (const shot of [...combat.shots, ...attacks]) {
     if (shot.life <= 0 || shot.owner !== 'player' || !overlaps(shot, boss)) continue;
     shot.life = 0;
-    if (boss.objectivesLocked || boss.mode !== 'exposed' || boss.grace > 0) continue;
+    if (boss.objectivesLocked || (!boss.interruptible && boss.mode !== 'exposed') || boss.grace > 0) continue;
     const damage = shot.helper ? Math.min(shot.damage, supportAllowance(boss)) : shot.damage;
     if (damage <= 0) continue;
     if (shot.melee && !claimPartyHit(party, shot, 'boss-core')) continue;
@@ -220,6 +375,11 @@ export function hitBoss(boss, combat, events, party = null, solids = []) {
       events.push({ type: 'bossDefeated', name: arena.name, points: 3000 });
       sayBoss(boss.dialogue, 'defeat', events);
       return;
+    }
+    if (boss.interruptible) {
+      const interrupted = boss.attackType === 'countdown' ? 'countdownBreak' : 'shieldBreak';
+      sayBoss(boss.dialogue, interrupted, events);
+      exposeShowman(boss, combat, events, true);
     }
     const nextPhase = phaseFor(boss);
     if (nextPhase !== boss.phase) {

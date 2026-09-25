@@ -5,7 +5,7 @@ import { LEVEL, PHYSICS } from '../src/level.js';
 import { ARENA } from '../src/encounters.js';
 import { CAMPAIGN, createCampaign, updateCampaign, advanceCampaign, selectLevel, selectInterlude, nextDestination, saveCampaign, pauseCampaign, retryLevel } from '../src/campaign.js';
 import { INTERLUDES } from '../src/arcade.js';
-import { createBoss } from '../src/boss.js';
+import { createBoss, hitBoss, updateBoss } from '../src/boss.js';
 import { worldMusicStep } from '../src/music.js';
 import { interact, updateMission, missionReady, missionStations, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
 import { submitWork, workView, prepareQuiz, validateQuiz, validQuizOverrides } from '../src/trivia-tasks.js';
@@ -28,6 +28,52 @@ test('the original engine accepts a mission without changing the selected charac
   assert.equal(state.stage, 'boss');
   assert.equal(state.boss.health, 12);
   assert.ok(events.some(event => event.type === 'bossEnter' && event.name === arena.name));
+});
+
+test('the Setup Wizard telegraphs responsive attacks and always leaves a punish window', () => {
+  const arena = CAMPAIGN[0].arena;
+  assert.equal(arena.behavior, 'showman');
+  assert.deepEqual(arena.phases.map(phase => phase.healthAbove), [8, 4, 0]);
+  const boss = createBoss(arena);
+  const combat = { health: 3, grace: 0, protection: 0, shots: [], enemies: [] };
+  const player = { x: boss.x - 90, y: 584, vx: 0, vy: 0, grounded: true };
+  const events = [];
+
+  boss.timer = 0;
+  updateBoss(boss, combat, player, 1 / 60, events);
+  assert.equal(boss.attackType, 'slam');
+  boss.mode = 'exposed'; boss.timer = 0; player.x = 80;
+  updateBoss(boss, combat, player, 1 / 60, events);
+  assert.equal(boss.attackType, 'volley');
+
+  player.x = boss.x - 330;
+  boss.attackHistory = ['charge', 'charge']; boss.mode = 'exposed'; boss.timer = 0;
+  updateBoss(boss, combat, player, 1 / 60, events);
+  assert.notEqual(boss.attackType, 'charge');
+
+  boss.attackType = 'charge'; boss.chargeDirection = 1; boss.mode = 'attack'; boss.timer = 1;
+  boss.x = arena.width - boss.w - 36;
+  updateBoss(boss, combat, player, 1 / 60, events);
+  assert.equal(boss.mode, 'exposed');
+  assert.ok(events.some(event => event.type === 'bossDialogue' && event.key === 'chargeMiss'));
+
+  boss.dialogue.current = null; boss.dialogue.cooldown = 0;
+  boss.attackType = 'overload'; boss.mode = 'attack'; boss.interruptible = true;
+  boss.grace = 0; boss.health = boss.maxHealth;
+  combat.shots.push({ owner: 'player', x: boss.x + 20, y: boss.y + 20,
+    w: 12, h: 12, damage: 1, life: 1 });
+  hitBoss(boss, combat, events);
+  assert.equal(boss.mode, 'exposed');
+  assert.ok(events.some(event => event.type === 'bossDialogue' && event.key === 'shieldBreak'));
+
+  boss.health = 1; boss.mode = 'exposed'; boss.interruptible = false; boss.grace = 0;
+  combat.enemies.push({ dead: false });
+  combat.shots.push({ owner: 'player', x: boss.x + 20, y: boss.y + 20,
+    w: 12, h: 12, damage: 1, life: 1 });
+  hitBoss(boss, combat, events);
+  assert.equal(boss.mode, 'defeated');
+  assert.equal(combat.shots.length, 0);
+  assert.equal(combat.enemies.length, 0);
 });
 
 test('the campaign has eight distinct sequential worlds with original-party states', () => {

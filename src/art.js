@@ -6,7 +6,7 @@ import { drawCollectible, drawPickup } from './collectibles.js';
 import { drawBackground, drawPlatform } from './scenery.js';
 import { ARENA } from './encounters.js';
 import { drawEnemy, drawProjectile, drawPowerup } from './enemy-art.js';
-import { drawArena, drawBossWarnings, drawBoss } from './boss-art.js';
+import { drawArena, drawBossWarnings, drawBoss, drawBossDialogue } from './boss-art.js';
 import { drawWorldBackground, drawWorldPlatform, drawMissionObjects, drawCampaignBoss } from './world-art.js';
 import { missionObjective } from './missions.js';
 
@@ -52,7 +52,10 @@ function drawCombatScene(ctx, state, reducedMotion, visible) {
   }
   if (state.stage === 'boss') {
     drawBossWarnings(ctx, state.boss);
-    if (state.mission.id) drawCampaignBoss(ctx, state.boss, state.mission, reducedMotion);
+    if (state.mission.id) {
+      drawCampaignBoss(ctx, state.boss, state.mission, reducedMotion);
+      drawBossDialogue(ctx, state.boss);
+    }
     else drawBoss(ctx, state.boss, reducedMotion);
   }
   for (const enemy of combat.enemies) {

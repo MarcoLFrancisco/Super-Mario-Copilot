@@ -40,6 +40,21 @@ const lines = {
     'Fine. No more autocomplete.',
     'New plan. Fewer safety checks.'
   ],
+  slam: ['Stand still. This is a precision operation.'],
+  volley: ['The first two were warning shots. Probably.'],
+  charge: ['Behold, advanced tactical running!'],
+  chargeMiss: ['That wall moved.'],
+  arenaControl: ['The floor is now a premium feature.'],
+  reinforcements: ['Minions! Address this customer complaint!'],
+  overload: ['You cannot hurt me emotionally or physically!'],
+  shieldBreak: ['Apparently, both.'],
+  desperation: ['Combo! Combo! Very expensive combo!'],
+  countdown: ['Please remain calm during your scheduled destruction.'],
+  countdownBreak: ['You skipped my cutscene!'],
+  burst: ['I have everything under contr—', 'Minor technical difficulty!'],
+  dodge: ['Dodging is just running with confidence.'],
+  idle: ['Are you buffering?'],
+  lowHealth: ['That health bar is spreading misinformation.'],
   defeat: [
     'You win. I will read the documentation.',
     'Human one. Hallucination zero.'
@@ -50,10 +65,18 @@ export const BOSS_LINES = Object.freeze(lines);
 
 const PRIORITY = Object.freeze({
   entrance: 3, tokens: 1, agents: 1, waves: 1,
-  exposed: 2, hit: 0, phase1: 3, phase2: 3, defeat: 4
+  slam: 1, volley: 1, charge: 1, chargeMiss: 4,
+  arenaControl: 1, reinforcements: 1, overload: 1, shieldBreak: 4,
+  desperation: 1, countdown: 2, countdownBreak: 4, burst: 1,
+  dodge: 0, idle: 0, lowHealth: 4,
+  exposed: 2, hit: 0, phase1: 3, phase2: 3, defeat: 5
 });
 const MOOD = Object.freeze({
   entrance: 'smug', tokens: 'smug', agents: 'smug', waves: 'angry',
+  slam: 'smug', volley: 'smug', charge: 'smug', chargeMiss: 'worried',
+  arenaControl: 'angry', reinforcements: 'smug', overload: 'smug', shieldBreak: 'hurt',
+  desperation: 'angry', countdown: 'angry', countdownBreak: 'worried', burst: 'worried',
+  dodge: 'annoyed', idle: 'smug', lowHealth: 'worried',
   exposed: 'worried', hit: 'hurt', phase1: 'angry', phase2: 'angry', defeat: 'defeated'
 });
 
@@ -83,7 +106,7 @@ export function sayBoss(dialogue, key, events = []) {
   const current = dialogue.current;
   if (current && priority <= current.priority) return null;
   if (dialogue.cooldown > 0 && priority < 2) return null;
-  const choices = (dialogue.lines ?? BOSS_LINES)[key];
+  const choices = (dialogue.lines ?? BOSS_LINES)[key] ?? BOSS_LINES[key];
   const index = dialogue.next[key] % choices.length;
   const text = choices[index];
   const duration = Math.max(2.6, Math.min(4.5, 1.4 + text.length * .055));

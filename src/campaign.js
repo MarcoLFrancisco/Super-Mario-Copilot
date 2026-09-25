@@ -99,8 +99,11 @@ const definitions = [
 ];
 
 const bossDialogue = {
-  campus: { entrance: ['Welcome! Your onboarding has 4,096 remaining steps.'],
-    exposed: ['A restart? But you have not filled in the feedback form.'], defeat: ['Setup complete. The tutorial would like feedback.'] },
+  campus: { entrance: ['Oh good. My final appointment.'],
+    phase1: ['You are ruining my moment.'], phase2: ['This is still part of my plan.'],
+    exposed: ['A restart? But you have not filled in the feedback form.'],
+    lowHealth: ['That health bar is spreading misinformation.'],
+    defeat: ['I demand a rematch with fewer witnesses.'] },
   github: { entrance: ['Two branches. One deeply unresolved conflict.'],
     tokens: ['This change looked smaller in the pull request.'], exposed: ['All tests passed. We are cautiously panicking.'],
     defeat: ['Merged. I will try not to revert that immediately.'] },
@@ -209,11 +212,13 @@ function buildMission(definition, index) {
     goal: { x: last.x + last.w - 125, y: last.y - 130, w: 76, h: 130 } };
   const health = index === 7 ? 24 : 12 + Math.min(index, 5) * 2;
   const arena = { ...ARENA, name: definition.boss, theme: definition.theme, bossStyle: definition.bossStyle,
+    behavior: definition.id === 'campus' ? 'showman' : 'core',
     dialogue: bossDialogue[definition.id],
     checkpointName: `${definition.boss} checkpoint`, stations: [],
     boss: { ...ARENA.boss, health },
     phases: definition.phases.map((name, phase) => ({ ...ARENA.phases[phase], name,
-      healthAbove: phase === 2 ? 0 : Math.floor(health * (phase === 0 ? 2 / 3 : 1 / 3)),
+      healthAbove: phase === 2 ? 0 : Math.floor(health * (definition.id === 'campus'
+        ? phase === 0 ? .7 : .35 : phase === 0 ? 2 / 3 : 1 / 3)),
       attack: definition.attacks[phase], warningTime: 1.6, attackDuration: 2.8 + index * .14,
       summonCount: 2, dangerDuration: .65, projectileSpeed: 145 + index * 5,
       waveSpeed: 160 + index * 5, interval: 1.8 - Math.min(index, 5) * .04 })) };
