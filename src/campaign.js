@@ -196,7 +196,7 @@ function buildMission(definition, index) {
         reward: block === 1 ? routeIndex === 8 ? 'microsoft' : 'blaster' : null });
     }
   }
-  for (const [routeIndex, reward] of [[0, 'recruit-first'], [4, 'recruit-second']]) {
+  for (const [routeIndex, reward] of [[0, 'recruit-first'], [4, 'recruit-second'], [8, 'recruit-third']]) {
     const floor = mainRoute[routeIndex];
     blocks.push({ id: `${definition.id}-${reward}`, x: floor.x + floor.w - 80, y: floor.y - 142,
       w: 32, h: 32, app: definition.app, kind: 'reward', reward });

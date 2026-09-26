@@ -16,6 +16,7 @@ import { renderArcade, loadArcadeArt } from './arcade-art.js';
 import { selectInterlude, nextDestination } from './campaign.js';
 import { loadWizardRig } from './wizard-rig.js';
 import { loadBossCollection } from './boss-collection.js';
+import { loadBumblebeeArt } from './bumblebee-art.js';
 import { actionForKey } from './input.js';
 import { quizTerminalBounds } from './world-art.js';
 
@@ -871,7 +872,7 @@ function frame(now) {
   hud(); requestAnimationFrame(frame);
 }
 if (ctx) {
-  await Promise.all([loadWizardRig(), loadArcadeArt(), loadBossCollection()]);
+  await Promise.all([loadWizardRig(), loadArcadeArt(), loadBossCollection(), loadBumblebeeArt()]);
   icons(); applyAccessibility(); resize(); panels(); audioControls();
   el('start-button').disabled = false; el('sound-button').disabled = false;
   text('load-status', ''); text('storage-status', storageAvailable ? 'Local progress' : 'Session-only progress');

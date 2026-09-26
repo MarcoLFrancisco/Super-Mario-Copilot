@@ -1,18 +1,19 @@
 import { PHYSICS as P } from './level.js';
 import { CHARACTERS, ATTACKS, visibleParty } from './party.js';
 import { drawCharacter, characterMotion } from './character.js';
+import { drawBumblebee } from './bumblebee-art.js';
 
 // World coordinates; caller owns camera, culling and damage-grace opacity.
 // Artwork only: never advance timers, mutate actors or resolve damage here.
-export function drawParty(ctx, party, time = 0, reducedMotion = false) {
+export function drawParty(ctx, party, time = 0, reducedMotion = false, speaker = null) {
   const actors = visibleParty(party);
   for (const actor of actors.slice(1).reverse()) {
-    drawPartyActor(ctx, actor, time, reducedMotion);
+    drawPartyActor(ctx, actor, time, reducedMotion, { talking: speaker === actor.id });
   }
-  drawPartyActor(ctx, actors[0], time, reducedMotion);
+  drawPartyActor(ctx, actors[0], time, reducedMotion, { talking: speaker === actors[0].id });
 }
 
-export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
+export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false, options = {}) {
   if (!actor || !CHARACTERS[actor.id]) return;
   const attack = actor.attack;
   const spec = attack && ATTACKS[attack.kind];
@@ -27,6 +28,7 @@ export function drawPartyActor(ctx, actor, time = 0, reducedMotion = false) {
   const outfit = CHARACTERS.marco.appearance;
   ctx.save();
   try {
+    if (actor.id === 'bumblebee') drawBumblebee(ctx, actor, time, reducedMotion, { ...options, extension, active });
     if (actor.id === 'mario') {
       drawCharacter(ctx, actor, time, reducedMotion,
         attack?.kind === 'kick' ? extension : null);

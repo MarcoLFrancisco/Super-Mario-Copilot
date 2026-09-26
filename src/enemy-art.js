@@ -110,12 +110,13 @@ export function drawPowerup(ctx, item, time = 0, reducedMotion = false) {
   const halo = ctx.createRadialGradient(item.w / 2, item.h / 2, 3, item.w / 2, item.h / 2, 27);
   halo.addColorStop(0, '#b3eaff77'); halo.addColorStop(1, '#b3eaff00');
   box(ctx, -15, -15, item.w + 30, item.h + 30, halo);
-  if (['helper-marco', 'helper-donkey', 'helper-mario'].includes(item.kind)) {
+  if (['helper-marco', 'helper-donkey', 'helper-mario', 'helper-bumblebee'].includes(item.kind)) {
     const [name, color, highlight] = item.kind === 'helper-marco'
       ? ['Marco', '#137d89', '#a4fff0']
       : item.kind === 'helper-donkey'
         ? ['Donkey', '#655f79', '#a9fff1']
-        : ['Mario', '#b93643', '#ffd6b0'];
+        : item.kind === 'helper-bumblebee'
+          ? ['Bumblebee', '#126aa2', '#ffe08f'] : ['Mario', '#b93643', '#ffd6b0'];
     box(ctx, 0, 0, item.w, item.h, color);
     box(ctx, 1, 1, item.w - 2, 3, highlight);
     text(ctx, name[0], item.w / 2, item.h - 6, 18, '#ffffff');

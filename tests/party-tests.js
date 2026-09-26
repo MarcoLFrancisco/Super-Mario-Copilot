@@ -29,7 +29,7 @@ function shot(combat, boss, damage = 1) {
 }
 
 export async function runTests({ test, assert }) {
-  for (const leader of ['marco', 'mario', 'donkey']) {
+  for (const leader of ['marco', 'mario', 'donkey', 'bumblebee']) {
     await test(`${leader}: solo start, two real box rewards, recovery and restart`, () => {
       const s = createState(leader);
       assert(s.party.leader === leader && visibleParty(s.party).length === 1, 'Must start solo');
@@ -73,9 +73,13 @@ export async function runTests({ test, assert }) {
     const box = activePartyAttacks(d.party)[0];
     assert(box.kind === 'backKick' && box.direction === -1 && box.x < 200, 'Donkey strikes behind');
     assert(swing(createState('mario').party, 'mario', 200, 200).attack.kind === 'kick', 'Mario kicks');
+    const robot = createState('bumblebee');
+    swing(robot.party, 'bumblebee', 200, 200, -1);
+    const pulse = activePartyAttacks(robot.party)[0];
+    assert(pulse.kind === 'pulse' && pulse.direction === -1 && pulse.damage === 1, 'Bumblebee emits a forward headset pulse');
   });
 
-  for (const id of ['marco', 'mario', 'donkey']) {
+  for (const id of ['marco', 'mario', 'donkey', 'bumblebee']) {
     await test(`${id}: automatic melee plants both running approaches through windup`, () => {
       for (const direction of [-1, 1]) {
         const world = { width: 800, hazards: [], platforms: [
@@ -321,6 +325,23 @@ export async function runTests({ test, assert }) {
     assert(last.health === 1 && !last.defeated, 'Helpers cannot finish alone');
     shot(c, last); hitBoss(last, c, events, s.party); hitBoss(last, c, events, s.party);
     assert(last.defeated && events.filter(e => e.type === 'bossDefeated').length === 1, 'Single player victory');
+  });
+
+  await test('Bumblebee support pulse keeps boss shields and the player finishing blow intact', () => {
+    const state = createState('marco');
+    const boss = createBoss();
+    const combat = emptyCombat();
+    const events = [];
+    state.party.unlocked.add('bumblebee');
+    const pulse = () => swing(state.party, 'bumblebee', boss.x - P.playerWidth - 8, boss.y + 30, 1);
+    pulse(); hitBoss(boss, combat, events, state.party);
+    assert(boss.health === boss.maxHealth, 'Shielded bosses reject the headset pulse');
+    boss.mode = 'exposed'; boss.health = 2; boss.phase = 2;
+    pulse(); hitBoss(boss, combat, events, state.party);
+    assert(boss.health === 1 && boss.helperDamage === 1, 'Bumblebee contributes one pulse damage');
+    boss.grace = 0;
+    pulse(); hitBoss(boss, combat, events, state.party);
+    assert(boss.health === 1 && !boss.defeated, 'The player still delivers the finishing blow');
   });
 
   await test('Companions land on the first crossed floor regardless of surface order', () => {

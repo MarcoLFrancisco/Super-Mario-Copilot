@@ -8,13 +8,17 @@ import { CAMPAIGN } from '../src/campaign.js';
 import { createBoss, SHOWMAN_MOVES } from '../src/boss.js';
 import { drawCampaignBoss, drawClimb, drawMissionObjects, drawWorldPlatform, quizTerminalBounds } from '../src/world-art.js';
 import { actionForKey } from '../src/input.js';
+import { createPartyDialogue, sayParty } from '../src/party-dialogue.js';
+import { drawPartyBubble } from '../src/party-bubbles.js';
 import { drawPartyActor } from '../src/party-art.js';
 import { characterMotion } from '../src/character.js';
 import { bossDialogueLayout, drawBossDialogue, drawBossWarnings } from '../src/boss-art.js';
-import { drawProjectile } from '../src/enemy-art.js';
+import { drawProjectile, drawPowerup } from '../src/enemy-art.js';
 import { loadWizardRig, wizardMatrices, wizardPose, wizardCrownY } from '../src/wizard-rig.js';
 import { WIZARD_RIG } from '../images/Boss1-rig.js';
 import { BOSS_COLLECTION } from '../images/Boss-collection.js';
+import { BUMBLEBEE_RIG } from '../images/Bumblebee-rig.js';
+import { loadBumblebeeArt, bumblebeePose } from '../src/bumblebee-art.js';
 import { BOSS_DESIGNS, loadBossCollection, themedBossPose, themedBossBounds, drawThemedBoss, drawArmoredCore } from '../src/boss-collection.js';
 import { interactionFor } from '../src/missions.js';
 import { workView, prepareQuiz, submitWork } from '../src/trivia-tasks.js';
@@ -35,6 +39,9 @@ await loadWizardRig(() => robotAtlas);
 const interceptorImage = { naturalWidth: 1024, naturalHeight: 1024,
   set src(value) { this.url = value; queueMicrotask(() => this.onload()); } };
 await loadArcadeArt(() => interceptorImage);
+const bumblebeeImage = { naturalWidth: BUMBLEBEE_RIG.atlasSize[0], naturalHeight: BUMBLEBEE_RIG.atlasSize[1],
+  set src(value) { this.url = value; queueMicrotask(() => this.onload()); } };
+await loadBumblebeeArt(() => bumblebeeImage);
 const bossImages = new Map();
 await loadBossCollection(key => {
   const image = { naturalWidth: BOSS_COLLECTION.atlasSize[0], naturalHeight: BOSS_COLLECTION.atlasSize[1],
@@ -63,6 +70,113 @@ function canvasRecorder(width = 1280) {
   });
   return { context, calls };
 }
+
+test('Bumblebee is a fourth selectable hero without replacing the original characters', () => {
+  const state = createOriginalState('bumblebee', CAMPAIGN[0]);
+  assert.equal(state.party.leader, 'bumblebee');
+  assert.deepEqual(Object.keys(state.party.actors).sort(), ['bumblebee', 'donkey', 'marco', 'mario']);
+  assert.equal(state.party.unlocked.size, 0);
+  const startX = state.player.x;
+  for (let frame = 0; frame < 40; frame += 1) update(state, { right: true }, 1 / 120);
+  assert.ok(state.player.x > startX);
+  assert.ok(update(state, { jumpPressed: true, jumpHeld: true }, 1 / 120).some(event => event.type === 'jump'));
+});
+
+test('Bumblebee uses BBRich pixels with independently animated face headset cap and pendant', () => {
+  assert.equal(BUMBLEBEE_RIG.source, 'BBRich.png');
+  const source = readFileSync(new URL('../images/BBRich.png', import.meta.url));
+  const atlas = readFileSync(new URL('../images/Bumblebee-rig.png', import.meta.url));
+  assert.equal(createHash('sha256').update(source).digest('hex'), BUMBLEBEE_RIG.sourceHash);
+  assert.deepEqual([atlas.readUInt32BE(16), atlas.readUInt32BE(20), atlas[25]], [...BUMBLEBEE_RIG.atlasSize, 6]);
+  assert.ok(BUMBLEBEE_RIG.foregroundPixels > 430000);
+  assert.ok(bumblebeeImage.url.endsWith('/images/Bumblebee-rig.png'));
+  const state = createOriginalState('bumblebee', CAMPAIGN[0]);
+  const actor = state.party.actors.bumblebee;
+  Object.assign(actor, { x: 300, y: 400, vx: 200, facing: 1, grounded: true, walkDistance: 8 });
+  const first = bumblebeePose(actor, 1);
+  actor.walkDistance += 12;
+  const walking = bumblebeePose(actor, 1);
+  assert.notDeepEqual(first.pendant, walking.pendant);
+  assert.notDeepEqual(first.leftEar, walking.leftEar);
+  assert.notDeepEqual(walking.face, walking.body);
+  actor.vx = 0;
+  const blink = bumblebeePose(actor, 4.5);
+  assert.ok(blink.leftEye.scaleY < .2);
+  assert.equal(bumblebeePose(actor, 4.5, true).leftEye.scaleY, 1);
+  assert.notDeepEqual(bumblebeePose(actor, 1, false, { talking: true }).mouth,
+    bumblebeePose(actor, 1.1, false, { talking: true }).mouth);
+  for (const facing of [-1, 1]) for (const reduced of [false, true]) {
+    actor.facing = facing;
+    const before = JSON.stringify(actor);
+    const { context, calls } = canvasRecorder();
+    drawPartyActor(context, actor, 1, reduced, { talking: true });
+    const draws = calls.filter(([name, image]) => name === 'drawImage' && image === bumblebeeImage);
+    assert.equal(draws.length, 12);
+    for (const [index, name] of BUMBLEBEE_RIG.drawOrder.entries()) {
+      const part = BUMBLEBEE_RIG.layers.find(layer => layer.name === name);
+      assert.deepEqual(draws[index], ['drawImage', bumblebeeImage, ...part.frame, ...part.source]);
+    }
+    assert.equal(JSON.stringify(actor), before);
+    const sourceTransforms = calls.slice(0, calls.findLastIndex(([name]) => name === 'drawImage'));
+    assert.ok(sourceTransforms.filter(([name]) => name === 'scale').every(([, horizontal, vertical]) => horizontal > 0 && vertical > 0),
+      'Cap and BB lettering must not be mirrored');
+  }
+  actor.climbing = 'rope'; actor.grounded = false; actor.climbDistance = 20;
+  const climbing = bumblebeePose(actor, 0, true);
+  actor.climbDistance += 15;
+  assert.notDeepEqual(bumblebeePose(actor, 0, true).body, climbing.body);
+  assert.deepEqual(bumblebeePose(actor, 1, true), bumblebeePose(actor, 2, true));
+});
+
+test('Bumblebee appears in selection recruitment dialogue and both visible pilot roles', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const selector = html.match(/<select id="character-select">([\s\S]*?)<\/select>/)[1];
+  assert.deepEqual([...selector.matchAll(/value="([^"]+)"/g)].map(match => match[1]), ['marco', 'mario', 'donkey', 'bumblebee']);
+  const dialogue = createPartyDialogue();
+  const caption = sayParty(dialogue, 'start', ['bumblebee'], [], 'bumblebee');
+  assert.equal(caption.character, 'bumblebee');
+  const bubble = canvasRecorder();
+  assert.ok(drawPartyBubble(bubble.context, caption, [{ id: 'bumblebee', x: 450, y: 510 }], 0));
+  assert.ok(bubble.calls.some(([name, text]) => name === 'fillText' && text === 'Bumblebee'));
+  const pickup = canvasRecorder();
+  drawPowerup(pickup.context, { kind: 'helper-bumblebee', x: 100, y: 200, w: 26, h: 26 }, 0, true);
+  assert.ok(pickup.calls.some(([name, text]) => name === 'fillText' && text === 'Bumblebee'));
+  for (const mode of ['orbit', 'pang']) {
+    const state = mode === 'orbit' ? createOrbit({ width: 1280 }) : createArcade('pang', { pilot: 'bumblebee' });
+    state.pilot = 'bumblebee';
+    for (const reduced of [true, false]) {
+      const { context, calls } = canvasRecorder();
+      (mode === 'orbit' ? renderOrbit : renderArcade)(context, state, reduced);
+      assert.equal(calls.filter(([name, image]) => name === 'drawImage' && image === bumblebeeImage).length, 12);
+    }
+  }
+});
+
+test('Bumblebee climbs fires and freezes animation state with the original controls', () => {
+  const state = createOriginalState('bumblebee', CAMPAIGN[0]);
+  const climb = state.world.climbs[0];
+  Object.assign(state.player, { x: climb.x - 17, y: climb.bottom - 46, vx: 0, vy: 0, grounded: true });
+  const startY = state.player.y;
+  for (let frame = 0; frame < 35; frame += 1) update(state, { up: true }, 1 / 120);
+  assert.ok(state.player.y < startY);
+  assert.equal(state.party.actors.bumblebee.climbing, climb.id);
+  setPaused(state, true);
+  const before = bumblebeePose(state.party.actors.bumblebee, state.time);
+  update(state, { up: true, attackPressed: true }, 1);
+  assert.deepEqual(bumblebeePose(state.party.actors.bumblebee, state.time), before);
+  setPaused(state, false);
+  update(state, { jumpPressed: true, jumpHeld: true }, 1 / 120);
+  assert.equal(state.player.climbing, null);
+  assert.ok(state.player.vy < 0);
+  state.combat.blaster = true;
+  const events = update(state, { fire: true, attackPressed: true }, 1 / 120);
+  assert.ok(events.some(event => event.type === 'shoot'));
+  assert.ok(events.some(event => event.type === 'melee' && event.character === 'bumblebee' && event.kind === 'pulse'));
+  assert.ok(state.combat.shots.some(projectile => projectile.owner === 'player'));
+  const actor = state.party.actors.bumblebee;
+  const pose = bumblebeePose(actor, state.time, false, { extension: 1 });
+  assert.notDeepEqual(pose.microphone, bumblebeePose({ ...actor, attack: null }, state.time).microphone);
+});
 
 test('the boss collection has distinct textured transparent atlases built from the original robot', () => {
   const source = readFileSync(new URL('../images/Boss1-rig.png', import.meta.url));

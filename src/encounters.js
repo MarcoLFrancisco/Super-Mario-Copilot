@@ -104,8 +104,8 @@ export const ENCOUNTERS = freeze({
   pickups: [protection('protection-inbox', 4, 320), protection('protection-teams', 8, 350)],
   // Power-ups and recruits never increment productivity counters.
   // Recruitment slots are resolved before blocks can release their pickups.
-  rewardTypes: ['blaster', 'microsoft', 'recruit-first', 'recruit-second',
-    'helper-marco', 'helper-donkey', 'helper-mario']
+  rewardTypes: ['blaster', 'microsoft', 'recruit-first', 'recruit-second', 'recruit-third',
+    'helper-marco', 'helper-donkey', 'helper-mario', 'helper-bumblebee']
 });
 
 // Arena uses its own coordinate space. Enter it at the world beacon; do not

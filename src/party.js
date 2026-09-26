@@ -11,17 +11,21 @@ export const CHARACTERS = Object.freeze({
   donkey: Object.freeze({ id: 'donkey', name: 'Donkey', role: 'helper',
     reward: 'helper-donkey', offset: -52 }),
   mario: Object.freeze({ id: 'mario', name: 'Mario', role: 'helper',
-    reward: 'helper-mario', offset: -96 })
+    reward: 'helper-mario', offset: -96 }),
+  bumblebee: Object.freeze({ id: 'bumblebee', name: 'Bumblebee', role: 'helper',
+    reward: 'helper-bumblebee', offset: -140 })
 });
 
-export const HELPER_IDS = Object.freeze(['donkey', 'mario']);
+export const HELPER_IDS = Object.freeze(['donkey', 'mario', 'bumblebee']);
 export const ATTACKS = Object.freeze({
   punch: Object.freeze({ duration: .28, cooldown: .36, start: .07, end: .19,
     reach: 30, height: 22, top: 12, damage: 1, backward: false }),
   kick: Object.freeze({ duration: .38, cooldown: .46, start: .1, end: .27,
     reach: 46, height: 24, top: 19, damage: 2, backward: false }),
   backKick: Object.freeze({ duration: .44, cooldown: .85, start: .12, end: .32,
-    reach: 56, height: 26, top: 16, damage: 3, backward: true })
+    reach: 56, height: 26, top: 16, damage: 3, backward: true }),
+  pulse: Object.freeze({ duration: .36, cooldown: .6, start: .12, end: .24,
+    reach: 38, height: 24, top: 12, damage: 1, backward: false })
 });
 
 function makeActor(id) {
@@ -51,7 +55,7 @@ export function initializeIndependentParty(party, player, context) {
 }
 
 export function nextAttackKind(actor) {
-  return actor.id === 'donkey' ? 'backKick'
+  return actor.id === 'bumblebee' ? 'pulse' : actor.id === 'donkey' ? 'backKick'
     : actor.id === 'mario' || actor.nextKick ? 'kick' : 'punch';
 }
 

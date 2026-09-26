@@ -87,7 +87,7 @@ function drawCombatScene(ctx, state, reducedMotion, visible) {
   }
   // Steady translucency conveys damage grace without rapid flashing.
   if (combat.grace > 0 && combat.protection <= 0) ctx.globalAlpha = .65;
-  drawParty(ctx, state.party, state.time, reducedMotion);
+  drawParty(ctx, state.party, state.time, reducedMotion, state.partyDialogue.current?.character);
   if (combat.blaster) {
     const facing = state.party.actors[state.party.leader].facing;
     const x = facing < 0 ? player.x - 6 : player.x + PHYSICS.playerWidth - 5;

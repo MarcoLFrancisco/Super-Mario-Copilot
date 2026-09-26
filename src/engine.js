@@ -54,7 +54,7 @@ export function createState(leader = 'marco', mission = {}) {
   };
   const recruits = companionIds(state.party);
   for (const block of state.blocks.blocks) {
-    const slot = ['recruit-first', 'recruit-second'].indexOf(block.reward);
+    const slot = ['recruit-first', 'recruit-second', 'recruit-third'].indexOf(block.reward);
     if (slot !== -1) block.reward = `helper-${recruits[slot]}`;
   }
   initializeIndependentParty(state.party, player, partyContext(state));

@@ -8,7 +8,8 @@ import { INTERLUDES } from '../src/arcade.js';
 import { createBoss, hitBoss, updateBoss, bossWeakPoint } from '../src/boss.js';
 import { createCombat, updateCombat } from '../src/combat.js';
 import { createDialogue, updateDialogue, sayBoss } from '../src/boss-dialogue.js';
-import { unlockHelper } from '../src/party.js';
+import { unlockHelper, CHARACTERS, companionIds } from '../src/party.js';
+import { resolveBlockY } from '../src/blocks.js';
 import { worldMusicStep } from '../src/music.js';
 import { interact, updateMission, missionReady, missionStations, stationStatus, stationLabel, missionObjective } from '../src/missions.js';
 import { submitWork, workView, prepareQuiz, validateQuiz, validQuizOverrides } from '../src/trivia-tasks.js';
@@ -521,7 +522,7 @@ test('the campaign has eight distinct sequential worlds with original-party stat
   for (const mission of CAMPAIGN.filter(mission => mission.type === 'platform')) {
     const state = createState('mario', mission);
     assert.equal(state.party.leader, 'mario');
-    assert.equal(Object.keys(state.party.actors).length, 3);
+    assert.equal(Object.keys(state.party.actors).length, 4);
     assert.equal(state.world.checkpoints.length, 4);
     assert.ok(state.world.width > 8000);
     assert.ok(state.combat.enemies.length >= 8);
@@ -581,7 +582,67 @@ test('reward blocks have jumping clearance and stay out of platforms and climb l
           || block.y + block.h < climb.top || block.y > climb.bottom, `${block.id}: obstructs ${climb.id}`);
       }
     }
-    assert.equal(mission.encounters.blocks.filter(block => block.reward?.startsWith('recruit-')).length, 2);
+    assert.equal(mission.encounters.blocks.filter(block => block.reward?.startsWith('recruit-')).length, 3);
+  }
+});
+
+test('Bumblebee joins a four-character campaign roster through real recruitment boxes and saves', () => {
+  for (const leader of Object.keys(CHARACTERS)) {
+    const campaign = createCampaign(leader);
+    const state = campaign.run;
+    state.combat.enemies = [];
+    const boxes = state.blocks.blocks.filter(block => block.reward?.startsWith('helper-'));
+    assert.equal(boxes.length, 3);
+    assert.deepEqual(boxes.map(block => block.reward.slice(7)).sort(), companionIds(state.party).sort());
+    for (const box of boxes) {
+      Object.assign(state.player, { x: box.x, y: box.y + box.h - 1, vx: 0, vy: -100 });
+      resolveBlockY(state.blocks, state.player, box.y + box.h + 2);
+      const pickup = state.blocks.pickups.find(item => item.id === `reward-${box.id}`);
+      assert.ok(pickup, box.id);
+      Object.assign(state.player, { x: pickup.x, y: pickup.y, vx: 0, vy: 0 });
+      const events = updateCampaign(campaign, {}, 1 / 120);
+      assert.equal(events.filter(event => event.type === 'helperUnlocked').length, 1);
+      assert.ok(state.party.unlocked.has(box.reward.slice(7)));
+      assert.equal(updateCampaign(campaign, {}, 1 / 120).filter(event => event.type === 'helperUnlocked').length, 0);
+    }
+    assert.equal(campaign.recruits.size, 3);
+    state.player.y = state.world.deathY + 1;
+    updateCampaign(campaign, {}, 1 / 120);
+    assert.equal(state.deaths, 1);
+    assert.equal(state.party.unlocked.size, 3);
+    const saved = saveCampaign(campaign);
+    const restored = createCampaign(saved.leader, saved);
+    assert.equal(restored.leader, leader);
+    assert.deepEqual([...restored.run.party.unlocked].sort(), [...campaign.recruits].sort());
+    assert.ok([...restored.run.party.unlocked].every(id => restored.run.party.actors[id].ai));
+  }
+  const previousSave = createCampaign('marco', { leader: 'marco', current: 1, unlocked: 1, recruits: ['mario', 'donkey'], blaster: true });
+  assert.deepEqual([...previousSave.recruits].sort(), ['donkey', 'mario']);
+  assert.equal(previousSave.run.party.unlocked.has('bumblebee'), false);
+  assert.ok(previousSave.run.blocks.blocks.some(block => block.reward === 'helper-bumblebee'));
+});
+
+test('Bumblebee selection carries through all worlds interludes and the final saucer', () => {
+  const campaign = createCampaign('bumblebee', { unlocked: 7, recruits: ['marco', 'mario', 'donkey'], blaster: true });
+  for (let index = 0; index < 8; index += 1) {
+    assert.equal(selectLevel(campaign, index), true);
+    assert.equal(campaign.run.pilot, 'bumblebee');
+    if (campaign.run.party) {
+      assert.equal(campaign.run.party.leader, 'bumblebee');
+      assert.equal(campaign.run.party.unlocked.size, 3);
+    }
+  }
+  campaign.run.status = 'complete';
+  assert.ok(updateCampaign(campaign, {}, 1 / 60).some(event => event.type === 'finaleStart'));
+  assert.equal(campaign.run.mode, 'orbit');
+  assert.equal(campaign.run.pilot, 'bumblebee');
+  for (const level of [1, 2, 4, 5]) {
+    assert.equal(selectInterlude(campaign, level), true);
+    assert.equal(campaign.run.pilot, 'bumblebee');
+    const saved = saveCampaign(campaign);
+    const restored = createCampaign(saved.leader, saved);
+    assert.equal(restored.run.pilot, 'bumblebee');
+    assert.equal(restored.interlude, campaign.interlude);
   }
 });
 

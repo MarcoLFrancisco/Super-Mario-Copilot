@@ -1,7 +1,7 @@
 # Copilot Cloud Quest
 
 An eight-world Microsoft AI-themed campaign with four arcade interludes extending the original platform game.
-Choose **Marco, Mario, or Donkey**, recruit the other two, and keep your existing
+Choose **Marco, Mario, Donkey, or Bumblebee**, recruit the other three, and keep your existing
 combat, blaster, checkpoints, and companions as you travel through the worlds.
 There are no replacement protagonists or separate Campus/Team Quest/Orbit modes.
 
@@ -391,13 +391,47 @@ inside the playfield.
 ## Team And Recovery
 
 Hit recruitment surprise boxes from below, then collect the released reward.
-The two recruitment slots belong to the non-selected original characters.
+Three campaign recruitment slots belong to the non-selected characters. The
+first two boxes keep their existing IDs and original recruits; the third is
+placed along the third chapter's main route. Older saves keep their selected
+leader, existing teammates, equipment, scores, and unlocked levels.
 Recruits, your selected leader, and earned blaster equipment carry into later
 levels. Companions retain the original independent navigation and combat rules.
 Recruited companions now pursue nearby reachable items, share pickup points and
 power-ups with the leader, and keep attacking nearby opponents automatically.
 There is no player-kill prerequisite for ordinary helper damage. Existing attack
 cooldowns, walls, boss support caps, and the player finishing blow remain in place.
+
+### Bumblebee
+
+Select **Bumblebee** in the Leader menu before starting, or recruit him from
+the third surprise box when playing one of the original heroes. His artwork
+uses the supplied [images/BBRich.png](images/BBRich.png), including the cap,
+blue headset, Microsoft-color chest panels, gold chain, and BB pendant. The
+earlier [images/BB.png](images/BB.png) is not used for his sprite.
+
+A transparent 12-part rig animates the face, blinking eyes, speaking mouth,
+headset, microphone, cap, chain, and pendant independently. Hover-thruster
+motion responds to movement, jumping, climbing, and boost; the original image
+has no legs, so no replacement limbs are drawn. Lettering stays readable in
+both facing directions. Pause freezes animation with simulation time, while
+reduced motion suppresses decorative blinking and idle sway.
+
+The usual movement, jump, keyboard climbing, boost, and blaster controls work
+unchanged. **J / Attack** produces a short-range headset pulse with one damage
+and a 0.6-second cooldown. Companions use the same automatic navigation,
+collection, and support limits; Bumblebee cannot bypass boss shields or take
+the player's finishing blow. He remains the selected pilot in interludes,
+Azure Orbit, and the finale; Invaders still uses its spacecraft artwork.
+
+[scripts/build-bumblebee-rig.swift](scripts/build-bumblebee-rig.swift) generates
+the included atlas and metadata from BBRich on macOS. Run
+`swift scripts/build-bumblebee-rig.swift` only when rebuilding artwork, then
+`npm run build` and `npm test`. `--preview` writes a neutral-pose asset preview
+to the system temporary directory. Original image files are not modified.
+The generator checks preserved features and neutral-pose reconstruction;
+tests cover actual recruitment, saves, controls, companion combat, and drawing.
+In-game appearance and animation still need human visual validation.
 
 Falling or losing all three health points returns you to the current checkpoint.
 World retries retain collected items, used bricks, defeated enemies, completed
@@ -486,6 +520,7 @@ recorded dialogue from the broader concept are not implemented.
 - [scripts/build-boss-collection.swift](scripts/build-boss-collection.swift): reproducible boss atlas generation from the supplied robot textures.
 - [src/arcade.js](src/arcade.js) and [src/arcade-art.js](src/arcade-art.js): orbital Invaders waves, abilities, upgrades, defense nodes, the core encounter, and Copilot-bubble interludes.
 - [src/party.js](src/party.js) and [src/party-art.js](src/party-art.js): the original team and character artwork.
+- [src/bumblebee-art.js](src/bumblebee-art.js): the BBRich sprite rig, facial animation, hover motion, and headset pulse presentation.
 - [src/orbit.js](src/orbit.js) and [src/orbit-art.js](src/orbit-art.js): saucer physics and the selected original pilot.
 - [src/main.js](src/main.js): campaign UI, input, decisions, preferences, and lifecycle.
 - [src/audio.js](src/audio.js) and [src/music.js](src/music.js): original synthesized audio and world arrangements.

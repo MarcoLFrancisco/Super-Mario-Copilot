@@ -5,37 +5,44 @@ const lines = {
   start: [
     ['marco', '📨 Copilot, summarize these emails. Especially the meeting about fewer meetings.'],
     ['mario', '🧑‍💻 GitHub Copilot, help with the hard tasks. My specialty is plumbing!'],
-    ['donkey', '🐴 Team ready. I handle backend problems. Literally.']
+    ['donkey', '🐴 Team ready. I handle backend problems. Literally.'],
+    ['bumblebee', 'Bumblebee online. Style checks passed.']
   ],
   collect: [
     ['marco', '📨 Let’s process these emails with Copilot. Reply-all is the real boss.'],
     ['mario', '📊 Another spreadsheet! Is the treasure in column X?'],
-    ['donkey', '💬 This Teams meeting could have been a carrot.']
+    ['donkey', '💬 This Teams meeting could have been a carrot.'],
+    ['bumblebee', 'Another task cleared. The chain stays gold.']
   ],
   combat: [
     ['donkey', '🐴 Bug report closed by the rear department. 💥'],
     ['marco', '🥊 That bug failed its kickboxing review.'],
-    ['mario', '🐛 GitHub Copilot, suggest a fix. I’ll handle the kick!']
+    ['mario', '🐛 GitHub Copilot, suggest a fix. I’ll handle the kick!'],
+    ['bumblebee', 'Bug silenced. Headset still on.']
   ],
   checkpoint: [
     ['marco', '☁️ Progress saved. Unlike that document named FINAL_final_v7.'],
     ['mario', '✅ Checkpoint reached. Finally, a reliable restore point!'],
-    ['donkey', '🥕 Backup complete. Please back up my carrots too.']
+    ['donkey', '🥕 Backup complete. Please back up my carrots too.'],
+    ['bumblebee', 'Checkpoint saved. Even my backup has bling.']
   ],
   recover: [
     ['donkey', '🐴 Reconnected! Have you tried turning the donkey off and on?'],
     ['marco', '🔄 That was a surprise code review from gravity.'],
-    ['mario', '☁️ Cloud recovery! Much softer than the landing.']
+    ['mario', '☁️ Cloud recovery! Much softer than the landing.'],
+    ['bumblebee', 'Reconnected. That fall was not in my playlist.']
   ],
   boss: [
     ['marco', '🤖 Copilot, summarize this boss in one word: yikes.'],
     ['mario', '🧑‍💻 Hard task detected. GitHub Copilot, let’s pair on this!'],
-    ['donkey', '🐴 Big bug. Same rear-end support package.']
+    ['donkey', '🐴 Big bug. Same rear-end support package.'],
+    ['bumblebee', 'Big processor. Small confidence interval.']
   ],
   complete: [
     ['marco', '🎉 Inbox zero bugs! The actual inbox still has 4,000 emails.'],
     ['mario', '🚀 Shipped it! Now who reviews the victory dance?'],
-    ['donkey', '🥕 Sprint complete. Scheduling a carrot retrospective.']
+    ['donkey', '🥕 Sprint complete. Scheduling a carrot retrospective.'],
+    ['bumblebee', 'Mission complete. Gold-standard teamwork.']
   ]
 };
 for (const group of Object.values(lines)) {
@@ -43,7 +50,7 @@ for (const group of Object.values(lines)) {
   Object.freeze(group);
 }
 export const PARTY_LINES = Object.freeze(lines);
-const IDS = Object.freeze(['marco', 'mario', 'donkey']);
+const IDS = Object.freeze(['marco', 'mario', 'donkey', 'bumblebee']);
 const PRIORITY = Object.freeze({
   start: 2, collect: 0, combat: 0, checkpoint: 1,
   recover: 1, boss: 3, complete: 4

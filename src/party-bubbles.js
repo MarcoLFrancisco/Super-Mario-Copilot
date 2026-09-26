@@ -2,8 +2,8 @@ import { VIEW, PHYSICS as P } from './level.js';
 
 // Presentation only. Accepts party-dialogue.js's current caption and the
 // currently present actors. Does not infer unlocks, advance timers, or speak.
-const LABELS = Object.freeze({ marco: 'Marco', mario: 'Mario', donkey: 'Donkey' });
-const COLORS = Object.freeze({ marco: '#087f86', mario: '#b5283d', donkey: '#685179' });
+const LABELS = Object.freeze({ marco: 'Marco', mario: 'Mario', donkey: 'Donkey', bumblebee: 'Bumblebee' });
+const COLORS = Object.freeze({ marco: '#087f86', mario: '#b5283d', donkey: '#685179', bumblebee: '#126aa2' });
 const FONT = '"Segoe UI", "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const segmenter = typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function'

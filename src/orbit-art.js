@@ -31,7 +31,7 @@ function drawSaucer(ctx, state, reducedMotion) {
   ctx.fillStyle = '#b7ebed22'; ctx.strokeStyle = '#bfe8e1'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.ellipse(paddle.x, hullY - 2, 39, 48, 0, Math.PI, Math.PI * 2); ctx.fill(); ctx.stroke();
   drawPartyActor(ctx, { id: state.pilot ?? 'marco', x: paddle.x - 17, y: paddle.y - 10, vx: 0, vy: 0,
-    facing: 1, grounded: true, boostTime: 0, attack: null }, state.time, true);
+    facing: 1, grounded: true, boostTime: 0, attack: null }, state.time, reducedMotion);
   ctx.strokeStyle = '#6cd5c0'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(paddle.x - 17, hullY - 18); ctx.lineTo(paddle.x - 29, hullY - 6); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(paddle.x + 11, hullY - 15); ctx.lineTo(paddle.x + 16, hullY - 6); ctx.stroke();
